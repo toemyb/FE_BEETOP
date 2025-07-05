@@ -1,16 +1,18 @@
+// layout/AppLayout.jsx
 import React, { useState } from 'react';
 import { Layout } from 'antd';
-import AppSider from './Menu';
-import AppHeader from './Header';
+import AppSider from './Menu'; // Assuming this is your sidebar component
+import AppHeader from './Header'; // Your updated AppHeader component
 
 const { Content } = Layout;
 
-const AppLayout = ({ children }) => {
+// Accept user and onLogout props
+const AppLayout = ({ children, user, onLogout }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* Sidebar cố định */}
+      {/* Fixed Sidebar */}
       <Layout.Sider
         width={250}
         collapsible
@@ -29,16 +31,17 @@ const AppLayout = ({ children }) => {
         <AppSider collapsed={collapsed} />
       </Layout.Sider>
 
-      {/* Phần nội dung */}
+      {/* Main content area */}
       <Layout style={{ marginLeft: collapsed ? 80 : 250 }}>
-        <AppHeader collapsed={collapsed} setCollapsed={setCollapsed} />
+        {/* Pass user and onLogout to AppHeader */}
+        <AppHeader collapsed={collapsed} setCollapsed={setCollapsed} user={user} onLogout={onLogout} />
 
         <Content
           style={{
             margin: 16,
             padding: 16,
             background: '#fff',
-            height: 'calc(100vh - 64px)', // 64px là chiều cao Header mặc định
+            height: 'calc(100vh - 64px)', // 64px is default Header height
             overflow: 'auto',
           }}
         >
