@@ -5,6 +5,7 @@ import { Form, Input, Button, Select, Card, message } from 'antd';
 
 const AddCpuComponent = () => {
   const [idCpu, setidCpu] = useState('');
+  const [form] = Form.useForm();
   const [ten, setten] = useState('');
   const [moTa, setmoTa] = useState('');
   const [trangThai, settrangThai] = useState(1);
@@ -24,6 +25,14 @@ const AddCpuComponent = () => {
   };
 
   useEffect(() => {
+
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || user.role !== 'ADMIN') {
+      message.error('Bạn không có quyền truy cập trang này!');
+      navigator('/login');
+      return;
+    }
+    
     if (id) {
       getAllById(id)
         .then((response) => {
@@ -40,7 +49,7 @@ const AddCpuComponent = () => {
     } else {
       generateIdCpu();
     }
-  }, [id]);
+  }, [id, form, navigator]);
 
   const onFinish = () => {
     const cpu = {

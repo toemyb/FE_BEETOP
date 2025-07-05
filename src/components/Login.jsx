@@ -1,65 +1,54 @@
-// src/components/Login.js
 import React, { useState } from "react";
 import { message } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Input, Button, Form } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
+import api from '../service/api';
 
 const Login = ({ setToken, setUser }) => {
-  const [tenDangNhap, setTenDangNhap] = useState("");
-  const [matKhau, setMatKhau] = useState("");
   const [err, setErr] = useState("");
-
   const navigate = useNavigate();
 
-  const handleSubmit = async () => { // Changed to async function for onFinish
+  const handleSubmit = async (values) => {
     setErr("");
-
     try {
-      const res = await fetch("/auth/signin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include", // Ensure cookies/credentials are sent if needed
-        body: JSON.stringify({ tenDangNhap, matKhau }),
+      const res = await api.post("/auth/signin", {
+        tenDangNhap: values.username,
+        matKhau: values.password,
       });
-      const data = res.headers.get("content-type")?.includes("application/json") ? await res.json() : {};
 
-      if (res.ok && data.meta?.tokenInfo?.accessToken) {
-        // Store access token
-        localStorage.setItem('accessToken', data.meta.tokenInfo.accessToken); // Corrected: Store accessToken
-        setToken(data.meta.tokenInfo.accessToken); // Update state
+      const { data, meta } = res.data;
+      const { accessToken, refreshToken } = meta.tokenInfo;
 
-        if (data.data) {
-          const loggedInUser = {
-            ten: data.data.ten || data.data.tenDangNhap,
-            tenDangNhap: data.data.tenDangNhap,
-            email: data.data.email,
-            soDienThoai: data.data.soDienThoai,
-            gioiTinh: data.data.gioiTinh,
-            ngaySinh: data.data.ngaySinh,
-            // Convert role from backend (e.g., "admin", "staff") to uppercase ("ADMIN", "STAFF")
-            role: data.data.tenChucVu ? data.data.tenChucVu.toUpperCase() : 'USER',
-          };
-          localStorage.setItem('user', JSON.stringify(loggedInUser));
-          setUser(loggedInUser);
-        } else {
-          message.warning('Đăng nhập thành công nhưng không lấy được thông tin người dùng chi tiết.');
-          // Provide a default user with a 'USER' role if detailed data is missing
-          const defaultUser = { ten: tenDangNhap, tenDangNhap: tenDangNhap, role: 'USER' };
-          setUser(defaultUser);
-          localStorage.setItem('user', JSON.stringify(defaultUser));
-        }
+      // Store tokens
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+      setToken(accessToken);
 
-        message.success('Đăng nhập thành công!');
-        navigate('/admin/thong-ke'); // Redirect to admin dashboard after successful login
+      const loggedInUser = {
+        ten: data.ten || data.tenDangNhap || values.username,
+        tenDangNhap: data.tenDangNhap,
+        email: data.email,
+        soDienThoai: data.soDienThoai,
+        gioiTinh: data.gioiTinh,
+        ngaySinh: data.ngaySinh,
+        role: data.tenChucVu ? data.tenChucVu.toUpperCase() : 'USER',
+      };
+      localStorage.setItem('user', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+
+      message.success('Đăng nhập thành công!');
+      // Redirect based on role
+      if (loggedInUser.role === 'KHACH_HANG') {
+        navigate('/customer/home');
       } else {
-        setErr(data.message || "Tên đăng nhập hoặc mật khẩu không đúng.");
-        message.error(data.message || "Đăng nhập thất bại!");
+        navigate('/admin/thong-ke');
       }
-    } catch (networkError) {
-      setErr("Lỗi mạng: Không thể kết nối đến máy chủ.");
-      message.error("Lỗi mạng: Không thể kết nối đến máy chủ!");
-      console.error("Network error:", networkError);
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Tên đăng nhập hoặc mật khẩu không đúng.';
+      setErr(errorMessage);
+      message.error(errorMessage);
+      console.error('Login error:', error);
     }
   };
 
@@ -70,29 +59,25 @@ const Login = ({ setToken, setUser }) => {
         name="login"
         initialValues={{ remember: true }}
         layout="vertical"
-        onFinish={handleSubmit} // Use onFinish for Ant Design Form
+        onFinish={handleSubmit}
       >
         <Form.Item
-          name="username" // Name for Ant Design Form.Item
+          name="username"
           rules={[{ required: true, message: 'Vui lòng nhập Tên đăng nhập hoặc Email!' }]}
         >
           <Input
             prefix={<UserOutlined />}
             placeholder="Tên đăng nhập hoặc Email"
-            value={tenDangNhap}
-            onChange={(e) => setTenDangNhap(e.target.value)}
           />
         </Form.Item>
 
         <Form.Item
-          name="password" // Name for Ant Design Form.Item
+          name="password"
           rules={[{ required: true, message: 'Vui lòng nhập Mật khẩu!' }]}
         >
           <Input.Password
             prefix={<LockOutlined />}
             placeholder="Mật khẩu"
-            value={matKhau}
-            onChange={(e) => setMatKhau(e.target.value)}
           />
         </Form.Item>
 
@@ -105,9 +90,7 @@ const Login = ({ setToken, setUser }) => {
 
       <Button
         type="default"
-        onClick={() =>
-          (window.location.href = "http://localhost:8080/oauth2/authorization/google")
-        }
+        onClick={() => (window.location.href = "http://localhost:8080/oauth2/authorization/google")}
         style={{
           width: '100%',
           backgroundColor: "#db4437",
@@ -123,28 +106,18 @@ const Login = ({ setToken, setUser }) => {
 
       <div style={{ marginTop: 15, textAlign: 'center' }}>
         <p>
-          <a
-            style={{ cursor: 'pointer', color: '#1890ff' }}
-            onClick={() => navigate('/')}
-          >
+          <a style={{ cursor: 'pointer', color: '#1890ff' }} onClick={() => navigate('/')}>
             Quay lại Trang chủ
           </a>
         </p>
-
         <p>
-          <a
-            style={{ cursor: 'pointer', color: '#1890ff' }}
-            onClick={() => navigate('/forgot-password')}
-          >
+          <a style={{ cursor: 'pointer', color: '#1890ff' }} onClick={() => navigate('/forgot-password')}>
             Quên mật khẩu?
           </a>
         </p>
         <p>
           Chưa có tài khoản?{" "}
-          <a
-            style={{ cursor: 'pointer', color: '#1890ff' }}
-            onClick={() => navigate('/register')}
-          >
+          <a style={{ cursor: 'pointer', color: '#1890ff' }} onClick={() => navigate('/register')}>
             Đăng ký ngay
           </a>
         </p>

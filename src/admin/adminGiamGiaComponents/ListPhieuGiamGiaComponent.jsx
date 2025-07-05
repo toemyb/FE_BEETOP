@@ -31,6 +31,18 @@ const ListPhieuGiamGiaComponent = () => {
 
   const renderStatus = (status) => statusMap[status] || <span className="badge bg-light text-dark">Không rõ</span>;
 
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (!user || user.role !== 'ADMIN') {
+      message.error('Bạn không có quyền truy cập trang này!');
+      navigator('/login');
+      return;
+    }
+
+    fetchPagedVouchers(0);
+  }, [navigator]);
+  
   const fetchPagedVouchers = (page) => {
     getPagedVouchers(page, size)
       .then((res) => {
