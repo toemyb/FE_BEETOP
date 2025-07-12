@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Menu from './layout/Menu'
 import './App.css'
 import AppLayout from './layout/AppLayout'
@@ -38,6 +40,15 @@ function App() {
       <Router>
 
         <AppLayout>
+
+          <ToastContainer
+            position="top-right" // Hiển thị ở góc trên bên phải
+            autoClose={3000}     // Tự tắt sau 3 giây
+            hideProgressBar={false}
+            closeOnClick
+            pauseOnHover
+            theme="light"
+          />
 
           <Routes>
 
