@@ -7,7 +7,7 @@ const { Header } = Layout;
 
 const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
   const {
-    token: { colorBgContainer },
+    token: { colorBgContainer, colorPrimary, colorTextBase },
   } = theme.useToken();
 
   const navigate = useNavigate();
@@ -43,6 +43,7 @@ const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)', // Thêm bóng đổ nhẹ
       }}
     >
       <Button
@@ -55,7 +56,7 @@ const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
         <Button
           type="text"
           icon={<BellOutlined />}
-          style={{ fontSize: '16px', width: 40, height: 40 }}
+          style={{ fontSize: '16px', width: 40, height: 40, color: colorTextBase }}
         />
         {user && user.ten ? (
           <Dropdown
@@ -64,18 +65,48 @@ const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
             placement="bottomRight"
           >
             <div
-              style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                gap: '12px',
+                padding: '4px 8px',
+                background: '#fff', // Nền trắng cho phần thông tin
+                borderRadius: '8px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)', // Bóng nhẹ
+                transition: 'all 0.3s',
+              }}
               onClick={(e) => e.preventDefault()}
+              onMouseEnter={(e) => (e.currentTarget.style.background = colorBgContainer)}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
             >
-              <Avatar style={{ backgroundColor: 'silver' }} icon={<UserOutlined />} />
-              <span style={{ fontWeight: 'bold' }}>{user.ten}</span>
+              <Avatar
+                src={user.anh || 'https://via.placeholder.com/40'}
+                style={{
+                  backgroundColor: user.anh ? 'transparent' : colorPrimary,
+                  border: user.anh ? '1px solid #ddd' : 'none',
+                }}
+                icon={!user.anh && <UserOutlined />}
+                size={40}
+              />
+              <div style={{ lineHeight: '1.2' }}>
+                <span style={{ fontWeight: 'bold', color: colorTextBase }}>{user.ten}</span>
+                <div style={{ fontSize: '13px', color: '#666', marginTop: '2px' }}>
+                  {user.role || 'Không có vai trò'}
+                </div>
+              </div>
             </div>
           </Dropdown>
         ) : (
           <Avatar
-            style={{ backgroundColor: 'silver', cursor: 'pointer' }}
+            style={{
+              backgroundColor: colorPrimary,
+              cursor: 'pointer',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            }}
             icon={<UserOutlined />}
             onClick={handleLoginClick}
+            size={40}
           />
         )}
       </div>

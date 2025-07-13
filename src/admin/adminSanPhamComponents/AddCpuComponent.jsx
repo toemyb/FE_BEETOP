@@ -26,7 +26,7 @@ const AddCpuComponent = () => {
 
   useEffect(() => {
 
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(sessionStorage.getItem('user'));
     if (!user || user.role !== 'ADMIN') {
       message.error('Bạn không có quyền truy cập trang này!');
       navigator('/login');

@@ -12,7 +12,7 @@ const api = axios.create({
 // Request interceptor để thêm token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('accessToken');
+    const token = sessionStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -26,34 +26,38 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    
+    // Chỉ xử lý lỗi 401 cho các request không phải là refresh token
+    if (error.response?.status === 401 && !originalRequest._retry && 
+        !originalRequest.url.includes('/auth/refresh')) {
       originalRequest._retry = true;
+      
       try {
         const response = await axios.post(
           'http://localhost:8080/auth/refresh',
           {},
-          { withCredentials: true }
+          { 
+            withCredentials: true,
+            
+          }
         );
+        
         const { accessToken, refreshToken } = response.data.data;
-
-        // Lưu token mới
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-
-        // Thêm token mới vào yêu cầu gốc
+        
+        // Lưu token mới vào sessionStorage của tab hiện tại
+        sessionStorage.setItem('accessToken', accessToken);
+        sessionStorage.setItem('refreshToken', refreshToken);
+        
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
-        message.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('user');
+        // Xử lý lỗi refresh token
+        sessionStorage.removeItem('accessToken');
+        sessionStorage.removeItem('refreshToken');
+        sessionStorage.removeItem('user');
         window.location.href = '/login';
-        return Promise.reject(referror);
+        return Promise.reject(refreshError);
       }
-    } else if (error.response?.status === 403) {
-      message.error('Bạn không có quyền truy cập tài nguyên này!');
-      window.location.href = '/';
     }
     return Promise.reject(error);
   }

@@ -7,19 +7,20 @@ const Profile = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    } else {
-      // If user data is not found, redirect to login page
-      navigate('/login');
-    }
-  }, [navigate]);
+  const userData = sessionStorage.getItem('user');
+  if (userData) {
+    const parsedUser = JSON.parse(userData);
+    console.log('User data:', parsedUser); // Kiểm tra trong console
+    setUser(parsedUser);
+  } else {
+    navigate('/login');
+  }
+}, [navigate]);
 
   if (!user) return <div>Đang tải thông tin...</div>;
 
   return (
-    <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px' }}> {/* Added padding for better spacing */}
+    <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px' }}>
       <h2>Thông tin cá nhân</h2>
       <div style={{
         background: '#f5f5f5',
@@ -29,7 +30,7 @@ const Profile = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <img
-            src={user.anh || '/default-avatar.png'}
+            src={user.anh || 'https://via.placeholder.com/100'} // Fallback ảnh mặc định
             alt="Avatar"
             style={{
               width: 100,
@@ -38,30 +39,27 @@ const Profile = () => {
               objectFit: 'cover',
               marginRight: 20
             }}
+            onError={(e) => { e.target.src = 'https://via.placeholder.com/100'; }} // Xử lý lỗi tải ảnh
           />
           <div>
-            <h3>{user.ten}</h3>
+            <h3>{user.ten || 'Không có tên'}</h3>
           </div>
         </div>
 
         <div style={{ marginBottom: 10 }}>
-          <strong>Tên đăng nhập:</strong> {user.tenDangNhap}
+          <strong>Email:</strong> {user.email || 'Không có email'}
         </div>
         <div style={{ marginBottom: 10 }}>
-          <strong>Email:</strong> {user.email}
+          <strong>Số điện thoại:</strong> {user.soDienThoai || 'Không có số'}
         </div>
         <div style={{ marginBottom: 10 }}>
-          <strong>Số điện thoại:</strong> {user.soDienThoai}
+          <strong>Giới tính:</strong> {user.gioiTinh || 'Không xác định'}
         </div>
         <div style={{ marginBottom: 10 }}>
-          <strong>Giới tính:</strong> {user.gioiTinh}
+          <strong>Ngày sinh:</strong> {user.ngaySinh || 'Không có ngày'}
         </div>
         <div style={{ marginBottom: 10 }}>
-          <strong>Ngày sinh:</strong> {user.ngaySinh}
-        </div>
-        <div style={{ marginBottom: 10 }}>
-          {/* Changed user.tenChucVu to user.role */}
-          <strong>Chức vụ:</strong> {user.role}
+          <strong>Chức vụ:</strong> {user.role || 'Không có vai trò'}
         </div>
       </div>
     </div>

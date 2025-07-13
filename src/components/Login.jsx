@@ -9,21 +9,20 @@ const Login = ({ setToken, setUser }) => {
   const [err, setErr] = useState("");
   const navigate = useNavigate();
 
-  const handleSubmit = async (values) => {
-    setErr("");
-    try {
-      const res = await api.post("/auth/signin", {
-        tenDangNhap: values.username,
-        matKhau: values.password,
-      });
+ const handleSubmit = async (values) => {
+  try {
+    const res = await api.post("/auth/signin", {
+      tenDangNhap: values.username,
+      matKhau: values.password,
+    });
 
-      const { data, meta } = res.data;
-      const { accessToken, refreshToken } = meta.tokenInfo;
+    const { data, meta } = res.data;
+    const { accessToken, refreshToken } = meta.tokenInfo;
 
-      // Store tokens
-      localStorage.setItem('accessToken', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      setToken(accessToken);
+    // Sử dụng sessionStorage thay vì localStorage
+    sessionStorage.setItem('accessToken', accessToken);
+    sessionStorage.setItem('refreshToken', refreshToken);
+    setToken(accessToken);
 
       const loggedInUser = {
         ten: data.ten || data.tenDangNhap || values.username,
@@ -33,9 +32,11 @@ const Login = ({ setToken, setUser }) => {
         gioiTinh: data.gioiTinh,
         ngaySinh: data.ngaySinh,
         role: data.tenChucVu ? data.tenChucVu.toUpperCase() : 'USER',
+        anh: data.anh || null // Thêm trường anh
       };
-      localStorage.setItem('user', JSON.stringify(loggedInUser));
-      setUser(loggedInUser);
+      
+       sessionStorage.setItem('user', JSON.stringify(loggedInUser));
+    setUser(loggedInUser);
 
       message.success('Đăng nhập thành công!');
       // Redirect based on role
@@ -63,11 +64,11 @@ const Login = ({ setToken, setUser }) => {
       >
         <Form.Item
           name="username"
-          rules={[{ required: true, message: 'Vui lòng nhập Tên đăng nhập hoặc Email!' }]}
+          rules={[{ required: true, message: 'Vui lòng nhập Số điện thoại hoặc Email!' }]}
         >
           <Input
             prefix={<UserOutlined />}
-            placeholder="Tên đăng nhập hoặc Email"
+            placeholder="Số điện thoại hoặc Email"
           />
         </Form.Item>
 

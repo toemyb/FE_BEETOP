@@ -1,13 +1,17 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 import AppLayout from './layout/AppLayout';
-import { Routes, Route, BrowserRouter as Router, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import {
+  Routes, Route, BrowserRouter as Router, useNavigate, useLocation, Navigate
+} from 'react-router-dom';
 import Login from './components/Login';
 import Profile from './components/Profile';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import CustomerHome from './components/CustomerHome';
+
+// Các component quản lý
 import ListDonhangComponent from './admin/adminDonHangComponents/ListDonHangComponent';
 import ListPhieuGiamGiaComponent from './admin/adminGiamGiaComponents/ListPhieuGiamGiaComponent';
 import ListCpuComponent from './admin/adminSanPhamComponents/ListCpuComponent';
@@ -32,49 +36,54 @@ import AddMauSacComponent from './admin/adminSanPhamComponents/AddMauSacComponen
 import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent';
 import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent';
 import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaComponent';
+import AddNhanVienComponent from './admin/adminTaiKhoanComponents/AddNhanVienComponent';
+import EditNhanVienComponent from './admin/adminTaiKhoanComponents/EditNhanVienComponent';
 import { message } from 'antd';
 import api from './service/api';
+import AddKhachHangComponent from './admin/adminTaiKhoanComponents/AddKhachHangComponent';
+import EditKhachHangComponent from './admin/adminTaiKhoanComponents/EditKhachHangComponent';
+
 
 const AppContent = () => {
-  const [token, setToken] = useState(localStorage.getItem('accessToken'));
+  const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
   const [user, setUser] = useState(null);
+  const [loadingSession, setLoadingSession] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     const restoreSession = async () => {
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('accessToken');
+      const storedUser = sessionStorage.getItem('user');
+      const storedToken = sessionStorage.getItem('accessToken');
 
       if (storedUser && storedToken) {
         try {
-          const parsedUser = JSON.parse(storedUser);
           const response = await api.get('/auth/me', {
             headers: { Authorization: `Bearer ${storedToken}` },
             withCredentials: true,
           });
+
           const userData = response.data.data;
           const updatedUser = {
-            ten: userData.ten || userData.tenDangNhap,
-            tenDangNhap: userData.tenDangNhap,
+            ten: userData.ten,
             email: userData.email,
             soDienThoai: userData.soDienThoai,
             gioiTinh: userData.gioiTinh,
             ngaySinh: userData.ngaySinh,
+            anh: userData.anh,
             role: userData.tenChucVu ? userData.tenChucVu.toUpperCase() : 'USER',
           };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+
+          sessionStorage.setItem('user', JSON.stringify(updatedUser));
           setUser(updatedUser);
           setToken(storedToken);
         } catch (error) {
           console.error('Failed to restore session:', error);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
+          sessionStorage.clear();
           setToken(null);
           setUser(null);
           if (!['/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)) {
-            message.error('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại!');
+            message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
             navigate('/login');
           }
         }
@@ -83,6 +92,8 @@ const AppContent = () => {
           navigate('/login');
         }
       }
+
+      setLoadingSession(false);
     };
 
     restoreSession();
@@ -90,19 +101,15 @@ const AppContent = () => {
 
   const handleLogout = async () => {
     try {
-      const token = localStorage.getItem('accessToken');
+      const token = sessionStorage.getItem('accessToken');
       if (token) {
         await api.post('/auth/signout', null, {
           headers: { Authorization: `Bearer ${token}` },
           withCredentials: true,
         });
       }
-    } catch (error) {
-      console.error('Error during logout:', error);
     } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      sessionStorage.clear();
       setToken(null);
       setUser(null);
       message.success('Đăng xuất thành công!');
@@ -137,6 +144,10 @@ const AppContent = () => {
     { path: '/admin/man-hinh', element: <ListManHinhComponent />, roles: ['ADMIN'] },
     { path: '/admin/khach-hang', element: <ListKhachHangComponent />, roles: ['ADMIN'] },
     { path: '/admin/nhan-vien', element: <ListNhanVienComponent />, roles: ['ADMIN'] },
+    { path: '/admin/nhan-vien/add', element: <AddNhanVienComponent />, roles: ['ADMIN'] },
+    { path: '/admin/nhan-vien/edit/:id', element: <EditNhanVienComponent />, roles: ['ADMIN'] },
+    { path: '/admin/khach-hang/add', element: <AddKhachHangComponent />, roles: ['ADMIN'] },
+    { path: '/admin/khach-hang/edit/:id', element: <EditKhachHangComponent />, roles: ['ADMIN'] },
     { path: '/admin/ban-tai-quay', element: <ListBanTaiQuayComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/tra-hang', element: <ListTraHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/profile', element: <Profile />, roles: ['ADMIN', 'NHAN_VIEN', 'KHACH_HANG'] },
@@ -145,6 +156,10 @@ const AppContent = () => {
 
   const noLayoutPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
   const shouldRenderLayout = !noLayoutPaths.includes(location.pathname);
+
+  if (loadingSession) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>
@@ -156,11 +171,9 @@ const AppContent = () => {
                 key={route.path}
                 path={route.path}
                 element={
-                  user && route.roles.includes(user.role) ? (
-                    route.element
-                  ) : (
-                    <Navigate to={user?.role === 'KHACH_HANG' ? '/customer/home' : '/login'} replace />
-                  )
+                  user && route.roles.includes(user.role)
+                    ? route.element
+                    : <Navigate to={user?.role === 'KHACH_HANG' ? '/customer/home' : '/login'} replace />
                 }
               />
             ))}

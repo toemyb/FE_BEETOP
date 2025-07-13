@@ -20,7 +20,7 @@ const Register = () => {
 
   const onFinish = async (values) => {
     // IMPORTANT: Extract 'ten' here, not 'hoVaTen'
-    const { tenDangNhap, ten, email, matKhau, ngaySinh, soDienThoai, gioiTinh } = values;
+    const { ten, email, soDienThoai,matKhau, ngaySinh,  gioiTinh } = values;
 
     const formattedNgaySinh = ngaySinh ? ngaySinh.format('YYYY-MM-DD') : null;
 
@@ -29,12 +29,11 @@ const Register = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tenDangNhap,
           ten, // <--- NOW SENDING 'ten' directly to match backend DTO
           email,
+          soDienThoai,
           matKhau,
           ngaySinh: formattedNgaySinh,
-          soDienThoai,
           gioiTinh,
         }),
       });
@@ -63,13 +62,6 @@ const Register = () => {
         initialValues={{ remember: true }}
         layout="vertical"
       >
-        {/* Tên đăng nhập */}
-        <Form.Item
-          name="tenDangNhap"
-          rules={[{ required: true, message: 'Vui lòng nhập Tên đăng nhập!' }]}
-        >
-          <Input prefix={<UserOutlined />} placeholder="Tên đăng nhập" />
-        </Form.Item>
 
         {/* Họ và tên (NOW named 'ten' to match backend DTO) */}
         <Form.Item
@@ -88,6 +80,18 @@ const Register = () => {
           ]}
         >
           <Input prefix={<MailOutlined />} placeholder="Địa chỉ Email (VD: example@gmail.com)" />
+        </Form.Item>
+
+        
+        {/* Số điện thoại */}
+        <Form.Item
+          name="soDienThoai"
+          rules={[
+            { required: true, message: 'Vui lòng nhập Số điện thoại!' },
+            { pattern: /^[0-9]{10,11}$/, message: 'Số điện thoại không hợp lệ!' }
+          ]}
+        >
+          <Input prefix={<PhoneOutlined />} placeholder="Số điện thoại" />
         </Form.Item>
 
         {/* Ngày sinh */}
@@ -110,22 +114,11 @@ const Register = () => {
           rules={[{ required: true, message: 'Vui lòng chọn Giới tính!' }]}
         >
           <Radio.Group>
-            <Radio value="NAM"> <ManOutlined /> Nam </Radio>
-            <Radio value="NU"> <WomanOutlined /> Nữ </Radio>
-            <Radio value="KHAC"> <QuestionCircleOutlined /> Khác </Radio>
+            <Radio value="Nam"> <ManOutlined /> Nam </Radio>
+            <Radio value="Nữ"> <WomanOutlined /> Nữ </Radio>
           </Radio.Group>
         </Form.Item>
 
-        {/* Số điện thoại */}
-        <Form.Item
-          name="soDienThoai"
-          rules={[
-            { required: true, message: 'Vui lòng nhập Số điện thoại!' },
-            { pattern: /^[0-9]{10,11}$/, message: 'Số điện thoại không hợp lệ!' }
-          ]}
-        >
-          <Input prefix={<PhoneOutlined />} placeholder="Số điện thoại" />
-        </Form.Item>
 
         {/* Mật khẩu */}
         <Form.Item
