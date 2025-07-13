@@ -1,6 +1,7 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { toast } from 'react-toastify';
 import React, { useEffect, useState } from 'react'
-import { addEmployee, getVoucher, updateVoucher,checkMaTrung } from '../../service/PhieuGiamGiaService'
+import { addEmployee, getVoucher, updateVoucher, checkMaTrung } from '../../service/PhieuGiamGiaService'
 
 const PhieuGiamGiaComponent = () => {
 
@@ -23,7 +24,16 @@ const PhieuGiamGiaComponent = () => {
 
     const navigator = useNavigate();
 
+    const location = useLocation();
+
+
     useEffect(() => {
+        const user = JSON.parse(sessionStorage.getItem('user'));
+    if (!user || user.role !== 'ADMIN') {
+      message.error('Bạn không có quyền truy cập trang này!');
+      navigator('/login');
+      return;
+    }
 
         if (paramid) {
 
@@ -49,6 +59,9 @@ const PhieuGiamGiaComponent = () => {
 
 
     }, [paramid])
+
+
+
 
 
     function handleidPhieuGiamGia(v) {
@@ -153,6 +166,7 @@ const PhieuGiamGiaComponent = () => {
                 .then((respone) => {
 
                     console.log(respone.date);
+                    toast.success(" Cập nhật phiếu giảm giá thành công!");
                     navigator('/admin/phieu-giam-gia')
 
 
@@ -171,10 +185,12 @@ const PhieuGiamGiaComponent = () => {
 
 
                 console.log(respone.data)
-                navigator('/admin/phieu-giam-gia')
+                toast.success("Thêm phiếu giảm giá thành công!");
+                navigator('/admin/phieu-giam-gia', { state: { newVoucher: respone.data } })
 
             }).catch(error => {
                 console.error(error);
+                toast.error("Lỗi khi thêm phiếu giảm giá!");
             })
 
         }
@@ -198,12 +214,12 @@ const PhieuGiamGiaComponent = () => {
 
     }
 
-    
+
 
     const validateFields = async () => {
         const newErrors = {};
         const today = new Date().toISOString().split('T')[0]; // yyyy-MM-dd
-        
+
 
 
 
@@ -219,9 +235,9 @@ const PhieuGiamGiaComponent = () => {
             } catch (err) {
                 console.error(err);
             }
-          }
+        }
 
-          
+
 
 
         if (!ten.trim()) newErrors.ten = "Tên không được để trống";
@@ -269,7 +285,7 @@ const PhieuGiamGiaComponent = () => {
         }
 
         return newErrors;
-      };
+    };
 
 
 
@@ -320,7 +336,17 @@ const PhieuGiamGiaComponent = () => {
                             <div className='form-group mb-2'>
 
                                 <label className='form-label'>Kiểu giảm giá</label>
-                                <input type='text' className='form-control' name='kieuGiamGia' value={kieuGiamGia} onChange={handleKieuGiamGia}></input>
+                                <select
+                                    className='form-control'
+                                    name='kieuGiamGia'
+                                    value={kieuGiamGia}
+                                    onChange={handleKieuGiamGia}
+                                >
+                                    <option value=''>-- Chọn kiểu giảm --</option>
+                                    <option value='GIAM_CO_DINH'>Giảm cố định</option>
+                                    <option value='GIAM_PHAN_TRAM'>Giảm phần trăm</option>
+                                </select>
+
                                 {errors.kieuGiamGia && <div className="text-danger">{errors.kieuGiamGia}</div>}
                             </div>
 

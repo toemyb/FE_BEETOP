@@ -1,48 +1,51 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import AppLayout from './layout/AppLayout';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import {
-  Routes, Route, BrowserRouter as Router, useNavigate, useLocation, Navigate
+  Routes, Route, BrowserRouter as Router, useNavigate, useLocation, Navigate,
 } from 'react-router-dom';
+import AppLayout from './layout/AppLayout';
 import Login from './components/Login';
-import Profile from './components/Profile';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
+import Profile from './components/Profile';
 import CustomerHome from './components/CustomerHome';
+import { message } from 'antd';
+import api from './service/api';
 
-// Các component quản lý
+// Component quản lý
 import ListDonhangComponent from './admin/adminDonHangComponents/ListDonHangComponent';
 import ListPhieuGiamGiaComponent from './admin/adminGiamGiaComponents/ListPhieuGiamGiaComponent';
+import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaComponent';
 import ListCpuComponent from './admin/adminSanPhamComponents/ListCpuComponent';
+import AddCpuComponent from './admin/adminSanPhamComponents/AddCpuComponent';
 import ListSanPhamComponent from './admin/adminSanPhamComponents/ListSanPhamComponent';
 import ListDanhMucComponent from './admin/adminSanPhamComponents/ListDanhMucComponent';
 import ListHangComponent from './admin/adminSanPhamComponents/ListHangComponent';
 import ListDoHoaComponent from './admin/adminSanPhamComponents/ListDoHoaComponent';
+import AddDoHoaComponent from './admin/adminSanPhamComponents/AddDoHoaComponent';
 import ListMauSacComponent from './admin/adminSanPhamComponents/ListMauSacComponent';
+import AddMauSacComponent from './admin/adminSanPhamComponents/AddMauSacComponent';
 import ListPinComponent from './admin/adminSanPhamComponents/ListPinComponent';
 import ListRamComponent from './admin/adminSanPhamComponents/ListRamComponent';
+import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent';
 import ListRomComponent from './admin/adminSanPhamComponents/ListRomComponent';
+import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent';
 import ListManHinhComponent from './admin/adminSanPhamComponents/ListManHinhComponent';
-import ListKhachHangComponent from './admin/adminTaiKhoanComponents/ListKhachHangComponent';
+import ListSeriComponent from './admin/adminSanPhamComponents/ListSeriComponent';
 import ListNhanVienComponent from './admin/adminTaiKhoanComponents/ListNhanVienComponent';
+import AddNhanVienComponent from './admin/adminTaiKhoanComponents/AddNhanVienComponent';
+import EditNhanVienComponent from './admin/adminTaiKhoanComponents/EditNhanVienComponent';
+import ListKhachHangComponent from './admin/adminTaiKhoanComponents/ListKhachHangComponent';
+import AddKhachHangComponent from './admin/adminTaiKhoanComponents/AddKhachHangComponent';
+import EditKhachHangComponent from './admin/adminTaiKhoanComponents/EditKhachHangComponent';
 import ListThongKeComponent from './admin/adminThongKeComponents/ListThongKeComponent';
 import ListBanTaiQuayComponent from './admin/adminBanHangTaiQuayComponents/ListBanTaiQuayComponent';
 import ListTraHangComponent from './admin/adminTraHangComponents/ListTraHangComponent';
-import AddCpuComponent from './admin/adminSanPhamComponents/AddCpuComponent';
-import AddDoHoaComponent from './admin/adminSanPhamComponents/AddDoHoaComponent';
-import ListSeriComponent from './admin/adminSanPhamComponents/ListSeriComponent';
-import AddMauSacComponent from './admin/adminSanPhamComponents/AddMauSacComponent';
-import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent';
-import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent';
-import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaComponent';
-import AddNhanVienComponent from './admin/adminTaiKhoanComponents/AddNhanVienComponent';
-import EditNhanVienComponent from './admin/adminTaiKhoanComponents/EditNhanVienComponent';
-import { message } from 'antd';
-import api from './service/api';
-import AddKhachHangComponent from './admin/adminTaiKhoanComponents/AddKhachHangComponent';
-import EditKhachHangComponent from './admin/adminTaiKhoanComponents/EditKhachHangComponent';
-
+import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
+import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent';
 
 const AppContent = () => {
   const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
@@ -124,6 +127,8 @@ const AppContent = () => {
     { path: '/admin/phieu-giam-gia', element: <ListPhieuGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-phieu-giam-gia', element: <PhieuGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/admin/edit-phieu-giam-gia/:idPhieugiamgia', element: <PhieuGiamGiaComponent />, roles: ['ADMIN'] },
+    { path: '/dot-giam-gia', element: <ListDotGiamGiaComponent />, roles: ['ADMIN'] },
+    { path: '/tao-dot-giam-gia', element: <DotGiamGiaComponents />, roles: ['ADMIN'] },
     { path: '/admin/san-pham', element: <ListSanPhamComponent />, roles: ['ADMIN'] },
     { path: '/admin/cpu', element: <ListCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-cpu', element: <AddCpuComponent />, roles: ['ADMIN'] },
@@ -141,14 +146,15 @@ const AppContent = () => {
     { path: '/admin/ram', element: <ListRamComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-ram', element: <AddRamComponent />, roles: ['ADMIN'] },
     { path: '/admin/rom', element: <ListRomComponent />, roles: ['ADMIN'] },
+    { path: '/admin/add-rom', element: <AddRomComponent />, roles: ['ADMIN'] },
     { path: '/admin/man-hinh', element: <ListManHinhComponent />, roles: ['ADMIN'] },
     { path: '/admin/khach-hang', element: <ListKhachHangComponent />, roles: ['ADMIN'] },
+    { path: '/admin/khach-hang/add', element: <AddKhachHangComponent />, roles: ['ADMIN'] },
+    { path: '/admin/khach-hang/edit/:id', element: <EditKhachHangComponent />, roles: ['ADMIN'] },
     { path: '/admin/nhan-vien', element: <ListNhanVienComponent />, roles: ['ADMIN'] },
     { path: '/admin/nhan-vien/add', element: <AddNhanVienComponent />, roles: ['ADMIN'] },
     { path: '/admin/nhan-vien/edit/:id', element: <EditNhanVienComponent />, roles: ['ADMIN'] },
-    { path: '/admin/khach-hang/add', element: <AddKhachHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/khach-hang/edit/:id', element: <EditKhachHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/ban-tai-quay', element: <ListBanTaiQuayComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/ban-hang-tai-quay', element: <ListBanTaiQuayComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/tra-hang', element: <ListTraHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/profile', element: <Profile />, roles: ['ADMIN', 'NHAN_VIEN', 'KHACH_HANG'] },
     { path: '/customer/home', element: <CustomerHome user={user} />, roles: ['KHACH_HANG'] },
@@ -157,12 +163,11 @@ const AppContent = () => {
   const noLayoutPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
   const shouldRenderLayout = !noLayoutPaths.includes(location.pathname);
 
-  if (loadingSession) {
-    return <div>Loading...</div>;
-  }
+  if (loadingSession) return <div>Loading...</div>;
 
   return (
     <>
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
       {shouldRenderLayout ? (
         <AppLayout user={user} onLogout={handleLogout}>
           <Routes>

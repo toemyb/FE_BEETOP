@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { deleteVoucher, listVouchers, searchVoucher, filterVouchers, getPagedVouchers, deactivateVoucher } from '../../service/PhieuGiamGiaService'
 import { FaEdit, FaSyncAlt } from 'react-icons/fa';
 
@@ -21,6 +21,8 @@ const ListPhieuGiamGiaComponent = () => {
   const [totalPages, setTotalPages] = useState(0);
   const size = 5;
 
+  const location = useLocation();
+
 
   const statusMap = {
     0: <span className="badge bg-primary">Chưa Kích Hoạt</span>,
@@ -29,7 +31,13 @@ const ListPhieuGiamGiaComponent = () => {
     3: <span className="badge bg-danger">Ngưng Hoạt Động</span>
   };
 
+  const kieuGiamGiaMap = {
+    GIAM_CO_DINH: 'Giảm cố định',
+    GIAM_PHAN_TRAM: 'Giảm phần trăm',
+  };
+
   const renderStatus = (status) => statusMap[status] || <span className="badge bg-light text-dark">Không rõ</span>;
+
 
 
   useEffect(() => {
@@ -63,6 +71,13 @@ const ListPhieuGiamGiaComponent = () => {
     }).format(value);
   };
 
+  useEffect(() => {
+    if (location.state && location.state.newVoucher) {
+      setVouchers(prev => [location.state.newVoucher, ...prev]);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
+
 
   useEffect(() => {
 
@@ -76,7 +91,7 @@ const ListPhieuGiamGiaComponent = () => {
   }, [keyword, startDate, endDate, trangThai, sortBy]);
 
 
-
+  
 
   function getAllVoucher() {
 
@@ -131,6 +146,15 @@ const ListPhieuGiamGiaComponent = () => {
   //   })
 
   // }
+
+  const formatGiaTriGiam = (giaTriGiam, kieuGiamGia) => {
+    if (kieuGiamGia === 'GIAM_PHAN_TRAM') {
+      return `${giaTriGiam}%`;
+    } else {
+      return formatCurrency(giaTriGiam);
+    }
+  };
+
 
 
   function handleSearch() {
@@ -323,8 +347,9 @@ const ListPhieuGiamGiaComponent = () => {
             <th>Kiểu giảm giá</th>
             <th>Giá trị giảm</th>
             <th>Thời gian</th>
-            <th>Giá trị tối thiểu</th>
-            <th>Giá trị tối đa</th>
+            {/* <th>Giá trị tối thiểu</th>
+            <th>Giá trị tối đa</th> */}
+            <th>Điều kiện áp dụng</th>
             <th>Mô tả</th>
             <th>Trạng thái</th>
             <th>Hành động</th>
@@ -346,16 +371,22 @@ const ListPhieuGiamGiaComponent = () => {
                 <td>{vouchers.idPhieugiamgia}</td>
                 <td>{vouchers.ten}</td>
                 <td>{vouchers.soLuong}</td>
-                <td>{vouchers.kieuGiamGia}</td>
-                <td style={{ color: 'red' }}>{formatCurrency(vouchers.giaTriGiam)}</td>
+                <td>{kieuGiamGiaMap[vouchers.kieuGiamGia] || vouchers.kieuGiamGia}</td>
+
+                <td style={{ color: 'red' }}>
+                  {formatGiaTriGiam(vouchers.giaTriGiam, vouchers.kieuGiamGia)}
+                </td>
 
                 <td>
                   {vouchers.ngayBatDau} - {vouchers.ngayKetThuc}
 
                 </td>
 
-                <td>{formatCurrency(vouchers.giaTriMin)}</td>
-                <td>{formatCurrency(vouchers.giaTriMax)}</td>
+                {/* <td>{formatCurrency(vouchers.giaTriMin)}</td>
+                <td>{formatCurrency(vouchers.giaTriMax)}</td> */}
+                <td>
+                  {formatCurrency(vouchers.giaTriMin)} - {formatCurrency(vouchers.giaTriMax)}
+                </td>
                 <td>{vouchers.moTa}</td>
                 <td>
 
