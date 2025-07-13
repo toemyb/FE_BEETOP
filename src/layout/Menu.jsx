@@ -68,10 +68,10 @@ const AppSider = ({ collapsed }) => {
 
         <SubMenu key="sanpham" icon={<AppstoreOutlined />} title="Quản Lý Sản Phẩm">
 
-        <Menu.Item key="sanpham-sp">
+          <Menu.Item key="sanpham-sp">
             <Link to="/admin/san-pham">Sản Phẩm</Link>
           </Menu.Item>
-   
+
           <Menu.Item key="sanpham-dohoa">
             <Link to="/admin/do-hoa">Đồ Họa</Link>
           </Menu.Item>
@@ -131,9 +131,10 @@ const AppSider = ({ collapsed }) => {
           <Menu.Item key="giamgia-phieu">
             <Link to="/admin/phieu-giam-gia">Phiếu Giảm Giá</Link>
           </Menu.Item>
+
           <Menu.Item key="giamgia-dot">
 
-            <Link to="/admin/dot-giam-gia">Đợt Giảm Giá</Link>
+            <Link to="/dot-giam-gia">Đợt Giảm Giá</Link>
 
           </Menu.Item>
 

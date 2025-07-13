@@ -29,6 +29,9 @@ import AddMauSacComponent from './admin/adminSanPhamComponents/AddMauSacComponen
 import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent'
 import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent'
 import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaComponent'
+import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
+import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent'
+
 
 function App() {
   const [count, setCount] = useState()
@@ -67,6 +70,19 @@ function App() {
 
             {/* // http://localhost:3000/admin/edit-phieu-giam-gia/1 */}
             <Route path='/admin/edit-phieu-giam-gia/:idPhieugiamgia' element={<PhieuGiamGiaComponent />}></Route>
+
+
+
+            {/* //Đợt giảm giá */}
+            
+            {/*// http://localhost:3000 */}
+            <Route path='/' element={<ListDotGiamGiaComponent />}></Route>
+
+            {/*// http://localhost:3000/dot-giam-gia */}
+            <Route path='/dot-giam-gia' element={<ListDotGiamGiaComponent />}></Route>
+
+            {/* http://localhost:3000/tao-dot-giam-gia */}
+            <Route path='/tao-dot-giam-gia' element={<DotGiamGiaComponents />}></Route>
 
 
 
