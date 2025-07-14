@@ -23,7 +23,7 @@ const AppLayout = ({ children, user, onLogout }) => {
           left: 0,
           top: 0,
           bottom: 0,
-          zIndex: 100,
+        
         }}
       >
         <AppSider collapsed={collapsed} user={user} />
@@ -36,7 +36,7 @@ const AppLayout = ({ children, user, onLogout }) => {
             padding: 16,
             background: '#fff',
             height: 'calc(100vh - 64px)',
-            overflow: 'auto',
+            overflowY: 'auto', // ✅ Đảm bảo không bị che notification
           }}
         >
           {children}

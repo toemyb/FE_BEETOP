@@ -46,6 +46,7 @@ import ListBanTaiQuayComponent from './admin/adminBanHangTaiQuayComponents/ListB
 import ListTraHangComponent from './admin/adminTraHangComponents/ListTraHangComponent';
 import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
 import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent';
+import AddLapTopComponent from './admin/adminSanPhamComponents/AddLapTopComponent';
 
 const AppContent = () => {
   const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
@@ -129,7 +130,8 @@ const AppContent = () => {
     { path: '/admin/edit-phieu-giam-gia/:idPhieugiamgia', element: <PhieuGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/dot-giam-gia', element: <ListDotGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/tao-dot-giam-gia', element: <DotGiamGiaComponents />, roles: ['ADMIN'] },
-    { path: '/admin/san-pham', element: <ListSanPhamComponent />, roles: ['ADMIN'] },
+    { path: '/admin/lap-top', element: <ListSanPhamComponent />, roles: ['ADMIN'] },
+    { path: '/admin/add-lap-top', element: <AddLapTopComponent />, roles: ['ADMIN'] },
     { path: '/admin/cpu', element: <ListCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-cpu', element: <AddCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-cpu/:id', element: <AddCpuComponent />, roles: ['ADMIN'] },

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Input, Select, Button, Space, Tag, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { listManHinh } from '../../service/ManHinhService'; // bạn cần tạo service này
+import { listManHinh } from '../../service/ManHinhService';
+import AddManHinhModal from './AddManHinhComponet'; // modal bạn đã có hoặc đã được tạo ở bước trước
 
 const { Option } = Select;
 
@@ -14,7 +14,10 @@ const ListManHinhComponent = () => {
   const [filterTanSo, setFilterTanSo] = useState('all');
   const [sortSize, setSortSize] = useState('default');
 
-  const navigate = useNavigate();
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 5 });
 
   useEffect(() => {
     fetchData();
@@ -42,29 +45,32 @@ const ListManHinhComponent = () => {
       temp = temp.filter(
         item =>
           item.ma?.toLowerCase().includes(s) ||
-          item.do_phan_giai?.toLowerCase().includes(s)
+          item.doPhanGiai?.toLowerCase().includes(s)
       );
     }
 
     if (filterTanSo !== 'all') {
-      temp = temp.filter(item => String(item.tan_so_quet) === filterTanSo);
+      temp = temp.filter(item => String(item.tanSoQuet) === filterTanSo);
     }
 
     if (sortSize === 'az') {
-      temp.sort((a, b) => String(a.kich_thuoc).localeCompare(String(b.kich_thuoc)));
+      temp.sort((a, b) => String(a.kichThuoc).localeCompare(String(b.kichThuoc)));
     } else if (sortSize === 'za') {
-      temp.sort((a, b) => String(b.kich_thuoc).localeCompare(String(a.kich_thuoc)));
+      temp.sort((a, b) => String(b.kichThuoc).localeCompare(String(a.kichThuoc)));
     }
 
     setFiltered(temp);
   }, [search, filterTanSo, sortSize, data]);
 
-  const handleAdd = () => {
-    navigate('/admin/add-manhinh');
+  const openModal = (id = null) => {
+    setEditingId(id);
+    setModalVisible(true);
   };
 
-  const handleUpdate = (id) => {
-    navigate(`/admin/update-manhinh/${id}`);
+  const closeModal = () => {
+    setEditingId(null);
+    setModalVisible(false);
+    fetchData();
   };
 
   const handleRefresh = () => {
@@ -77,7 +83,8 @@ const ListManHinhComponent = () => {
   const columns = [
     {
       title: 'STT',
-      render: (_, __, index) => index + 1,
+      render: (_, __, index) =>
+        (pagination.current - 1) * pagination.pageSize + index + 1,
     },
     {
       title: 'Mã',
@@ -101,7 +108,7 @@ const ListManHinhComponent = () => {
     {
       title: 'Hành động',
       render: (_, record) => (
-        <Button type="link" onClick={() => handleUpdate(record.id)}>
+        <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
         </Button>
       ),
@@ -110,6 +117,8 @@ const ListManHinhComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
+      <h2>Danh sách màn hình</h2>
+
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <Input
           placeholder="Tìm mã hoặc độ phân giải"
@@ -138,7 +147,7 @@ const ListManHinhComponent = () => {
           <Option value="za">Kích thước Z-A</Option>
         </Select>
 
-        <Button type="primary" onClick={handleAdd}>
+        <Button type="primary" onClick={() => openModal()}>
           + Thêm Màn Hình
         </Button>
       </Space>
@@ -148,9 +157,24 @@ const ListManHinhComponent = () => {
         columns={columns}
         dataSource={filtered}
         loading={loading}
-        pagination={{ pageSize: 5 }}
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20'],
+          total: filtered.length,
+        }}
         bordered
+        onChange={(pag) => setPagination(pag)}
       />
+
+      {modalVisible && (
+        <AddManHinhModal
+          open={modalVisible}
+          id={editingId}
+          onClose={closeModal}
+          onSuccess={() => {}}
+        />
+      )}
     </div>
   );
 };

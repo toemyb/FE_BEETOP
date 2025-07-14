@@ -1,0 +1,25 @@
+/* Giúp antd notification hiển thị không bị che */
+.ant-notification {
+  
+    z-index: 1050 !important;
+  }
+.ant-menu a {
+  text-decoration: none !important;
+}
+
+  
+  @keyframes toastIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+  
+  .animate-toast {
+    animation: toastIn 0.4s ease-in-out;
+  }
+  
