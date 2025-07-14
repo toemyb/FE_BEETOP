@@ -7,15 +7,15 @@ const Profile = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-  const userData = sessionStorage.getItem('user');
-  if (userData) {
-    const parsedUser = JSON.parse(userData);
-    console.log('User data:', parsedUser); // Kiểm tra trong console
-    setUser(parsedUser);
-  } else {
-    navigate('/login');
-  }
-}, [navigate]);
+    const userData = sessionStorage.getItem('user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      console.log('User data:', parsedUser); // Kiểm tra trong console
+      setUser(parsedUser);
+    } else {
+      navigate('/login');
+    }
+  }, [navigate]);
 
   if (!user) return <div>Đang tải thông tin...</div>;
 
@@ -30,7 +30,7 @@ const Profile = () => {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
           <img
-            src={user.anh || 'https://via.placeholder.com/100'} // Fallback ảnh mặc định
+            src={user.anh || '/default-avatar.png'}
             alt="Avatar"
             style={{
               width: 100,
@@ -39,7 +39,7 @@ const Profile = () => {
               objectFit: 'cover',
               marginRight: 20
             }}
-            onError={(e) => { e.target.src = 'https://via.placeholder.com/100'; }} // Xử lý lỗi tải ảnh
+            onError={(e) => { e.target.onerror = null; e.target.src = '/default-avatar.png'; }} // fallback local ảnh nếu ảnh user lỗi
           />
           <div>
             <h3>{user.ten || 'Không có tên'}</h3>

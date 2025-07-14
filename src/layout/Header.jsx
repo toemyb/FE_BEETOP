@@ -81,7 +81,7 @@ const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
               onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
             >
               <Avatar
-                src={user.anh || 'https://via.placeholder.com/40'}
+                src={user.anh || '/default-avatar.png'}
                 style={{
                   backgroundColor: user.anh ? 'transparent' : colorPrimary,
                   border: user.anh ? '1px solid #ddd' : 'none',
