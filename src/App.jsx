@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Menu from './layout/Menu'
 import './App.css'
+import { Toaster } from 'react-hot-toast'; 
 import AppLayout from './layout/AppLayout'
 import { Routes, Route, BrowserRouter as Router } from 'react-router-dom'
 import ListDonhangComponent from './admin/adminDonHangComponents/ListDonHangComponent'
@@ -26,6 +27,7 @@ import ListSeriComponent from './admin/adminSanPhamComponents/ListSeriComponent'
 import AddMauSacComponent from './admin/adminSanPhamComponents/AddMauSacComponent'
 import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent'
 import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent'
+import AddLapTopComponent from './admin/adminSanPhamComponents/AddLapTopComponent'
 import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaComponent'
 
 function App() {
@@ -36,7 +38,7 @@ function App() {
 
 
       <Router>
-
+      <Toaster position="top-right" />
         <AppLayout>
 
           <Routes>
@@ -60,13 +62,15 @@ function App() {
 
 
             {/* // Sản phẩm */}
-            <Route path='/admin/san-pham' element={<ListSanPhamComponent />}></Route>
+            <Route path='/admin/lap-top' element={<ListSanPhamComponent />}></Route>
+            <Route path='/admin/add-lap-top' element={<AddLapTopComponent />}></Route>
+            
 
             <Route path='/admin/do-hoa' element={<ListDoHoaComponent />}></Route>
             {/*// http://localhost:3000/admin/add-doHoa */}
             <Route path='/admin/add-do-hoa' element={<AddDoHoaComponent />}></Route>
             {/*// http://localhost:3000/admin/update-doHoa/1 */}
-            <Route path='/admin/update-do-hoa/:id' element={<AddDoHoaComponent />}></Route>
+            {/* <Route path='/admin/update-do-hoa/:id' element={<AddDoHoaComponent />}></Route> */}
 
 
             {/*// http://localhost:3000/admin/cpu */}

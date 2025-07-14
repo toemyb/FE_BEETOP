@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, message, Input, Select, Space } from 'antd';
+import { Table, Button, Tag, Input, Select, Space } from 'antd';
 import { listCpu } from '../../service/CpuService';
-import { useNavigate } from 'react-router-dom';
+import AdminBreadcrumb from '../components/Breadcrumb';
+import AddCpuModal from './AddCpuComponent'; // ✅ modal thêm/sửa
+import useToast from '../../hooks/useNotify';
 
 const { Option } = Select;
 
@@ -14,43 +16,47 @@ const ListCpuComponent = () => {
   const [filterTrangThai, setFilterTrangThai] = useState('all');
   const [sortOption, setSortOption] = useState('default');
 
-  const navigate = useNavigate();
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+  });
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+
+  const { error } = useToast();
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const res = await listCpu();
-      const data = res.data;
-      const list = data.content || data;
-      setCpuList(list);
-      setFilteredList(list);
+      const data = res.data.content || res.data;
+      setCpuList(data);
+      setFilteredList(data);
     } catch {
-      message.error('Lỗi khi tải dữ liệu CPU');
+      error('Lỗi khi tải dữ liệu CPU');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  useEffect(() => {
     let temp = [...cpuList];
 
-    // Tìm kiếm
     if (searchText.trim()) {
       temp = temp.filter((item) =>
         item.ten?.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
-    // Lọc trạng thái
     if (filterTrangThai !== 'all') {
       temp = temp.filter((item) => item.trangThai === Number(filterTrangThai));
     }
 
-    // Sắp xếp
     if (sortOption === 'az') {
       temp.sort((a, b) => a.ten.localeCompare(b.ten));
     } else if (sortOption === 'za') {
@@ -67,18 +73,31 @@ const ListCpuComponent = () => {
     fetchData();
   };
 
+  const openModal = (id = null) => {
+    setEditingId(id);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingId(null);
+    fetchData();
+  };
+
   const columns = [
     {
       title: 'STT',
-      render: (_, __, index) => index + 1,
+      render: (_, __, index) =>
+        (pagination.current - 1) * pagination.pageSize + index + 1,
     },
     {
-      title: 'IdCpu',
+      title: 'Mã CPU',
       dataIndex: 'idCpu',
     },
     {
       title: 'Tên',
       dataIndex: 'ten',
+      render: (text) => <strong>{text}</strong>,
     },
     {
       title: 'Mô tả',
@@ -93,7 +112,7 @@ const ListCpuComponent = () => {
     {
       title: 'Thao tác',
       render: (_, record) => (
-        <Button type="link" onClick={() => navigate(`/admin/update-cpu/${record.id}`)}>
+        <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
         </Button>
       ),
@@ -102,17 +121,23 @@ const ListCpuComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      {/* Bộ lọc và tìm kiếm */}
-      <Space style={{ marginBottom: 16, flexWrap: 'wrap' }} size="middle">
+      <AdminBreadcrumb items={[{ label: 'CPU' }]} />
+      <h2>Danh sách CPU</h2>
+
+      <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
         <Input
-          placeholder="Tìm Chip"
+          placeholder="Tìm kiếm tên CPU"
           allowClear
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 200 }}
         />
-        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
-          Làm Mới
+
+        <Button
+          onClick={handleRefresh}
+          style={{ background: '#FFD700', color: '#000' }}
+        >
+          Làm mới
         </Button>
 
         <span>Trạng Thái:</span>
@@ -126,7 +151,7 @@ const ListCpuComponent = () => {
           <Option value="0">Ngừng</Option>
         </Select>
 
-        <span>Hiển Thị:</span>
+        <span>Sắp xếp:</span>
         <Select
           value={sortOption}
           onChange={setSortOption}
@@ -137,19 +162,40 @@ const ListCpuComponent = () => {
           <Option value="za">Tên Z-A</Option>
         </Select>
 
-        <Button type="primary" onClick={() => navigate('/admin/add-cpu')}>
-          + Tạo Chip
+        <Button type="primary" onClick={() => openModal()}>
+          + Thêm CPU
         </Button>
       </Space>
 
-      {/* Bảng với phân trang FE, nhưng không xử lý gì trong logic */}
       <Table
         rowKey="id"
         columns={columns}
         dataSource={filteredList}
         loading={loading}
-        pagination={{ pageSize: 5 }}
+        bordered
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: filteredList.length,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+        }}
+        onChange={(pag) => {
+          setPagination({
+            current: pag.current,
+            pageSize: pag.pageSize,
+          });
+        }}
       />
+
+      {modalVisible && (
+        <AddCpuModal
+          open={modalVisible}
+          id={editingId}
+          onClose={closeModal}
+          onSuccess={() => {}}
+        />
+      )}
     </div>
   );
 };

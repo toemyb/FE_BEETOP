@@ -1,124 +1,133 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Modal, Form, Input, Select } from 'antd';
 import { addDohoa, getAllById, updateDohoa } from '../../service/DoHoaService';
-import { Form, Input, Select, Button, Card, message } from 'antd';
+import useToast from '../../hooks/useNotify'; // Hook custom toast
 
 const { Option } = Select;
 
-const AddDoHoaComponent = () => {
-  const [idDohoa, setIdDohoa] = useState('');
-  const [hangcardOboard, setHangcardOboard] = useState('');
-  const [modelcardOboard, setModelcardOboard] = useState('');
-  const [tenDayDu, setTenDayDu] = useState('');
-  const [loaiCard, setLoaiCard] = useState('');
-  const [boNhoRam, setBoNhoRam] = useState('');
-  const [moTa, setMoTa] = useState('');
-  const [trangThai, setTrangThai] = useState(1);
-
-  const { id } = useParams();
-  const navigator = useNavigate();
+const AddDoHoaModal = ({ open, id, onClose, onSuccess }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const { success, error } = useToast();
 
   useEffect(() => {
     if (id) {
       getAllById(id)
-        .then((response) => {
-          const data = response.data.data;
-          setIdDohoa(data.idDohoa);
-          setHangcardOboard(data.hangcardOboard);
-          setModelcardOboard(data.modelcardOboard);
-          setTenDayDu(data.tenDayDu);
-          setLoaiCard(data.loaiCard);
-          setBoNhoRam(data.boNhoRam);
-          setMoTa(data.moTa);
-          setTrangThai(data.trangThai);
+        .then((res) => {
+          const data = res.data.data;
+          form.setFieldsValue(data);
         })
-        .catch((error) => {
-          console.error('Lỗi khi tải dữ liệu:', error);
-          message.error('Không thể tải dữ liệu đồ họa');
+        .catch(() => {
+          error('Không thể tải dữ liệu đồ họa');
         });
+    } else {
+      form.resetFields();
+      form.setFieldsValue({ trangThai: 1 }); // Default trạng thái
     }
-  }, [id]);
+  }, [id, form]);
 
-  const onFinish = () => {
-    const doHoa = {
-      idDohoa,
-      hangcardOboard,
-      modelcardOboard,
-      tenDayDu,
-      loaiCard,
-      boNhoRam,
-      moTa,
-      trangThai: Number(trangThai),
-    };
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      setLoading(true);
+      const payload = { ...values, trangThai: Number(values.trangThai) };
 
-    const request = id ? updateDohoa({ id, ...doHoa }) : addDohoa(doHoa);
+      const request = id
+        ? updateDohoa({ id, ...payload })
+        : addDohoa(payload);
 
-    request
-      .then(() => {
-        message.success(id ? 'Cập nhật đồ họa thành công!' : 'Thêm đồ họa thành công!');
-        navigator('/admin/do-hoa');
-      })
-      .catch((error) => {
-        console.error('Lỗi khi lưu:', error);
-        message.error(id ? 'Cập nhật thất bại' : 'Thêm thất bại');
-      });
-  };
+      await request;
 
-  const handleCancel = () => {
-    navigator('/admin/do-hoa');
+      success(
+        id
+          ? `Đã cập nhật: ${values.idDohoa}`
+          : `Đã thêm: ${values.idDohoa}`
+      );
+
+      if (onSuccess) onSuccess(id ? 'edit' : 'add', values.idDohoa);
+      onClose();
+    } catch (err) {
+      console.error('Lỗi submit form:', err);
+      error(id ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 16px' }}>
-      <Card title={id ? 'CẬP NHẬT ĐỒ HỌA' : 'THÊM ĐỒ HỌA'} style={{ width: '100%', maxWidth: 700 }}>
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item label="Mã Đồ Họa">
-            <Input value={idDohoa} onChange={(e) => setIdDohoa(e.target.value)} />
-          </Form.Item>
+    <Modal
+      open={open}
+      title={id ? 'CẬP NHẬT ĐỒ HỌA' : 'THÊM ĐỒ HỌA'}
+      onCancel={onClose}
+      onOk={handleOk}
+      okText="Xác nhận"
+      cancelText="Hủy"
+      confirmLoading={loading}
+      destroyOnClose
+      centered
+    >
+      <Form form={form} layout="vertical">
+        <Form.Item
+          label="Mã Đồ Họa"
+          name="idDohoa"
+          rules={[{ required: true, message: 'Vui lòng nhập Mã Đồ Họa' }]}
+        >
+          <Input disabled={!!id} />
+        </Form.Item>
 
-          <Form.Item label="Hãng Card Onboard" required>
-            <Input value={hangcardOboard} onChange={(e) => setHangcardOboard(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Hãng Card Onboard"
+          name="hangcardOboard"
+          rules={[{ required: true, message: 'Vui lòng nhập Hãng Card Onboard' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Model Card Onboard" required>
-            <Input value={modelcardOboard} onChange={(e) => setModelcardOboard(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Model Card Onboard"
+          name="modelcardOboard"
+          rules={[{ required: true, message: 'Vui lòng nhập Model Card Onboard' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Tên Đầy Đủ" required>
-            <Input value={tenDayDu} onChange={(e) => setTenDayDu(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Tên Đầy Đủ"
+          name="tenDayDu"
+          rules={[{ required: true, message: 'Vui lòng nhập Tên đầy đủ' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Loại Card" required>
-            <Input value={loaiCard} onChange={(e) => setLoaiCard(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Loại Card"
+          name="loaiCard"
+          rules={[{ required: true, message: 'Vui lòng nhập Loại Card' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Bộ Nhớ RAM" required>
-            <Input value={boNhoRam} onChange={(e) => setBoNhoRam(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Bộ Nhớ RAM"
+          name="boNhoRam"
+          rules={[{ required: true, message: 'Vui lòng nhập Bộ nhớ RAM' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Mô Tả">
-            <Input value={moTa} onChange={(e) => setMoTa(e.target.value)} />
-          </Form.Item>
+        <Form.Item label="Mô Tả" name="moTa">
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Trạng Thái">
-            <Select value={trangThai} onChange={setTrangThai}>
-              <Option value={1}>Hoạt động</Option>
-              <Option value={0}>Ngưng hoạt động</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item style={{ textAlign: 'right' }}>
-            <Button onClick={handleCancel} style={{ marginRight: 8 }}>
-              Hủy
-            </Button>
-            <Button type="primary" htmlType="submit">
-              Xác nhận
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-    </div>
+        <Form.Item label="Trạng Thái" name="trangThai">
+          <Select>
+            <Option value={1}>Hoạt động</Option>
+            <Option value={0}>Ngưng hoạt động</Option>
+          </Select>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 };
 
-export default AddDoHoaComponent;
+export default AddDoHoaModal;

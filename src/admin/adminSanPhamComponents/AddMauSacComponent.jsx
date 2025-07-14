@@ -1,96 +1,96 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Modal, Form, Input, Select } from 'antd';
 import { addMausac, getAllById, updateMausac } from '../../service/MauSacService';
-import { Form, Input, Select, Button, Card, message } from 'antd';
+import useToast from '../../hooks/useNotify'; // dùng hook toast tương tự
 
 const { Option } = Select;
 
-const AddMauSacComponent = () => {
-  const [idMauSac, setIdMauSac] = useState('');
-  const [ten, setTen] = useState('');
-  const [moTa, setMoTa] = useState('');
-  const [trangThai, setTrangThai] = useState(1);
-
-  const { id } = useParams();
-  const navigator = useNavigate();
+const AddMauSacModal = ({ open, id, onClose, onSuccess }) => {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const { success, error } = useToast();
 
   useEffect(() => {
     if (id) {
       getAllById(id)
-        .then((response) => {
-          const ms = response.data.data;
-          setIdMauSac(ms.idMauSac);
-          setTen(ms.ten);
-          setMoTa(ms.moTa);
-          setTrangThai(ms.trangThai);
+        .then((res) => {
+          const data = res.data.data;
+          form.setFieldsValue(data);
         })
-        .catch((error) => {
-          console.error('Lỗi khi tải màu sắc:', error);
-          message.error('Không thể tải dữ liệu màu sắc');
+        .catch(() => {
+          error('Không thể tải dữ liệu màu sắc');
         });
+    } else {
+      form.resetFields();
     }
-  }, [id]);
+  }, [id, form]);
 
-  const onFinish = () => {
-    const ms = {
-      idMauSac,
-      ten,
-      moTa,
-      trangThai: Number(trangThai),
-    };
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      setLoading(true);
 
-    const request = id ? updateMausac({ id, ...ms }) : addMausac(ms);
+      const payload = { ...values, trangThai: Number(values.trangThai) };
+      const request = id ? updateMausac({ id, ...payload }) : addMausac(payload);
+      await request;
 
-    request
-      .then(() => {
-        message.success(id ? 'Cập nhật màu sắc thành công!' : 'Thêm màu sắc thành công!');
-        navigator('/admin/mau-sac');
-      })
-      .catch((error) => {
-        console.error('Lỗi khi lưu:', error);
-        message.error(id ? 'Cập nhật thất bại' : 'Thêm thất bại');
-      });
-  };
+      success(
+        id
+          ? `Cập nhật thành công: ${values.idMauSac}`
+          : `Thêm mới thành công: ${values.idMauSac}`
+      );
 
-  const handleCancel = () => {
-    navigator('/admin/mau-sac');
+      if (onSuccess) {
+        onSuccess(id ? 'edit' : 'add', values.idMauSac);
+      }
+
+      onClose();
+    } catch (err) {
+      console.error('Lỗi submit form:', err);
+      error(id ? 'Cập nhật thất bại' : 'Thêm thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '40px 16px' }}>
-      <Card title={id ? 'CẬP NHẬT MÀU SẮC' : 'THÊM MÀU SẮC'} style={{ width: '100%', maxWidth: 600 }}>
-        <Form layout="vertical" onFinish={onFinish}>
-          <Form.Item label="Mã màu sắc">
-            <Input value={idMauSac} onChange={(e) => setIdMauSac(e.target.value)} />
-          </Form.Item>
+    <Modal
+      open={open}
+      title={id ? 'CẬP NHẬT MÀU SẮC' : 'THÊM MÀU SẮC'}
+      onCancel={onClose}
+      onOk={handleOk}
+      okText="Xác nhận"
+      cancelText="Hủy"
+      confirmLoading={loading}
+      destroyOnClose
+      centered
+    >
+      <Form form={form} layout="vertical">
+        <Form.Item label="Mã Màu Sắc" name="idMauSac">
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Tên màu" required>
-            <Input value={ten} onChange={(e) => setTen(e.target.value)} />
-          </Form.Item>
+        <Form.Item
+          label="Tên Màu"
+          name="ten"
+          rules={[{ required: true, message: 'Vui lòng nhập tên màu' }]}
+        >
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Mô tả">
-            <Input value={moTa} onChange={(e) => setMoTa(e.target.value)} />
-          </Form.Item>
+        <Form.Item label="Mô Tả" name="moTa">
+          <Input />
+        </Form.Item>
 
-          <Form.Item label="Trạng thái">
-            <Select value={trangThai} onChange={setTrangThai}>
-              <Option value={1}>Hoạt động</Option>
-              <Option value={0}>Ngưng hoạt động</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item style={{ textAlign: 'right' }}>
-            <Button onClick={handleCancel} style={{ marginRight: 8 }}>
-              Hủy
-            </Button>
-            <Button type="primary" htmlType="submit">
-              Xác nhận
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
-    </div>
+        <Form.Item label="Trạng Thái" name="trangThai" initialValue={1}>
+          <Select>
+            <Option value={1}>Hoạt động</Option>
+            <Option value={0}>Ngưng hoạt động</Option>
+          </Select>
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 };
 
-export default AddMauSacComponent;
+export default AddMauSacModal;

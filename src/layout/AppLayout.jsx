@@ -23,7 +23,7 @@ const AppLayout = ({ children }) => {
           left: 0,
           top: 0,
           bottom: 0,
-          zIndex: 100,
+        
         }}
       >
         <AppSider collapsed={collapsed} />
@@ -38,8 +38,8 @@ const AppLayout = ({ children }) => {
             margin: 16,
             padding: 16,
             background: '#fff',
-            height: 'calc(100vh - 64px)', // 64px là chiều cao Header mặc định
-            overflow: 'auto',
+            height: 'calc(100vh - 64px)',
+            overflowY: 'auto', // ✅ Đảm bảo không bị che notification
           }}
         >
           {children}

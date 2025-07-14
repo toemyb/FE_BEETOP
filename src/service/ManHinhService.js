@@ -5,9 +5,9 @@ const REST_API_URL = 'http://localhost:8080/api/man-hinh'
 
 export const listManHinh = () => axios.get(REST_API_URL)
 
-export const addCpu = (cpu) => axios.post("http://localhost:8080/api/man-hinh/them-man-hinh", cpu)
+export const addManHinh = (cpu) => axios.post("http://localhost:8080/api/man-hinh/them-man-hinh", cpu)
 
-export const updateCpu = (cpu) => {
+export const updateManHinh = (cpu) => {
   return axios.post(`${REST_API_URL}/sua-man-hinh`, cpu, {
     headers: {
       "Content-Type": "application/json"
