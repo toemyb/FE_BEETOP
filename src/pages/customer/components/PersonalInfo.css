@@ -1,0 +1,56 @@
+.personal-info {
+    width: 100%;
+}
+
+.info-content {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.avatar-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    background: #fafafa;
+    border-radius: 12px;
+}
+
+.info-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.info-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.info-field label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #262626;
+    display: flex;
+    align-items: center;
+}
+
+.field-value {
+    font-size: 16px;
+    color: #595959;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 8px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+@media (max-width: 768px) {
+    .info-fields {
+        grid-template-columns: 1fr;
+    }
+}
+

@@ -47,6 +47,15 @@ import ListTraHangComponent from './admin/adminTraHangComponents/ListTraHangComp
 import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
 import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent';
 import AddLapTopComponent from './admin/adminSanPhamComponents/AddLapTopComponent';
+import CustomerLayout from './layout/CustomerLayout';
+import HomePage from './pages/customer/HomePage';
+import ProductListPage from './pages/customer/ProductListPage';
+import ProductDetailPage from './pages/customer/ProductDetailPage';
+import CartPage from './pages/customer/CartPage';
+import OrderInformationPage from './pages/customer/OrderInformationPage';
+import OrderLookupPage from './pages/customer/OrderLookupPage';
+import OrderDetailPage from './pages/customer/OrderDetailPage';
+import AccountPage from './pages/customer/AccountPage';
 
 const AppContent = () => {
   const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
@@ -92,7 +101,10 @@ const AppContent = () => {
           }
         }
       } else {
-        if (!['/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)) {
+        const publicPaths = ['/', '/cart', '/products', '/login', '/register', '/forgot-password', '/reset-password', '/profile', '/account'];
+        const isPublicPage = publicPaths.some(path => location.pathname.startsWith(path));
+
+        if (!isPublicPage) {
           navigate('/login');
         }
       }
@@ -167,36 +179,127 @@ const AppContent = () => {
 
   if (loadingSession) return <div>Loading...</div>;
 
+  if (loadingSession) return <div>Loading...</div>;
+
   return (
     <>
-      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} closeOnClick pauseOnHover theme="light" />
-      {shouldRenderLayout ? (
-        <AppLayout user={user} onLogout={handleLogout}>
-          <Routes>
-            {routes.map((route) => (
-              <Route
-                key={route.path}
-                path={route.path}
-                element={
-                  user && route.roles.includes(user.role)
-                    ? route.element
-                    : <Navigate to={user?.role === 'KHACH_HANG' ? '/customer/home' : '/login'} replace />
-                }
-              />
-            ))}
-          </Routes>
-        </AppLayout>
-      ) : (
-        <Routes>
-          <Route path="/" element={<Login setToken={setToken} setUser={setUser} />} />
-          <Route path="/login" element={<Login setToken={setToken} setUser={setUser} />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-        </Routes>
-      )}
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        closeOnClick
+        pauseOnHover
+        theme="light"
+      />
+
+      <Routes>
+        {/* ========== PHẦN KHÁCH HÀNG ========= */}
+        <Route
+          path="/"
+          element={
+            <CustomerLayout>
+              <HomePage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/products"
+          element={
+            <CustomerLayout>
+              <ProductListPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/product-detail/:id"
+          element={
+            <CustomerLayout>
+              <ProductDetailPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/cart"
+          element={
+            <CustomerLayout>
+              <CartPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <CustomerLayout>
+              <OrderInformationPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/order-detail/:idOrder"
+          element={
+            <CustomerLayout>
+              <OrderDetailPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/tra-cuu"
+          element={
+            <CustomerLayout>
+              <OrderLookupPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <CustomerLayout>
+              <AccountPage />
+            </CustomerLayout>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <CustomerLayout>
+              <Profile />
+            </CustomerLayout>
+          }
+        />
+
+        {/* ========== PHẦN ADMIN (CẦN ĐĂNG NHẬP) ========= */}
+        {shouldRenderLayout && user ? (
+          <Route
+            path="/*"
+            element={
+              <AppLayout user={user} onLogout={handleLogout}>
+                <Routes>
+                  {routes.map((route) => (
+                    <Route
+                      key={route.path}
+                      path={route.path}
+                      element={
+                        user && route.roles.includes(user.role)
+                          ? route.element
+                          : <Navigate to="/login" replace />
+                      }
+                    />
+                  ))}
+                </Routes>
+              </AppLayout>
+            }
+          />
+        ) : null}
+
+        {/* ========== PHẦN AUTH ========= */}
+        <Route path="/login" element={<Login setToken={setToken} setUser={setUser} />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+      </Routes>
     </>
   );
+
 };
 
 function App() {
