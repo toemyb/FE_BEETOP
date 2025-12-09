@@ -22,15 +22,20 @@ const AppSider = ({ collapsed, user }) => {
   const getSelectedKey = () => {
     if (pathname.startsWith('/admin/san-pham') || pathname.startsWith('/admin/lap-top')) return 'sanpham-sp';
     if (pathname.startsWith('/admin/do-hoa')) return 'sanpham-dohoa';
+    if (pathname.startsWith('/admin/add-lap-top')) return 'sanpham-sp';
+    if (pathname.startsWith('/admin/sua-lap-top')) return 'sanpham-sp';
+    if (pathname.startsWith('/admin/lap-top-ct')) return 'sanpham-sp';
     if (pathname.startsWith('/admin/mau-sac')) return 'sanpham-mausac';
     if (pathname.startsWith('/admin/cpu')) return 'sanpham-cpu';
-    if (pathname.startsWith('/admin/seri')) return 'sanpham-seri';
+    // if (pathname.startsWith('/admin/seri')) return 'sanpham-seri';
     if (pathname.startsWith('/admin/ram')) return 'sanpham-ram';
     if (pathname.startsWith('/admin/rom')) return 'sanpham-rom';
-    if (pathname.startsWith('/admin/hang')) return 'sanpham-hang';
+    if (pathname.startsWith('/admin/he-dieu-hanh')) return 'sanpham-hedieuhanh';
     if (pathname.startsWith('/admin/pin')) return 'sanpham-pin';
-    if (pathname.startsWith('/admin/danh-muc')) return 'sanpham-danhmuc';
+    if (pathname.startsWith('/admin/kich-thuoc')) return 'sanpham-kichthuoc';
+    if (pathname.startsWith('/admin/thuong-hieu')) return 'sanpham-thuonghieu';
     if (pathname.startsWith('/admin/man-hinh')) return 'sanpham-manhinh';
+   
 
     if (pathname.startsWith('/admin/nhan-vien')) return 'taikhoan-nhanvien';
     if (pathname.startsWith('/admin/khach-hang')) return 'taikhoan-khachhang';
@@ -42,6 +47,7 @@ const AppSider = ({ collapsed, user }) => {
     if (pathname.startsWith('/admin/don-hang')) return 'donhang';
     if (pathname.startsWith('/admin/tra-hang')) return 'trahang';
     if (pathname.startsWith('/admin/thong-ke')) return 'thongke';
+
 
     return '';
   };
@@ -103,15 +109,17 @@ const AppSider = ({ collapsed, user }) => {
       disabled: user?.role !== 'ADMIN',
       children: [
         { key: 'sanpham-sp', label: <Link to="/admin/lap-top">Sản Phẩm</Link> },
+        // { key: 'sanpham-tsp', label: <Link to="/admin/add-lap-top">Sản Phẩm</Link> },
         { key: 'sanpham-dohoa', label: <Link to="/admin/do-hoa">Đồ Họa</Link> },
         { key: 'sanpham-mausac', label: <Link to="/admin/mau-sac">Màu Sắc</Link> },
         { key: 'sanpham-cpu', label: <Link to="/admin/cpu">Cpu</Link> },
-        { key: 'sanpham-seri', label: <Link to="/admin/seri">Seri</Link> },
+        // { key: 'sanpham-seri', label: <Link to="/admin/seri">Seri</Link> },
         { key: 'sanpham-ram', label: <Link to="/admin/ram">Ram</Link> },
         { key: 'sanpham-rom', label: <Link to="/admin/rom">Rom</Link> },
-        { key: 'sanpham-hang', label: <Link to="/admin/hang">Hãng</Link> },
         { key: 'sanpham-pin', label: <Link to="/admin/pin">Pin</Link> },
-        { key: 'sanpham-danhmuc', label: <Link to="/admin/danh-muc">Danh Mục</Link> },
+        { key: 'sanpham-hedieuhanh', label: <Link to="/admin/he-dieu-hanh">Hệ Điều Hành</Link> },
+        { key: 'sanpham-kichthuoc', label: <Link to="/admin/kich-thuoc">Kích Thước</Link> },
+        { key: 'sanpham-thuonghieu', label: <Link to="/admin/thuong-hieu">Thương Hiệu</Link> },
         { key: 'sanpham-manhinh', label: <Link to="/admin/man-hinh">Màn Hình</Link> },
       ],
     },

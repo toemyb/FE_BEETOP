@@ -36,3 +36,6 @@ export const getAllHeDieuHanh = () => {
   export const getAllKichThuoc = () => {
     return api.get(`${BASE_URL}/kich-thuoc`);
   };
+    export const getAllThuongHieu = () => {
+    return api.get(`${BASE_URL}/thuong-hieu`);
+  };
