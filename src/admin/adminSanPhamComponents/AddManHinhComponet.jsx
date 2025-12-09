@@ -12,39 +12,102 @@ const AddManHinhModal = ({ open, id, onClose, onSuccess }) => {
 
   useEffect(() => {
     if (id) {
+      // EDIT
       getAllById(id)
         .then((res) => {
-          const data = res.data.data;
-          form.setFieldsValue(data);
+          const data =
+            res?.data?.data ??
+            res?.data?.content ??
+            res?.data ??
+            null;
+          if (data) {
+            form.setFieldsValue({
+              ma: data.ma,
+              doPhanGiai: data.doPhanGiai,
+              tanSoQuet: Number(data.tanSoQuet ?? 60),
+              kichThuoc: Number(data.kichThuoc ?? 0),
+              trangThai: Number(data.trangThai ?? 1),
+            });
+          } else {
+            error('Không tìm thấy dữ liệu màn hình');
+          }
         })
         .catch(() => {
           error('Không thể tải dữ liệu màn hình');
         });
     } else {
+      // ADD – reset + default
       form.resetFields();
-      form.setFieldsValue({ tanSoQuet: 60, trangThai: 1 });
+      form.setFieldsValue({
+        tanSoQuet: 60,
+        trangThai: 1,
+      });
     }
-  }, [id, form]);
+  }, [id, form, error]);
 
-  const handleOk = async () => {
+  // ✅ Hàm thực sự gọi API
+  const doSubmit = async (values) => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
 
-      const payload = { ...values, trangThai: Number(values.trangThai) };
+      const payload = {
+        ...values,
+        tanSoQuet: Number(values.tanSoQuet),
+        kichThuoc: Number(values.kichThuoc),
+        trangThai: Number(values.trangThai ?? 1),
+      };
+
       const request = id
         ? updateManHinh({ id, ...payload })
         : addManHinh(payload);
 
       await request;
-      success(id ? 'Cập nhật màn hình thành công!' : 'Thêm màn hình thành công!');
-      if (onSuccess) onSuccess(id ? 'edit' : 'add', values.ma);
+
+      success(
+        id
+          ? `Cập nhật màn hình "${values.ma}" thành công`
+          : `Thêm màn hình "${values.ma}" thành công`
+      );
+
+      onSuccess?.(id ? 'edit' : 'add', values.ma);
       onClose();
     } catch (err) {
       console.error('Lỗi xử lý:', err);
-      error(id ? 'Cập nhật thất bại' : 'Thêm thất bại');
+      error(id ? 'Cập nhật màn hình thất bại' : 'Thêm màn hình thất bại');
+      throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 🔔 Nút OK: validate + popup xác nhận
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+
+      if (id) {
+        Modal.confirm({
+          title: 'Xác nhận cập nhật',
+          content: `Bạn có chắc chắn muốn thay đổi màn hình "${values.ma}"?`,
+          okText: 'Đồng ý',
+          cancelText: 'Hủy',
+          centered: true,
+          onOk: () => doSubmit(values),
+        });
+      } else {
+        Modal.confirm({
+          title: 'Xác nhận thêm mới',
+          content: `Bạn có chắc chắn muốn thêm màn hình "${values.ma}"?`,
+          okText: 'Đồng ý',
+          cancelText: 'Hủy',
+          centered: true,
+          onOk: () => doSubmit(values),
+        });
+      }
+    } catch (err) {
+      if (err?.errorFields) {
+        error('Vui lòng kiểm tra lại các trường bắt buộc');
+      }
     }
   };
 
@@ -93,7 +156,11 @@ const AddManHinhModal = ({ open, id, onClose, onSuccess }) => {
           <InputNumber min={10} max={50} step={0.1} style={{ width: '100%' }} />
         </Form.Item>
 
-        <Form.Item label="Trạng thái" name="trangThai" initialValue={1}>
+        <Form.Item
+          label="Trạng thái"
+          name="trangThai"
+          rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+        >
           <Select>
             <Option value={1}>Hoạt động</Option>
             <Option value={0}>Ngưng hoạt động</Option>

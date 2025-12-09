@@ -22,8 +22,6 @@ import PhieuGiamGiaComponent from './admin/adminGiamGiaComponents/PhieuGiamGiaCo
 import ListCpuComponent from './admin/adminSanPhamComponents/ListCpuComponent';
 import AddCpuComponent from './admin/adminSanPhamComponents/AddCpuComponent';
 import ListSanPhamComponent from './admin/adminSanPhamComponents/ListSanPhamComponent';
-import ListDanhMucComponent from './admin/adminSanPhamComponents/ListDanhMucComponent';
-import ListHangComponent from './admin/adminSanPhamComponents/ListHangComponent';
 import ListDoHoaComponent from './admin/adminSanPhamComponents/ListDoHoaComponent';
 import AddDoHoaComponent from './admin/adminSanPhamComponents/AddDoHoaComponent';
 import ListMauSacComponent from './admin/adminSanPhamComponents/ListMauSacComponent';
@@ -34,7 +32,7 @@ import AddRamComponent from './admin/adminSanPhamComponents/AddRamComponent';
 import ListRomComponent from './admin/adminSanPhamComponents/ListRomComponent';
 import AddRomComponent from './admin/adminSanPhamComponents/AddRomComponent';
 import ListManHinhComponent from './admin/adminSanPhamComponents/ListManHinhComponent';
-import ListSeriComponent from './admin/adminSanPhamComponents/ListSeriComponent';
+// import ListSeriComponent from './admin/adminSanPhamComponents/ListSeriComponent';
 import ListNhanVienComponent from './admin/adminTaiKhoanComponents/ListNhanVienComponent';
 import AddNhanVienComponent from './admin/adminTaiKhoanComponents/AddNhanVienComponent';
 import EditNhanVienComponent from './admin/adminTaiKhoanComponents/EditNhanVienComponent';
@@ -47,6 +45,12 @@ import ListTraHangComponent from './admin/adminTraHangComponents/ListTraHangComp
 import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
 import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent';
 import AddLapTopComponent from './admin/adminSanPhamComponents/AddLapTopComponent';
+import ListSanPhamCTComponent from './admin/adminSanPhamComponents/ListSanPhamCTComponent';
+import AddLapTopCTComponent from './admin/adminSanPhamComponents/AddLapTopCTComponent';
+import UpdateLapTopCTComponent from './admin/adminSanPhamComponents/UpdateLapTopCTComponent';
+import ListHeDieuHanhComponent from './admin/adminSanPhamComponents/ListHeDieuHanhComponent';
+import ListThuongHieuComponent from './admin/adminSanPhamComponents/ListThuongHieuComponent';
+import ListKichThuocComponent from './admin/adminSanPhamComponents/ListKichThuocComponent';
 
 const AppContent = () => {
   const [token, setToken] = useState(sessionStorage.getItem('accessToken'));
@@ -131,16 +135,21 @@ const AppContent = () => {
     { path: '/dot-giam-gia', element: <ListDotGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/tao-dot-giam-gia', element: <DotGiamGiaComponents />, roles: ['ADMIN'] },
     { path: '/admin/lap-top', element: <ListSanPhamComponent />, roles: ['ADMIN'] },
+    { path: '/admin/lap-top-ct/:idLaptop', element: <ListSanPhamCTComponent />, roles: ['ADMIN'] },
+    { path: '/admin/lap-top-ct/add/:idLaptop', element: <AddLapTopCTComponent />, roles: ['ADMIN'] },
+    { path: '/admin/lap-top-ct/edit/:id', element: <UpdateLapTopCTComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-lap-top', element: <AddLapTopComponent />, roles: ['ADMIN'] },
+    { path: '/admin/sua-lap-top/:id', element: <AddLapTopComponent />, roles: ['ADMIN'] },
     { path: '/admin/cpu', element: <ListCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-cpu', element: <AddCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-cpu/:id', element: <AddCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/do-hoa', element: <ListDoHoaComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-do-hoa', element: <AddDoHoaComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-do-hoa/:id', element: <AddDoHoaComponent />, roles: ['ADMIN'] },
-    { path: '/admin/danh-muc', element: <ListDanhMucComponent />, roles: ['ADMIN'] },
-    { path: '/admin/hang', element: <ListHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/seri', element: <ListSeriComponent />, roles: ['ADMIN'] },
+    { path: '/admin/kich-thuoc', element: <ListKichThuocComponent />, roles: ['ADMIN'] },
+    { path: '/admin/he-dieu-hanh', element: <ListHeDieuHanhComponent />, roles: ['ADMIN'] },
+    { path: '/admin/thuong-hieu', element: <ListThuongHieuComponent />, roles: ['ADMIN'] },
+    // { path: '/admin/seri', element: <ListSeriComponent />, roles: ['ADMIN'] },
     { path: '/admin/mau-sac', element: <ListMauSacComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-mausac', element: <AddMauSacComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-mausac/:id', element: <AddMauSacComponent />, roles: ['ADMIN'] },
