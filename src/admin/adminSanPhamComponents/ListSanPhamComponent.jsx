@@ -6,7 +6,6 @@ import {
   Select,
   Space,
   Tag,
-  Image,
   Tooltip,
   message,
 } from 'antd';
@@ -16,22 +15,22 @@ import {
   EyeOutlined,
   ReloadOutlined,
   DownloadOutlined,
-  UploadOutlined,
   FileExcelOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { listLaptop } from '../../service/LapTopService';
 import {
-  getAllDoHoa,
-  getAllRam,
-  getAllRom,
-  getAllCpu,
   getAllManHinh,
   getAllPin,
   getAllHeDieuHanh,
 } from '../../service/OptionService';
 
 const { Option } = Select;
+
+const statusMap = {
+  1: { text: 'Hoạt động', color: 'green' },
+  0: { text: 'Ngưng hoạt động', color: 'red' },
+};
 
 const ListSanPhamComponent = () => {
   const navigate = useNavigate();
@@ -40,20 +39,15 @@ const ListSanPhamComponent = () => {
   const [filteredList, setFilteredList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+
+  // filters: Pin, Màn hình, HĐH, Thương hiệu, Trạng thái
   const [filters, setFilters] = useState({
-    ram: '',
-    rom: '',
-    cpu: '',
-    manHinh: '',
     pin: '',
     doHoa: '',
     heDieuHanh: '',
     status: '',
   });
 
-  const [ramList, setRamList] = useState([]);
-  const [romList, setRomList] = useState([]);
-  const [cpuList, setCpuList] = useState([]);
   const [screenList, setScreenList] = useState([]);
   const [pinList, setPinList] = useState([]);
   const [doHoaList, setDoHoaList] = useState([]);
@@ -132,6 +126,7 @@ const ListSanPhamComponent = () => {
 
       setProducts(mapped);
       setFilteredList(mapped);
+      setPagination((prev) => ({ ...prev, current: 1 }));
     } catch (error) {
       console.error('❌ Lỗi khi tải danh sách laptop:', error);
       message.error('Không tải được danh sách sản phẩm.');
@@ -225,10 +220,6 @@ const ListSanPhamComponent = () => {
       return (
         matchSearch &&
         matchStatus &&
-        matchDoHoa &&
-        matchRam &&
-        matchRom &&
-        matchCpu &&
         matchPin &&
         matchScreen &&
         matchHDH
@@ -236,10 +227,15 @@ const ListSanPhamComponent = () => {
     });
 
     setFilteredList(filtered);
+    setPagination((prev) => ({ ...prev, current: 1 }));
   }, [searchText, filters, products]);
 
+  // ✅ sửa lại hàm này
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((prev) => ({
+      ...prev,
+      [key]: key === 'status' ? (value ?? 'all') : (value ?? ''), // status dùng 'all', cái khác dùng ''
+    }));
   };
 
 const columns = [
@@ -346,7 +342,6 @@ const columns = [
           Làm Mới
         </Button>
 
-        <Button icon={<UploadOutlined />}>Import IMEI</Button>
         <Button icon={<DownloadOutlined />}>Tải Mẫu</Button>
         <Button icon={<FileExcelOutlined />}>Export Excel</Button>
         <Button

@@ -72,7 +72,7 @@ const AddDoHoaModal = ({ open, id, onClose, onSuccess }) => {
           name="idDohoa"
           rules={[{ required: true, message: 'Vui lòng nhập Mã Đồ Họa' }]}
         >
-          <Input disabled={!!id} />
+          <Input/>
         </Form.Item>
 
         <Form.Item
