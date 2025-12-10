@@ -1,0 +1,39 @@
+import api from './api';
+
+const BASE_URL = '/api/thong-ke';
+
+export const getThongKeTongQuan = (params) => {
+  return api.get(`${BASE_URL}/tong-quan`, { params });
+};
+
+// Thống kê 12 tháng so sánh 2 năm
+export const getThongKe12Thang = (nam1, nam2) => {
+  return api.get(`${BASE_URL}/nam`, {
+    params: { 
+      nam1: nam1, 
+      nam2: nam2 
+    }
+  });
+};
+
+// Thống kê theo ngày so sánh 2 tháng
+export const getThongKeTheoThang = (nam1, thang1, nam2, thang2) => {
+  return api.get(`${BASE_URL}/thang`, {
+    params: {
+      nam1: nam1,
+      thang1: thang1,
+      nam2: nam2,
+      thang2: thang2
+    }
+  });
+};
+
+// Thống kê so sánh 2 ngày
+export const getThongKeSoSanhHaiNgay = (ngay1, ngay2) => {
+  return api.get(`${BASE_URL}/ngay`, {
+    params: {
+      ngay1: ngay1.format('YYYY-MM-DD'),
+      ngay2: ngay2.format('YYYY-MM-DD')
+    }
+  });
+};
