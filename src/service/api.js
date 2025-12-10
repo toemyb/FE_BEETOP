@@ -27,6 +27,19 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
+    // Xử lý lỗi CORS hoặc network errors
+    if (!error.response) {
+      console.error('Network error or CORS issue:', error.message);
+      // Không redirect nếu đang ở trang login
+      if (window.location.pathname !== '/login' && 
+          !window.location.pathname.includes('/register') &&
+          !window.location.pathname.includes('/forgot-password')) {
+        // Chỉ log error, không redirect để tránh loop
+        console.warn('Có thể có vấn đề với CORS hoặc backend chưa chạy');
+      }
+      return Promise.reject(error);
+    }
+    
     // Chỉ xử lý lỗi 401 cho các request không phải là refresh token
     if (error.response?.status === 401 && !originalRequest._retry && 
         !originalRequest.url.includes('/auth/refresh')) {
@@ -38,7 +51,6 @@ api.interceptors.response.use(
           {},
           { 
             withCredentials: true,
-            
           }
         );
         
@@ -55,7 +67,10 @@ api.interceptors.response.use(
         sessionStorage.removeItem('accessToken');
         sessionStorage.removeItem('refreshToken');
         sessionStorage.removeItem('user');
-        window.location.href = '/login';
+        // Chỉ redirect nếu không phải đang ở trang login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       }
     }

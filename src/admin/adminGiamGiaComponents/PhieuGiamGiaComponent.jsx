@@ -29,11 +29,11 @@ const PhieuGiamGiaComponent = () => {
 
     useEffect(() => {
         const user = JSON.parse(sessionStorage.getItem('user'));
-        if (!user || user.role !== 'ADMIN') {
-            message.error('Bạn không có quyền truy cập trang này!');
-            navigator('/login');
-            return;
-        }
+    if (!user || user.role !== 'ADMIN') {
+      message.error('Bạn không có quyền truy cập trang này!');
+      navigator('/login');
+      return;
+    }
 
         if (paramid) {
 
@@ -256,24 +256,9 @@ const PhieuGiamGiaComponent = () => {
         }
 
         // Giá trị giảm > 0
-        if (!giaTriGiam) {
-            newErrors.giaTriGiam = "Giá trị giảm không được để trống";
-        } else {
-            const value = parseFloat(giaTriGiam);
-
-            if (kieuGiamGia === "GIAM_PHAN_TRAM") {
-                if (value < 1 || value > 100) {
-                    newErrors.giaTriGiam = "Giá trị giảm phần trăm phải từ 1% đến 100%";
-                }
-            } else if (kieuGiamGia === "GIAM_CO_DINH") {
-                if (value <= 0) {
-                    newErrors.giaTriGiam = "Giá trị giảm cố định phải > 0";
-                }
-            }
+        if (giaTriGiam && parseFloat(giaTriGiam) <= 0) {
+            newErrors.giaTriGiam = "Giá trị giảm phải > 0";
         }
-
-
-
 
         // Ngày bắt đầu phải trước ngày kết thúc
         if (ngayBatDau && ngayKetThuc && ngayBatDau > ngayKetThuc) {

@@ -83,12 +83,29 @@ const AppContent = () => {
           setToken(storedToken);
         } catch (error) {
           console.error('Failed to restore session:', error);
-          sessionStorage.clear();
-          setToken(null);
-          setUser(null);
-          if (!['/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)) {
-            message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
-            navigate('/login');
+          
+          // Nếu là lỗi CORS hoặc network, không clear session ngay
+          if (!error.response) {
+            console.warn('CORS hoặc network error - giữ lại session hiện tại');
+            // Sử dụng user từ sessionStorage nếu có
+            try {
+              const parsedUser = JSON.parse(storedUser);
+              setUser(parsedUser);
+              setToken(storedToken);
+            } catch (e) {
+              console.error('Error parsing stored user:', e);
+            }
+          } else {
+            // Chỉ clear session nếu là lỗi 401 hoặc 403
+            if (error.response.status === 401 || error.response.status === 403) {
+              sessionStorage.clear();
+              setToken(null);
+              setUser(null);
+              if (!['/login', '/register', '/forgot-password', '/reset-password'].includes(location.pathname)) {
+                message.error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+                navigate('/login');
+              }
+            }
           }
         }
       } else {

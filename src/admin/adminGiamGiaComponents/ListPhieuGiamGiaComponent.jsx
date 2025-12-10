@@ -71,12 +71,12 @@ const ListPhieuGiamGiaComponent = () => {
     }).format(value);
   };
 
-  // useEffect(() => {
-  //   if (location.state && location.state.newVoucher) {
-  //     setVouchers(prev => [location.state.newVoucher, ...prev]);
-  //     window.history.replaceState({}, document.title);
-  //   }
-  // }, [location.state]);
+  useEffect(() => {
+    if (location.state && location.state.newVoucher) {
+      setVouchers(prev => [location.state.newVoucher, ...prev]);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
 
   useEffect(() => {
