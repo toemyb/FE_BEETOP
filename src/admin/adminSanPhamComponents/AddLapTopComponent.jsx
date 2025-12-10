@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Form, Input, Select, Button, Row, Col, Card, message, Skeleton } from "antd";
+import {
+  Form,
+  Input,
+  Select,
+  Button,
+  Row,
+  Col,
+  Card,
+  message,
+  Skeleton,
+  Modal,
+} from "antd";
 import { useNavigate, useParams } from "react-router-dom";
 import { addLaptop, getAllById, updateLaptop } from "../../service/LapTopService";
 import {
@@ -7,7 +18,7 @@ import {
   getAllPin,
   getAllKichThuoc,
   getAllHeDieuHanh,
-  getAllThuongHieu,        // ✅ THÊM
+  getAllThuongHieu,
 } from "../../service/OptionService";
 
 const { Option } = Select;
@@ -19,7 +30,7 @@ const AddLaptopForm = () => {
   const idLaptop = params.idLaptop || params.id;
   const isEdit = !!idLaptop;
 
-  const [brands, setBrands] = useState([]);  // ✅ THÊM
+  const [brands, setBrands] = useState([]);
   const [screens, setScreens] = useState([]);
   const [pins, setPins] = useState([]);
   const [sizes, setSizes] = useState([]);
@@ -28,7 +39,8 @@ const AddLaptopForm = () => {
   const [saving, setSaving] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(isEdit);
 
-  const pickList = (res) => res?.data?.data?.content || res?.data?.content || res?.data || [];
+  const pickList = (res) =>
+    res?.data?.data?.content || res?.data?.content || res?.data || [];
   const pickObj = (res) => res?.data?.data || res?.data || {};
 
   // Load các option chọn
@@ -36,14 +48,14 @@ const AddLaptopForm = () => {
     (async () => {
       try {
         const [th, m, p, k, h] = await Promise.all([
-          getAllThuongHieu(),   // ✅ THÊM
+          getAllThuongHieu(),
           getAllManHinh(),
           getAllPin(),
           getAllKichThuoc(),
           getAllHeDieuHanh(),
         ]);
 
-        setBrands(pickList(th));        // ✅ THÊM
+        setBrands(pickList(th));
         setScreens(pickList(m));
         setPins(pickList(p));
         setSizes(
@@ -62,7 +74,12 @@ const AddLaptopForm = () => {
 
   // Load chi tiết khi Sửa
   useEffect(() => {
-    if (!isEdit) return;
+    if (!isEdit) {
+      // form thêm mới: mặc định trạng thái = 1
+      form.setFieldsValue({ trangThai: 1 });
+      return;
+    }
+
     (async () => {
       try {
         const res = await getAllById(idLaptop); // GET /api/laptop/detail/:id
@@ -70,11 +87,12 @@ const AddLaptopForm = () => {
         form.setFieldsValue({
           tenSanPham: item.tenSanPham,
           moTa: item.moTa,
-          idThuongHieu: item.idThuongHieu,   // ✅ THÊM
+          idThuongHieu: item.idThuongHieu,
           idManHinh: item.idManHinh,
           idPin: item.idPin,
           idKichThuoc: item.idKichThuoc,
           idHeDieuHanh: item.idHeDieuHanh,
+          trangThai: item.trangThai ?? 1, // ✅ load trạng thái
         });
       } catch (e) {
         console.error(e);
@@ -85,41 +103,76 @@ const AddLaptopForm = () => {
     })();
   }, [isEdit, idLaptop, form]);
 
-  const onFinish = async (v) => {
+  // Hàm thực sự gọi API (thêm / sửa)
+  const doSubmit = async (values) => {
     const payload = {
-      tenSanPham: v.tenSanPham,
-      moTa: v.moTa || "",
-      idThuongHieu: v.idThuongHieu,   // ✅ THÊM
-      idManHinh: v.idManHinh,
-      idPin: v.idPin,
-      idKichThuoc: v.idKichThuoc,
-      idHeDieuHanh: v.idHeDieuHanh,
+      tenSanPham: values.tenSanPham,
+      moTa: values.moTa || "",
+      idThuongHieu: values.idThuongHieu,
+      idManHinh: values.idManHinh,
+      idPin: values.idPin,
+      idKichThuoc: values.idKichThuoc,
+      idHeDieuHanh: values.idHeDieuHanh,
+      trangThai: Number(values.trangThai ?? 1), // ✅ gửi trạng thái
     };
 
     try {
       setSaving(true);
       if (isEdit) {
         const res = await updateLaptop(idLaptop, payload);
-        if (res?.data?.code === 200) message.success(res.data.message || "Cập nhật laptop thành công");
+        if (res?.data?.code === 200)
+          message.success(res.data.message || "Cập nhật laptop thành công");
         else message.success("Cập nhật laptop thành công");
       } else {
         const res = await addLaptop(payload);
-        if (res?.data?.code === 200) message.success(res.data.message || "Thêm laptop thành công");
+        if (res?.data?.code === 200)
+          message.success(res.data.message || "Thêm laptop thành công");
         else message.success("Thêm laptop thành công");
         form.resetFields();
+        form.setFieldsValue({ trangThai: 1 });
       }
       navigate("/admin/lap-top");
     } catch (e) {
       console.error(e);
-      message.error(isEdit ? "Không thể cập nhật laptop." : "Không thể thêm laptop.");
+      message.error(
+        isEdit ? "Không thể cập nhật laptop." : "Không thể thêm laptop."
+      );
+      throw e;
     } finally {
       setSaving(false);
     }
   };
 
+  // Submit form: popup xác nhận rồi mới gọi doSubmit
+  const onFinish = async (values) => {
+    const name = values.tenSanPham || "(không tên)";
+    if (isEdit) {
+      Modal.confirm({
+        title: "Xác nhận cập nhật",
+        content: `Bạn có chắc chắn muốn cập nhật laptop "${name}"?`,
+        okText: "Đồng ý",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => doSubmit(values),
+      });
+    } else {
+      Modal.confirm({
+        title: "Xác nhận thêm mới",
+        content: `Bạn có chắc chắn muốn thêm laptop "${name}"?`,
+        okText: "Đồng ý",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => doSubmit(values),
+      });
+    }
+  };
+
   return (
     <div style={{ padding: 24, display: "flex", justifyContent: "center" }}>
-      <Card title={isEdit ? "SỬA SẢN PHẨM" : "THÊM SẢN PHẨM"} style={{ width: "100%", maxWidth: 1000 }}>
+      <Card
+        title={isEdit ? "SỬA SẢN PHẨM" : "THÊM SẢN PHẨM"}
+        style={{ width: "100%", maxWidth: 1000 }}
+      >
         {loadingDetail ? (
           <Skeleton active paragraph={{ rows: 6 }} />
         ) : (
@@ -136,11 +189,14 @@ const AddLaptopForm = () => {
               </Col>
               <Col span={12}>
                 <Form.Item name="moTa" label="Mô Tả">
-                  <Input.TextArea rows={1} placeholder="Laptop mỏng nhẹ, hiệu năng cao..." />
+                  <Input.TextArea
+                    rows={1}
+                    placeholder="Laptop mỏng nhẹ, hiệu năng cao..."
+                  />
                 </Form.Item>
               </Col>
 
-              {/* ✅ Thương hiệu */}
+              {/* Thương hiệu */}
               <Col span={6}>
                 <Form.Item
                   name="idThuongHieu"
@@ -157,6 +213,7 @@ const AddLaptopForm = () => {
                 </Form.Item>
               </Col>
 
+              {/* Màn hình */}
               <Col span={6}>
                 <Form.Item
                   name="idManHinh"
@@ -173,6 +230,7 @@ const AddLaptopForm = () => {
                 </Form.Item>
               </Col>
 
+              {/* Pin */}
               <Col span={6}>
                 <Form.Item
                   name="idPin"
@@ -189,6 +247,7 @@ const AddLaptopForm = () => {
                 </Form.Item>
               </Col>
 
+              {/* Kích thước */}
               <Col span={6}>
                 <Form.Item
                   name="idKichThuoc"
@@ -205,6 +264,7 @@ const AddLaptopForm = () => {
                 </Form.Item>
               </Col>
 
+              {/* Hệ điều hành */}
               <Col span={6}>
                 <Form.Item
                   name="idHeDieuHanh"
@@ -220,13 +280,31 @@ const AddLaptopForm = () => {
                   </Select>
                 </Form.Item>
               </Col>
+
+              {/* 🔥 Trạng thái */}
+              <Col span={6}>
+                <Form.Item
+                  name="trangThai"
+                  label="Trạng Thái"
+                  rules={[{ required: true, message: "Chọn trạng thái" }]}
+                  initialValue={1}
+                >
+                  <Select>
+                    <Option value={1}>Hoạt động</Option>
+                    <Option value={0}>Ngưng hoạt động</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
             </Row>
 
             <Form.Item>
               <Button type="primary" htmlType="submit" loading={saving}>
                 {isEdit ? "Lưu Thay Đổi" : "Lưu Sản Phẩm"}
               </Button>
-              <Button style={{ marginLeft: 8 }} onClick={() => navigate("/admin/lap-top")}>
+              <Button
+                style={{ marginLeft: 8 }}
+                onClick={() => navigate("/admin/lap-top")}
+              >
                 Hủy
               </Button>
             </Form.Item>

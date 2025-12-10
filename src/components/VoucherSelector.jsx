@@ -138,31 +138,37 @@ const VoucherSelector = ({
   //    - id: UUID dùng cho BE
   //    - code: mã hiển thị kiểu "PGG0022"
   const vouchers = useMemo(
-    () =>
-      (rawVouchers || []).map((v) => {
-        // ⚠️ CHÚ Ý: sửa đúng tên field UUID voucher của bạn ở đây nếu khác
-        const uuid = v.id; // ví dụ: "a79f4db8-3b4c-4e6a-9e5d-3c2b9f..."
-        // field mã hiển thị, ví dụ: "PGG0022"
-        const code =
-          v.ma ||
-          v.maPhieu ||
-          v.maPhieuGiamGia ||
-          v.maVoucher ||
-          v.code ||
-          v.idPhieugiamgia ||
-          uuid;
+  () =>
+    (rawVouchers || []).map((v) => {
+      // 💡 Với API /phieu-giam-gia hiện tại, mã voucher là idPhieugiamgia (PGG001...)
+      const codeFromApi =
+        v.idPhieugiamgia ||   // từ ListPhieuGiamGiaComponent
+        v.idPhieuGiamGia ||   // phòng trường hợp BE trả camel-case
+        v.ma ||
+        v.maPhieu ||
+        v.maPhieuGiamGia ||
+        v.maVoucher ||
+        v.code;
 
-        return {
-          ...v,
-          id: uuid,          // dùng làm key & để gửi lên BE
-          uuid,              // nếu cần
-          code,              // để hiển thị "PGG0022"
-          name: v.ten || v.name || v.moTa || code,
-          discount: calcDiscount(v),
-        };
-      }),
-    [rawVouchers, subtotal]
-  );
+      const uuid =
+        codeFromApi ||        // dùng chính mã này làm id
+        v.id ||
+        v.uuid ||
+        v.idVoucher;
+
+      const code = codeFromApi || uuid;
+
+      return {
+        ...v,
+        id: uuid,              // 🚩 id FE & gửi lên BE (string mã voucher)
+        uuid,
+        code,                  // hiển thị
+        name: v.ten || v.name || v.moTa || code,
+        discount: calcDiscount(v),
+      };
+    }),
+  [rawVouchers, subtotal]
+);
 
   // voucher đang hoạt động & trong thời gian
   const activeByStatusAndDate = useMemo(
@@ -174,10 +180,9 @@ const VoucherSelector = ({
   const applicable = useMemo(() => {
     return activeByStatusAndDate.filter((v) => {
       const minOrder = Number(v.giaTriMin || 0);
-      const maxOrder = Number(v.giaTriMax || 0);
       const minOk = minOrder ? subtotal >= minOrder : true;
-      const maxOk = maxOrder ? subtotal <= maxOrder : true;
-      return minOk && maxOk;
+
+      return minOk;
     });
   }, [activeByStatusAndDate, subtotal]);
 

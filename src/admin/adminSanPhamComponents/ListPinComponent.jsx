@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Select, Space } from 'antd';
+import { Table, Button, Input, Select, Space, Tag } from 'antd';
 import { listPin } from '../../service/PinService';
 import AddPinModal from './AddPinComponent';
 import AdminBreadcrumb from '../components/Breadcrumb';
@@ -34,11 +34,10 @@ const ListPinComponent = () => {
     setLoading(true);
     try {
       const res = await listPin();
-      const data =
-        res?.data?.data ??
-        res?.data?.content ??
-        (Array.isArray(res?.data) ? res.data : []) ??
-        [];
+
+      // 🔁 Call giống DoHoa: ưu tiên data.content, không có thì lấy data
+      const data = res.data.content || res.data;
+
       setPinList(data);
       setFilteredList(data);
       setPagination((p) => ({ ...p, current: 1 }));
@@ -74,7 +73,7 @@ const ListPinComponent = () => {
     else if (sortOption === 'dl_za') temp.sort(by('dungLuong', 'desc'));
 
     setFilteredList(temp);
-    setPagination((p) => ({ ...p, current: 1 })); // tránh trang rỗng sau khi lọc/sort
+    setPagination((p) => ({ ...p, current: 1 }));
   }, [searchText, sortOption, pinList]);
 
   const handleRefresh = () => {
@@ -110,12 +109,19 @@ const ListPinComponent = () => {
       render: (text) => <strong>{s(text) || '—'}</strong>,
     },
     {
+      title: 'Trạng thái',
+      dataIndex: 'trangThai',
+      render: (val) => {
+        if (val === 1) return <Tag color="green">Hoạt động</Tag>;
+        if (val === 0) return <Tag color="red">Ngưng</Tag>;
+        return <Tag>Chưa thiết lập</Tag>;
+      },
+    },
+    {
       title: 'Hành động',
       render: (_v, record) => (
         <Button
           type="link"
-          // ✅ nếu BE dùng id làm khóa chính: để record.id
-          // nếu BE nhận idPin cho API detail, đổi thành record.idPin
           onClick={() => openModal(record?.id)}
         >
           Sửa

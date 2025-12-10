@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Tag, Input, Select, Space, Row, Col, Typography, Card } from 'antd';
+import {
+  Table,
+  Button,
+  Tag,
+  Input,
+  Select,
+  Space,
+  Row,
+  Col,
+  Typography,
+  Card,
+} from 'antd';
 import { listHeDieuHanh } from '../../service/HeDieuHanhService';
 import AddHeDieuHanhModal from './AddHeDieuHanhComponent';
 import AdminBreadcrumb from '../components/Breadcrumb';
@@ -32,18 +43,28 @@ const ListHeDieuHanhComponent = () => {
     setLoading(true);
     try {
       const res = await listHeDieuHanh();
-      const data = res?.data?.content || res?.data || [];
+      const data =
+        res?.data?.data?.content ||
+        res?.data?.content ||
+        (Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : []) ||
+        [];
       setHdhList(data);
       setFilteredList(data);
+      setPagination((p) => ({ ...p, current: 1 }));
     } catch (e) {
       console.error('Không thể tải dữ liệu Hệ điều hành', e);
+      setHdhList([]);
+      setFilteredList([]);
     } finally {
       setLoading(false);
     }
   };
 
   const pickName = (item) =>
-    item?.tenDayDu ?? item?.ten ?? item?.name ?? `${item?.hang ?? ''} ${item?.phienBan ?? item?.version ?? ''}`.trim();
+    item?.tenDayDu ??
+    item?.ten ??
+    item?.name ??
+    `${item?.hang ?? ''} ${item?.phienBan ?? item?.version ?? ''}`.trim();
 
   useEffect(() => {
     let temp = [...hdhList];
@@ -54,16 +75,23 @@ const ListHeDieuHanhComponent = () => {
     }
 
     if (filterTrangThai !== 'all') {
-      temp = temp.filter((item) => Number(item?.trangThai) === Number(filterTrangThai));
+      temp = temp.filter(
+        (item) => Number(item?.trangThai) === Number(filterTrangThai)
+      );
     }
 
     if (sortOption === 'az') {
-      temp.sort((a, b) => (pickName(a) || '').localeCompare(pickName(b) || ''));
+      temp.sort((a, b) =>
+        (pickName(a) || '').localeCompare(pickName(b) || '')
+      );
     } else if (sortOption === 'za') {
-      temp.sort((a, b) => (pickName(b) || '').localeCompare(pickName(a) || ''));
+      temp.sort((a, b) =>
+        (pickName(b) || '').localeCompare(pickName(a) || '')
+      );
     }
 
     setFilteredList(temp);
+    setPagination((p) => ({ ...p, current: 1 }));
   }, [searchText, filterTrangThai, sortOption, hdhList]);
 
   const handleRefresh = () => {
@@ -95,7 +123,8 @@ const ListHeDieuHanhComponent = () => {
     {
       title: 'Mã HĐH',
       dataIndex: 'ma',
-      render: (_val, record) => record?.ma ?? record?.idHedieuhanh ?? record?.ma,
+      render: (_val, record) =>
+        record?.ma ?? record?.idHedieuhanh ?? record?.ma,
       width: 150,
       align: 'center',
     },
@@ -113,11 +142,25 @@ const ListHeDieuHanhComponent = () => {
       align: 'center',
     },
     {
+      title: 'Trạng thái',
+      dataIndex: 'trangThai',
+      width: 130,
+      align: 'center',
+      render: (val) => {
+        if (val === 1) return <Tag color="green">Hoạt động</Tag>;
+        if (val === 0) return <Tag color="red">Ngưng</Tag>;
+        return <Tag>Chưa thiết lập</Tag>;
+      },
+    },
+    {
       title: 'Hành động',
       width: 120,
       align: 'center',
       render: (_val, record) => (
-        <Button type="link" onClick={() => openModal(record?.id ?? record?.idHedieuhanh)}>
+        <Button
+          type="link"
+          onClick={() => openModal(record?.id ?? record?.idHedieuhanh)}
+        >
           Sửa
         </Button>
       ),
@@ -128,7 +171,12 @@ const ListHeDieuHanhComponent = () => {
     <div style={{ padding: '24px 32px' }}>
       <AdminBreadcrumb items={[{ label: 'Hệ điều hành' }]} />
 
-      <Card style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+      <Card
+        style={{
+          borderRadius: 12,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+        }}
+      >
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
           <Col>
             <Title level={3} style={{ margin: 0 }}>
@@ -136,7 +184,11 @@ const ListHeDieuHanhComponent = () => {
             </Title>
           </Col>
           <Col>
-            <Button type="primary" onClick={() => openModal()} style={{ fontWeight: 500 }}>
+            <Button
+              type="primary"
+              onClick={() => openModal()}
+              style={{ fontWeight: 500 }}
+            >
               + Thêm Hệ điều hành
             </Button>
           </Col>
@@ -160,13 +212,20 @@ const ListHeDieuHanhComponent = () => {
             style={{ width: 250 }}
           />
 
-          <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          <Button
+            onClick={handleRefresh}
+            style={{ background: '#FFD700', color: '#000' }}
+          >
             Làm Mới
           </Button>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Trạng thái:</span>
-            <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 140 }}>
+            <Select
+              value={filterTrangThai}
+              onChange={setFilterTrangThai}
+              style={{ width: 140 }}
+            >
               <Option value="all">Tất cả</Option>
               <Option value="1">Hoạt động</Option>
               <Option value="0">Ngưng</Option>
@@ -175,7 +234,11 @@ const ListHeDieuHanhComponent = () => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Sắp xếp:</span>
-            <Select value={sortOption} onChange={setSortOption} style={{ width: 140 }}>
+            <Select
+              value={sortOption}
+              onChange={setSortOption}
+              style={{ width: 140 }}
+            >
               <Option value="default">Mặc định</Option>
               <Option value="az">Tên A-Z</Option>
               <Option value="za">Tên Z-A</Option>

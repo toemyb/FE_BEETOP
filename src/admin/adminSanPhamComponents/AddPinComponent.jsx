@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input } from 'antd';
+import { Modal, Form, Input, Select } from 'antd';
 import { addPin, getAllById, updatePin } from '../../service/PinService';
 import useToast from '../../hooks/useNotify';
+
+const { Option } = Select;
 
 const AddPinModal = ({ open, id, onClose, onSuccess }) => {
   const [form] = Form.useForm();
@@ -19,23 +21,26 @@ const AddPinModal = ({ open, id, onClose, onSuccess }) => {
             (Array.isArray(res?.data) ? res.data : res?.data) ??
             null;
 
-          if (data) form.setFieldsValue(data);
+          if (data) {
+            form.setFieldsValue(data);
+          }
         })
         .catch(() => {
           error('Không thể tải dữ liệu Pin');
         });
     } else {
       form.resetFields();
+      // mặc định trạng thái = 1 khi thêm mới
+      form.setFieldsValue({ trangThai: 1 });
     }
   }, [id, form, error]);
 
-  // Lưu (thêm/sửa)
-  const handleOk = async () => {
+  const doSubmit = async (values) => {
     try {
-      const values = await form.validateFields();
       setLoading(true);
+      const payload = { ...values };
 
-      const req = id ? updatePin({ id, ...values }) : addPin(values);
+      const req = id ? updatePin({ id, ...payload }) : addPin(payload);
       await req;
 
       success(id ? `Đã cập nhật: ${values.idPin}` : `Đã thêm: ${values.idPin}`);
@@ -46,6 +51,30 @@ const AddPinModal = ({ open, id, onClose, onSuccess }) => {
       error(id ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Lưu (thêm/sửa)
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+
+      // nếu đang sửa → hỏi confirm
+      if (id) {
+        Modal.confirm({
+          title: 'Xác nhận cập nhật',
+          content: `Bạn có chắc chắn muốn cập nhật Pin "${values.idPin}"?`,
+          okText: 'Cập nhật',
+          cancelText: 'Hủy',
+          onOk: () => doSubmit(values),
+        });
+      } else {
+        // thêm mới thì submit luôn
+        await doSubmit(values);
+      }
+    } catch (err) {
+      // validate fail thì không làm gì
+      console.error(err);
     }
   };
 
@@ -61,14 +90,18 @@ const AddPinModal = ({ open, id, onClose, onSuccess }) => {
       destroyOnClose
       centered
     >
-      <Form form={form} layout="vertical">
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{ trangThai: 1 }}
+      >
         {/* Mã Pin */}
         <Form.Item
           label="Mã Pin"
           name="idPin"
           rules={[{ required: true, message: 'Vui lòng nhập Mã Pin' }]}
         >
-          <Input disabled={!!id} placeholder="Ví dụ: PIN001" />
+          <Input/>
         </Form.Item>
 
         {/* Dung lượng */}
@@ -78,6 +111,18 @@ const AddPinModal = ({ open, id, onClose, onSuccess }) => {
           rules={[{ required: true, message: 'Vui lòng nhập Dung lượng' }]}
         >
           <Input placeholder="Ví dụ: 3-cell, 5-cell, 56Wh..." />
+        </Form.Item>
+
+        {/* Trạng thái */}
+        <Form.Item
+          label="Trạng thái"
+          name="trangThai"
+          rules={[{ required: true, message: 'Vui lòng chọn Trạng thái' }]}
+        >
+          <Select>
+            <Option value={1}>Hoạt động</Option>
+            <Option value={0}>Ngưng</Option>
+          </Select>
         </Form.Item>
       </Form>
     </Modal>

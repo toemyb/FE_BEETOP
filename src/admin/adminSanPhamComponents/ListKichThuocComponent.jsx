@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Input, Select, Space } from 'antd';
-import { listKichthuoc } from '../../service/KichThuocService'; // (đổi tên file đúng của bạn)
+import { Table, Button, Input, Select, Space, Tag } from 'antd';
+import { listKichthuoc } from '../../service/KichThuocService';
 import AddKichThuocModal from './AddKichThuocComponent';
 import AdminBreadcrumb from '../components/Breadcrumb';
 
@@ -10,6 +10,12 @@ const s = (v) => String(v ?? '');
 const lower = (v) => s(v).toLowerCase();
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+// ⚡ Map trạng thái giống bên Đồ họa
+const statusMap = {
+  0: { text: 'Ngừng hoạt động', color: 'red' },
+  1: { text: 'Đang hoạt động', color: 'green' },
+};
+
 const ListKichThuocComponent = () => {
   const [ktList, setKtList] = useState([]);
   const [filteredList, setFilteredList] = useState([]);
@@ -17,6 +23,7 @@ const ListKichThuocComponent = () => {
 
   const [searchText, setSearchText] = useState('');
   const [sortOption, setSortOption] = useState('default');
+  const [filterTrangThai, setFilterTrangThai] = useState('all'); // 🔥 filter trạng thái
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -29,7 +36,6 @@ const ListKichThuocComponent = () => {
     setLoading(true);
     try {
       const res = await listKichthuoc();
-      // Chấp nhận nhiều shape: {code, data}, {content}, hoặc array thẳng
       const data =
         res?.data?.data ??
         res?.data?.content ??
@@ -38,9 +44,11 @@ const ListKichThuocComponent = () => {
       setKtList(data);
       setFilteredList(data);
       setPagination((p) => ({ ...p, current: 1 }));
+      setFilterTrangThai('all'); // reset filter
     } catch (e) {
       console.error('Không thể tải dữ liệu Kích thước', e);
-      setKtList([]); setFilteredList([]);
+      setKtList([]);
+      setFilteredList([]);
     } finally {
       setLoading(false);
     }
@@ -48,6 +56,12 @@ const ListKichThuocComponent = () => {
 
   useEffect(() => {
     let temp = [...ktList];
+
+    // 🎯 Lọc theo trạng thái
+    if (filterTrangThai !== 'all') {
+      const st = Number(filterTrangThai);
+      temp = temp.filter((it) => Number(it?.trangThai) === st);
+    }
 
     // 🔎 Tìm theo idKichThuoc hoặc giá trị số
     if (searchText.trim()) {
@@ -99,11 +113,12 @@ const ListKichThuocComponent = () => {
 
     setFilteredList(temp);
     setPagination((p) => ({ ...p, current: 1 }));
-  }, [searchText, sortOption, ktList]);
+  }, [searchText, sortOption, filterTrangThai, ktList]);
 
   const handleRefresh = () => {
     setSearchText('');
     setSortOption('default');
+    setFilterTrangThai('all');
     fetchData();
   };
 
@@ -122,6 +137,18 @@ const ListKichThuocComponent = () => {
     { title: 'Chiều rộng', dataIndex: 'chieuRong', render: (v) => `${num(v)} cm` },
     { title: 'Chiều cao', dataIndex: 'chieuCao', render: (v) => `${num(v)} cm` },
     { title: 'Khối lượng', dataIndex: 'khoiLuong', render: (v) => `${num(v)} kg` },
+
+    // 🟢 Cột trạng thái
+    {
+      title: 'Trạng thái',
+      dataIndex: 'trangThai',
+      width: 140,
+      render: (v) => {
+        const cfg = statusMap[Number(v)] || statusMap[0];
+        return <Tag color={cfg.color}>{cfg.text}</Tag>;
+      },
+    },
+
     {
       title: 'Hành động',
       render: (_v, record) => (
@@ -164,6 +191,18 @@ const ListKichThuocComponent = () => {
           <Option value="cao_desc">Cao ↓</Option>
           <Option value="kl_asc">Khối lượng ↑</Option>
           <Option value="kl_desc">Khối lượng ↓</Option>
+        </Select>
+
+        {/* 🔥 Filter trạng thái giống Đồ họa */}
+        <span>Trạng thái:</span>
+        <Select
+          value={filterTrangThai}
+          onChange={setFilterTrangThai}
+          style={{ width: 160 }}
+        >
+          <Option value="all">Tất cả</Option>
+          <Option value="1">Đang hoạt động</Option>
+          <Option value="0">Ngừng hoạt động</Option>
         </Select>
 
         <Button type="primary" onClick={() => openModal()}>

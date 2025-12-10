@@ -268,37 +268,42 @@ const InvoiceWorkingArea = ({
 
     // 🔧 Sync voucher đang áp dụng trên đơn (List<PosVoucherDTO>)
     if (Array.isArray(data.vouchers)) {
-      const vList = data.vouchers.map((v) => {
-        const uuid =
-          v.id ||
-          v.uuid ||
-          v.idVoucher ||
-          v.idPhieuGiamGia;
+  const vList = data.vouchers.map((v) => {
+    // BE PosVoucherDTO: idPhieuGiamGia là mã voucher (PGG001...)
+    const codeFromDto =
+      v.idPhieuGiamGia ||  // đúng kiểu từ BE
+      v.idPhieugiamgia ||  // phòng khi BE viết khác camel-case
+      v.idPhieugiamgia;    // fallback nữa
 
-        const code =
-          v.ma ||
-          v.maPhieu ||
-          v.maPhieuGiamGia ||
-          v.maVoucher ||
-          v.code ||
-          v.idPhieuGiamGia ||
-          uuid;
+    const uuid =
+      codeFromDto ||       // dùng chính mã này làm "id"
+      v.id ||
+      v.uuid ||
+      v.idVoucher;
 
-        return {
-          id: uuid,
-          code,
-          name: v.ten || v.name || code,
-          kieuGiamGia: v.kieuGiamGia,
-          discount: Number(v.giaTriGiam || 0),
-          giaTriMin: Number(v.giaTriMin || 0),
-          giaTriMax: Number(v.giaTriMax || 0),
-          trangThai: v.trangThai,
-        };
-      });
-      setAppliedVouchers(vList);
-    } else {
-      setAppliedVouchers([]);
-    }
+    const code =
+      codeFromDto ||
+      v.ma ||
+      v.maPhieu ||
+      v.maPhieuGiamGia ||
+      v.maVoucher ||
+      v.code ||
+      uuid;
+
+    return {
+      id: uuid,           // 🚩 ID dùng cho FE & gửi lên BE
+      code,
+      name: v.ten || v.name || code,
+      kieuGiamGia: v.kieuGiamGia,
+      discount: Number(v.giaTriGiam || 0),
+      giaTriMin: Number(v.giaTriMin || 0),
+      trangThai: v.trangThai,
+    };
+  });
+  setAppliedVouchers(vList);
+} else {
+  setAppliedVouchers([]);
+}
 
     // Nếu invoice hiện chưa có customer nhưng OrderDetail có tên/sđt thì hiển thị
     if (!invoice.customer && (data.tenKhachHang || data.sdtKhachHang)) {

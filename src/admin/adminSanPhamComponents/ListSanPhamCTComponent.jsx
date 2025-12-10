@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Space, Button, message, Modal } from 'antd'; // 👈 THÊM Modal
-import { ReloadOutlined, EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, Tag, Space, Button, message, Modal } from 'antd';
+import {
+  ReloadOutlined,
+  EditOutlined,
+  PlusOutlined,
+  PictureOutlined,
+} from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getLaptopCTByLaptop } from '../../service/LapTopCTService';
-import { getSeriByLaptopCt } from '../../service/SeriService';
-import AddSeriComponent from './AddSeriComponent'; // 👈 IMPORT FORM SERI
+import { getAnhByLaptopCt } from '../../service/AnhService';   // ✅ service ảnh
+import AddSeriComponent from './AddSeriComponent';
+import AddAnhComponent from './AddAnhComponent';
 
 const ListLaptopCTComponent = () => {
   const navigate = useNavigate();
@@ -12,10 +18,14 @@ const ListLaptopCTComponent = () => {
 
   const [variants, setVariants] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [seriCounts, setSeriCounts] = useState({});
 
-  // state cho modal thêm seri
+  // modal thêm seri
   const [openSeriModal, setOpenSeriModal] = useState(false);
+
+  // modal quản lý ảnh
+  const [openAnhModal, setOpenAnhModal] = useState(false);
+
+  // id biến thể đang thao tác (dùng chung cho cả seri & ảnh)
   const [currentLaptopCtId, setCurrentLaptopCtId] = useState(null);
 
   const fetchData = async () => {
@@ -27,6 +37,7 @@ const ListLaptopCTComponent = () => {
 
     setLoading(true);
     try {
+      // ===== 1. Lấy list biến thể =====
       const response = await getLaptopCTByLaptop(idLaptop);
 
       const raw =
@@ -51,9 +62,32 @@ const ListLaptopCTComponent = () => {
         trangThai: item.trangThai,
         ngayTao: item.ngayTao,
         ngayCapNhat: item.ngayCapNhat,
+        soLuongSeri: item.soLuongSeri ?? 0,
       }));
 
-      setVariants(mapped);
+      // ===== 2. Với mỗi biến thể, gọi API ảnh để lấy thumbnail =====
+      const withImage = await Promise.all(
+        mapped.map(async (v) => {
+          try {
+            const resAnh = await getAnhByLaptopCt(v.id);
+            const listAnh = resAnh?.data?.data || resAnh?.data || [];
+            const first = Array.isArray(listAnh) && listAnh.length > 0 ? listAnh[0] : null;
+
+            return {
+              ...v,
+              anhUrl: first?.imgURL || null,
+            };
+          } catch (e) {
+            console.error('Lỗi load ảnh cho biến thể', v.id, e);
+            return {
+              ...v,
+              anhUrl: null,
+            };
+          }
+        })
+      );
+
+      setVariants(withImage);
     } catch (err) {
       console.error('❌ Lỗi khi tải danh sách biến thể laptop:', err);
       message.error('Không tải được danh sách biến thể.');
@@ -67,36 +101,37 @@ const ListLaptopCTComponent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idLaptop]);
 
-  // ====== LOAD SỐ LƯỢNG SERI CHO TỪNG BIẾN THỂ ======
-  useEffect(() => {
-    if (!variants.length) return;
-
-    const fetchSeriCounts = async () => {
-      try {
-        const result = {};
-        await Promise.all(
-          variants.map(async (v) => {
-            const res = await getSeriByLaptopCt(v.id);
-            const list = res?.data?.data || res?.data || [];
-            result[v.id] = Array.isArray(list) ? list.length : 0;
-          })
-        );
-        setSeriCounts(result);
-      } catch (e) {
-        console.error('❌ Lỗi load số lượng seri:', e);
-      }
-    };
-
-    fetchSeriCounts();
-  }, [variants]);
-
   const columns = [
     { title: 'STT', dataIndex: 'stt', width: 60 },
+
+    // ✅ CỘT ẢNH SAU STT
+    {
+      title: 'Ảnh',
+      dataIndex: 'anhUrl',
+      width: 90,
+      render: (url) =>
+        url ? (
+          <img
+            src={url}
+            alt="Ảnh biến thể"
+            style={{
+              width: 50,
+              height: 50,
+              objectFit: 'cover',
+              borderRadius: 4,
+            }}
+          />
+        ) : (
+          <span style={{ color: '#aaa' }}>(Chưa có)</span>
+        ),
+    },
+
     {
       title: 'Mã biến thể',
       dataIndex: 'idLaptopCT',
       width: 160,
-      render: (val) => val || <span style={{ color: '#aaa' }}>(Chưa gán mã)</span>,
+      render: (val) =>
+        val || <span style={{ color: '#aaa' }}>(Chưa gán mã)</span>,
     },
     { title: 'RAM', dataIndex: 'ram', width: 100 },
     { title: 'SSD', dataIndex: 'ssd', width: 100 },
@@ -108,14 +143,16 @@ const ListLaptopCTComponent = () => {
       dataIndex: 'giaBan',
       width: 140,
       render: (val) =>
-        val != null ? val.toLocaleString('vi-VN') + ' ₫' : <span style={{ color: '#aaa' }}>-</span>,
+        val != null ? Number(val).toLocaleString('vi-VN') + ' ₫' : (
+          <span style={{ color: '#aaa' }}>-</span>
+        ),
     },
     {
       title: 'Số lượng seri',
       dataIndex: 'soLuongSeri',
       width: 130,
       align: 'center',
-      render: (_, record) => seriCounts[record.id] ?? 0,
+      render: (val) => val ?? 0,
     },
     {
       title: 'Trạng thái',
@@ -136,21 +173,25 @@ const ListLaptopCTComponent = () => {
       width: 220,
       render: (_, record) => (
         <Space>
+          {/* Sửa biến thể */}
           <Button
             icon={<EditOutlined />}
             type="text"
             onClick={() => navigate(`/admin/lap-top-ct/edit/${record.id}`)}
           />
 
+          {/* Quản lý ảnh biến thể */}
           <Button
-            icon={<EyeOutlined />}
+            icon={<PictureOutlined />}
             type="text"
+            title="Quản lý ảnh"
             onClick={() => {
-              console.log('View variant id = ', record.id);
+              setCurrentLaptopCtId(record.id);
+              setOpenAnhModal(true);
             }}
           />
 
-          {/* 👇 Nút mở modal thêm seri */}
+          {/* Thêm Seri */}
           <Button
             icon={<PlusOutlined />}
             type="text"
@@ -207,13 +248,34 @@ const ListLaptopCTComponent = () => {
         footer={null}
         width={900}
         destroyOnClose
+        title="Quản lý Serial Numbers"
       >
         {currentLaptopCtId && (
           <AddSeriComponent
             idLaptopCt={currentLaptopCtId}
             onClose={() => {
               setOpenSeriModal(false);
-              fetchData(); // reload lại list + số lượng seri
+              fetchData(); // reload số lượng seri
+            }}
+          />
+        )}
+      </Modal>
+
+      {/* MODAL QUẢN LÝ ẢNH */}
+      <Modal
+        open={openAnhModal}
+        onCancel={() => setOpenAnhModal(false)}
+        footer={null}
+        width={900}
+        destroyOnClose
+        title="Quản lý ảnh biến thể"
+      >
+        {currentLaptopCtId && (
+          <AddAnhComponent
+            idLaptopCt={currentLaptopCtId}
+            onClose={() => {
+              setOpenAnhModal(false);
+              // nếu sau này cần dùng số lượng ảnh trong list thì có thể gọi fetchData() ở đây
             }}
           />
         )}

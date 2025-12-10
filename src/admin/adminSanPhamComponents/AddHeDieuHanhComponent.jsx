@@ -1,7 +1,9 @@
 import React, { useEffect } from 'react';
-import { Modal, Form, Input } from 'antd';
+import { Modal, Form, Input, Select } from 'antd';
 import { addHeDieuHanh, getAllById, updateHeDieuHanh } from '../../service/HeDieuHanhService';
 import useToast from '../../hooks/useNotify';
+
+const { Option } = Select;
 
 const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
   const [form] = Form.useForm();
@@ -11,7 +13,15 @@ const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
     if (id && open) {
       getAllById(id)
         .then((res) => {
-          form.setFieldsValue(res.data.data); // ⬅ Lấy đúng object bên trong
+          const data =
+            res?.data?.data ??
+            res?.data?.content ??
+            (Array.isArray(res?.data) ? res.data : res?.data) ??
+            null;
+
+          if (data) {
+            form.setFieldsValue(data);
+          }
         })
         .catch(() => error('Không thể tải dữ liệu hệ điều hành'));
     } else if (open) {
@@ -19,22 +29,53 @@ const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
     }
   }, [id, open, form, error]);
 
+  const doSave = async (values) => {
+    if (id) {
+      // 🟡 GỌI API UPDATE
+      await updateHeDieuHanh({ id, ...values });
+      success('Cập nhật hệ điều hành thành công!');
+    } else {
+      // 🟢 GỌI API ADD
+      await addHeDieuHanh(values);
+      success('Thêm hệ điều hành thành công!');
+    }
+
+    onSuccess?.();
+    onClose();
+  };
+
   const handleOk = async () => {
     try {
       const values = await form.validateFields();
 
       if (id) {
-        await updateHeDieuHanh({ id, ...values });
-        success('Cập nhật hệ điều hành thành công!');
+        // 🔔 HỎI XÁC NHẬN KHI SỬA
+        Modal.confirm({
+          title: 'Xác nhận cập nhật',
+          content: `Bạn có chắc chắn muốn cập nhật hệ điều hành "${values.ten}"?`,
+          okText: 'Đồng ý',
+          cancelText: 'Hủy',
+          onOk: async () => {
+            try {
+              await doSave(values);
+            } catch (e) {
+              console.error(e);
+              error('Cập nhật hệ điều hành thất bại');
+            }
+          },
+        });
       } else {
-        await addHeDieuHanh(values);
-        success('Thêm hệ điều hành thành công!');
+        // THÊM MỚI – KHÔNG CẦN CONFIRM
+        try {
+          await doSave(values);
+        } catch (e) {
+          console.error(e);
+          error('Thêm hệ điều hành thất bại');
+        }
       }
-
-      onSuccess?.();
-      onClose();
     } catch (e) {
-      error('Lưu hệ điều hành thất bại');
+      // lỗi validate form -> không làm gì thêm
+      console.error(e);
     }
   };
 
@@ -48,8 +89,7 @@ const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
       cancelText="Hủy"
       destroyOnClose
     >
-      <Form layout="vertical" form={form}>
-        
+      <Form layout="vertical" form={form} initialValues={{ trangThai: 1 }}>
         <Form.Item
           name="ma"
           label="Mã hệ điều hành"
@@ -74,6 +114,16 @@ const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
           <Input placeholder="Ví dụ: 22H2, 2023, 12.4..." />
         </Form.Item>
 
+        <Form.Item
+          name="trangThai"
+          label="Trạng thái"
+          rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+        >
+          <Select placeholder="Chọn trạng thái">
+            <Option value={1}>Hoạt động</Option>
+            <Option value={0}>Ngưng</Option>
+          </Select>
+        </Form.Item>
       </Form>
     </Modal>
   );

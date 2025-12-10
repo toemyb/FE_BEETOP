@@ -23,6 +23,7 @@ import {
   getAllManHinh,
   getAllPin,
   getAllHeDieuHanh,
+  getAllThuongHieu,
 } from '../../service/OptionService';
 
 const { Option } = Select;
@@ -43,31 +44,21 @@ const ListSanPhamComponent = () => {
   // filters: Pin, Màn hình, HĐH, Thương hiệu, Trạng thái
   const [filters, setFilters] = useState({
     pin: '',
-    doHoa: '',
+    manHinh: '',
     heDieuHanh: '',
-    status: '',
+    thuongHieu: '',
+    status: 'all',
   });
 
   const [screenList, setScreenList] = useState([]);
   const [pinList, setPinList] = useState([]);
-  const [doHoaList, setDoHoaList] = useState([]);
   const [heDieuHanhList, setHeDieuHanhList] = useState([]);
+  const [thuongHieuList, setThuongHieuList] = useState([]);
 
-  const formatDate = (iso) => {
-    if (!iso) return '';
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString('vi-VN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return iso;
-    }
-  };
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 5,
+  });
 
   const fetchData = async () => {
     setLoading(true);
@@ -83,46 +74,54 @@ const ListSanPhamComponent = () => {
           ? response.data.records
           : [];
 
-      const mapped = raw.map((item, index) => ({
-        stt: index + 1,
-        id: item.id || item.idLaptop,
-        ma: item.idLaptop,
-        ten: item.tenSanPham,
-        // thương hiệu
-        thuongHieu: item.tenThuongHieu || item.thuongHieu || 'Chưa rõ',
-        image: item.imageUrl || '',
+      const mapped = raw.map((item) => {
+        const tongSoLuongSeri =
+          typeof item.tongSoLuongSeri === 'number'
+            ? item.tongSoLuongSeri
+            : typeof item.soLuongTon === 'number'
+            ? item.soLuongTon
+            : 0;
 
-        soLuong: item.soLuongTon ?? 0,
-        phienBan: item.phienBan ?? 1,
+        const soLuongBienThe =
+          typeof item.soLuongBienThe === 'number'
+            ? item.soLuongBienThe
+            : typeof item.phienBan === 'number'
+            ? item.phienBan
+            : 0;
 
-        // tên hiển thị cho các cột thông số
-        ramName: item.ramName || item.tenRam || item.ram,
-        romName: item.romName || item.tenRom || item.rom || item.tenSsd,
-        cpuName: item.cpuName || item.tenCpu || item.cpu,
-        manHinhName:
-          item.manHinhName || item.tenManHinh || item.doPhanGiaiManHinh,
-        pinName: item.pinName || item.tenPin || item.dungLuongPin,
-        doHoaName: item.doHoaName || item.tenDoHoa || item.cardDoHoa,
-        heDieuHanhName:
-          item.heDieuHanhName || item.tenHeDieuHanh || item.heDieuHanh,
+        const trangThaiInt =
+          item.trangThai != null
+            ? Number(item.trangThai)
+            : tongSoLuongSeri > 0
+            ? 1
+            : 0;
 
-        ramId: item.ramId ?? null,
-        romId: item.romId ?? null,
-        cpuId: item.cpuId ?? null,
-        manHinhId: item.idManHinh ?? null,
-        pinId: item.idPin ?? null,
-        doHoaId: item.doHoaId ?? null,
-        heDieuHanhId: item.heDieuHanhId ?? null,
+        return {
+          id: item.id || item.idLaptop,
+          ma: item.idLaptop,
+          ten: item.tenSanPham,
 
-        trangThai:
-          typeof item.soLuongTon === 'number'
-            ? item.soLuongTon > 0
-              ? 'active'
-              : 'inactive'
-            : 'active',
-        ngayTao: item.ngayTao,
-        ngaySua: item.ngaySua,
-      }));
+          thuongHieu: item.tenThuongHieu || item.thuongHieu || 'Chưa rõ',
+          thuongHieuId: item.idThuongHieu ?? item.thuongHieuId ?? null,
+
+          tongSoLuongSeri,
+          soLuongBienThe,
+
+          manHinhName:
+            item.manHinhName || item.tenManHinh || item.doPhanGiaiManHinh,
+          pinName: item.pinName || item.tenPin || item.dungLuongPin,
+          heDieuHanhName:
+            item.heDieuHanhName || item.tenHeDieuHanh || item.heDieuHanh,
+
+          manHinhId: item.idManHinh ?? null,
+          pinId: item.idPin ?? null,
+          heDieuHanhId: item.heDieuHanhId ?? null,
+
+          trangThai: trangThaiInt,
+          ngayTao: item.ngayTao,
+          ngaySua: item.ngaySua,
+        };
+      });
 
       setProducts(mapped);
       setFilteredList(mapped);
@@ -137,33 +136,22 @@ const ListSanPhamComponent = () => {
 
   const fetchOptions = async () => {
     try {
-      const [
-        ramRes,
-        romRes,
-        cpuRes,
-        screenRes,
-        heDieuHanhRes,
-        pinRes,
-        doHoaRes,
-      ] = await Promise.all([
-        getAllRam(),
-        getAllRom(),
-        getAllCpu(),
-        getAllManHinh(),
-        getAllHeDieuHanh(),
-        getAllPin(),
-        getAllDoHoa(),
-      ]);
+      const [screenRes, heDieuHanhRes, pinRes, thuongHieuRes] =
+        await Promise.all([
+          getAllManHinh(),
+          getAllHeDieuHanh(),
+          getAllPin(),
+          getAllThuongHieu(),
+        ]);
 
-      setRamList(ramRes?.data?.content || ramRes?.data || []);
-      setRomList(romRes?.data?.content || romRes?.data || []);
-      setCpuList(cpuRes?.data?.content || cpuRes?.data || []);
       setScreenList(screenRes?.data?.content || screenRes?.data || []);
       setHeDieuHanhList(
-        heDieuHanhRes?.data?.content || heDieuHanhRes?.data || []
+        heDieuHanhRes?.data?.content || heDieuHanhRes?.data || [],
       );
       setPinList(pinRes?.data?.content || pinRes?.data || []);
-      setDoHoaList(doHoaRes?.data?.content || doHoaRes?.data || []);
+      setThuongHieuList(
+        thuongHieuRes?.data?.content || thuongHieuRes?.data || [],
+      );
     } catch (error) {
       console.error('❌ Lỗi khi tải dữ liệu combobox:', error);
     }
@@ -202,27 +190,28 @@ const ListSanPhamComponent = () => {
       const eq = (a, b) =>
         a == null || b == null ? false : String(a) === String(b);
 
-      const matchStatus =
-        !filters.status ||
-        filters.status === 'all' ||
-        item.trangThai === filters.status;
+      // lọc trạng thái
+      let matchStatus = true;
+      if (filters.status && filters.status !== 'all') {
+        const stFilter = Number(filters.status);
+        matchStatus = Number(item.trangThai ?? -1) === stFilter;
+      }
 
-      const matchDoHoa = !filters.doHoa || eq(item.doHoaId, filters.doHoa);
-      const matchRam = !filters.ram || eq(item.ramId, filters.ram);
-      const matchRom = !filters.rom || eq(item.romId, filters.rom);
-      const matchCpu = !filters.cpu || eq(item.cpuId, filters.cpu);
       const matchPin = !filters.pin || eq(item.pinId, filters.pin);
       const matchScreen =
         !filters.manHinh || eq(item.manHinhId, filters.manHinh);
       const matchHDH =
         !filters.heDieuHanh || eq(item.heDieuHanhId, filters.heDieuHanh);
+      const matchBrand =
+        !filters.thuongHieu || eq(item.thuongHieuId, filters.thuongHieu);
 
       return (
         matchSearch &&
         matchStatus &&
         matchPin &&
         matchScreen &&
-        matchHDH
+        matchHDH &&
+        matchBrand
       );
     });
 
@@ -238,94 +227,79 @@ const ListSanPhamComponent = () => {
     }));
   };
 
-const columns = [
-  { title: 'STT', dataIndex: 'stt', width: 60 },
-
-  {
-    title: 'Ảnh',
-    dataIndex: 'image',
-    width: 80,
-    render: (src) =>
-      src ? (
-        <Image src={src} width={50} />
-      ) : (
-        <span style={{ color: '#aaa' }}>(Trống)</span>
+  const columns = [
+    {
+      title: 'STT',
+      width: 60,
+      render: (_, __, index) =>
+        (pagination.current - 1) * pagination.pageSize + index + 1,
+    },
+    { title: 'Mã Sản Phẩm', dataIndex: 'ma', width: 140 },
+    { title: 'Tên Sản Phẩm', dataIndex: 'ten', width: 220 },
+    {
+      title: 'Thương Hiệu',
+      dataIndex: 'thuongHieu',
+      width: 150,
+      render: (val) =>
+        val ? (
+          <Tag color="blue">{val}</Tag>
+        ) : (
+          <span style={{ color: '#aaa' }}>(Chưa rõ)</span>
+        ),
+    },
+    { title: 'Màn Hình', dataIndex: 'manHinhName', width: 130 },
+    { title: 'Pin', dataIndex: 'pinName', width: 110 },
+    { title: 'Hệ Điều Hành', dataIndex: 'heDieuHanhName', width: 140 },
+    {
+      title: 'Số Lượng',
+      dataIndex: 'tongSoLuongSeri',
+      width: 160,
+      render: (total, record) =>
+        `${total ?? 0} (${record.soLuongBienThe ?? 0} phiên bản)`,
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'trangThai',
+      width: 140,
+      align: 'center',
+      render: (val) => {
+        const cfg = statusMap[Number(val)] || statusMap[0];
+        return <Tag color={cfg.color}>{cfg.text}</Tag>;
+      },
+    },
+    {
+      title: 'Thao Tác',
+      fixed: 'right',
+      width: 120,
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="Sửa">
+            <Button
+              icon={<EditOutlined />}
+              type="text"
+              onClick={() => navigate(`/admin/sua-lap-top/${record.id}`)}
+            />
+          </Tooltip>
+          <Tooltip title="Xem biến thể">
+            <Button
+              icon={<EyeOutlined />}
+              type="text"
+              onClick={() => navigate(`/admin/lap-top-ct/${record.id}`)}
+            />
+          </Tooltip>
+        </Space>
       ),
-  },
-
-  { title: 'Mã Sản Phẩm', dataIndex: 'ma', width: 140 },
-  { title: 'Tên Sản Phẩm', dataIndex: 'ten', width: 220 },
-
-  {
-    title: 'Thương Hiệu',
-    dataIndex: 'thuongHieu',
-    width: 150,
-    render: (val) =>
-      val ? (
-        <Tag color="blue">{val}</Tag>
-      ) : (
-        <span style={{ color: '#aaa' }}>(Chưa rõ)</span>
-      ),
-  },
-
-  // Giữ lại Màn Hình – Pin – Hệ Điều Hành
-  { title: 'Màn Hình', dataIndex: 'manHinhName', width: 130 },
-
-  { title: 'Pin', dataIndex: 'pinName', width: 110 },
-
-  { title: 'Hệ Điều Hành', dataIndex: 'heDieuHanhName', width: 140 },
-
-  {
-    title: 'Số Lượng',
-    dataIndex: 'soLuong',
-    width: 120,
-    render: (s, record) => `${s ?? 0} (${record.phienBan ?? 1} phiên bản)`,
-  },
-
-  {
-    title: 'Trạng Thái',
-    dataIndex: 'trangThai',
-    width: 120,
-    render: (val) =>
-      val === 'active' ? (
-        <Tag color="green">Kinh doanh</Tag>
-      ) : (
-        <Tag color="red">Ngưng</Tag>
-      ),
-  },
-
-  {
-    title: 'Thao Tác',
-    fixed: 'right',
-    width: 120,
-    render: (_, record) => (
-      <Space>
-        <Tooltip title="Sửa">
-          <Button
-            icon={<EditOutlined />}
-            type="text"
-            onClick={() => navigate(`/admin/sua-lap-top/${record.id}`)}
-          />
-        </Tooltip>
-        <Tooltip title="Xem">
-          <Button
-            icon={<EyeOutlined />}
-            type="text"
-            onClick={() => navigate(`/admin/lap-top-ct/${record.id}`)}
-          />
-        </Tooltip>
-      </Space>
-    ),
-  },
-];
-
+    },
+  ];
 
   return (
     <div style={{ padding: 24 }}>
       <h2>Danh sách sản phẩm laptop</h2>
 
-      {/* phần filter giữ nguyên, chỉ thêm combobox Hệ điều hành */}
-      <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
+      <Space
+        style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }}
+        size="middle"
+      >
         <Input
           placeholder="Tìm kiếm theo mã, tên, thương hiệu"
           allowClear
@@ -353,72 +327,26 @@ const columns = [
         </Button>
       </Space>
 
-      <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
+      {/* Filter row */}
+      <Space
+        style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }}
+        size="middle"
+      >
+        {/* Thương hiệu */}
         <Select
-          placeholder="RAM"
-          style={{ width: 150 }}
-          onChange={(val) => handleFilterChange('ram', val)}
-          allowClear
-        >
-          {ramList.map((item) => (
-            <Option key={String(item.id)} value={String(item.id)}>
-              {item.dungLuongRam || item.ten || item.name}
-            </Option>
-          ))}
-        </Select>
-
-        <Select
-          placeholder="ROM"
-          style={{ width: 150 }}
-          onChange={(val) => handleFilterChange('rom', val)}
-          allowClear
-        >
-          {romList.map((item) => (
-            <Option key={String(item.id)} value={String(item.id)}>
-              {item.dungLuongSsd || item.ten || item.name}
-            </Option>
-          ))}
-        </Select>
-
-        <Select
-          placeholder="CPU"
-          style={{ width: 150 }}
-          onChange={(val) => handleFilterChange('cpu', val)}
-          allowClear
-        >
-          {cpuList.map((item) => (
-            <Option key={String(item.id)} value={String(item.id)}>
-              {item.ten}
-            </Option>
-          ))}
-        </Select>
-
-        <Select
-          placeholder="Màn Hình"
-          style={{ width: 150 }}
-          onChange={(val) => handleFilterChange('manHinh', val)}
-          allowClear
-        >
-          {screenList.map((item) => (
-            <Option key={String(item.id)} value={String(item.id)}>
-              {item.doPhanGiai || item.ten}
-            </Option>
-          ))}
-        </Select>
-
-        <Select
-          placeholder="Hệ Điều Hành"
+          placeholder="Thương Hiệu"
           style={{ width: 160 }}
-          onChange={(val) => handleFilterChange('heDieuHanh', val)}
+          onChange={(val) => handleFilterChange('thuongHieu', val)}
           allowClear
         >
-          {heDieuHanhList.map((item) => (
+          {thuongHieuList.map((item) => (
             <Option key={String(item.id)} value={String(item.id)}>
               {item.ten}
             </Option>
           ))}
         </Select>
 
+        {/* Pin */}
         <Select
           placeholder="Pin"
           style={{ width: 150 }}
@@ -432,28 +360,45 @@ const columns = [
           ))}
         </Select>
 
+        {/* Màn hình */}
         <Select
-          placeholder="Đồ Họa"
-          style={{ width: 160 }}
-          onChange={(val) => handleFilterChange('doHoa', val)}
+          placeholder="Màn Hình"
+          style={{ width: 150 }}
+          onChange={(val) => handleFilterChange('manHinh', val)}
           allowClear
         >
-          {doHoaList.map((item) => (
+          {screenList.map((item) => (
             <Option key={String(item.id)} value={String(item.id)}>
-              {item.tenDayDu || item.ten}
+              {item.doPhanGiai || item.ten}
             </Option>
           ))}
         </Select>
 
+        {/* Hệ điều hành */}
+        <Select
+          placeholder="Hệ Điều Hành"
+          style={{ width: 160 }}
+          onChange={(val) => handleFilterChange('heDieuHanh', val)}
+          allowClear
+        >
+          {heDieuHanhList.map((item) => (
+            <Option key={String(item.id)} value={String(item.id)}>
+              {item.ten}
+            </Option>
+          ))}
+        </Select>
+
+        {/* Trạng thái */}
         <Select
           placeholder="Trạng Thái"
           style={{ width: 140 }}
+          value={filters.status === 'all' ? undefined : filters.status}
           onChange={(val) => handleFilterChange('status', val)}
           allowClear
         >
           <Option value="all">Tất cả</Option>
-          <Option value="active">Kinh doanh</Option>
-          <Option value="inactive">Ngưng</Option>
+          <Option value="1">Hoạt động</Option>
+          <Option value="0">Ngưng hoạt động</Option>
         </Select>
       </Space>
 
@@ -462,10 +407,21 @@ const columns = [
         columns={columns}
         dataSource={filteredList}
         loading={loading}
-        pagination={{ pageSize: 5 }}
-        locale={{ emptyText: 'Chưa có dữ liệu sản phẩm' }}
         bordered
-        scroll={{ x: 1500 }}
+        scroll={{ x: 1200 }}
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: filteredList.length,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+        }}
+        onChange={(pag) => {
+          setPagination({
+            current: pag.current,
+            pageSize: pag.pageSize,
+          });
+        }}
       />
     </div>
   );
