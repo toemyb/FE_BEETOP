@@ -32,7 +32,6 @@ export const searchOrdersRaw = (params = {}) => {
     sort = 'ngayTao,desc',
   } = params;
 
-  // BE nhận sortType: newest | oldest
   let sortType = 'newest';
   const lower = sort.toLowerCase();
   if (lower.includes('asc')) {
@@ -52,10 +51,12 @@ export const searchOrdersRaw = (params = {}) => {
       page,
       size,
       sortType,
+
+      // DÒNG DUY NHẤT BẠN CẦN THÊM – SIÊU QUAN TRỌNG
+      trangThaiDonForTaiQuay: [2, 3],   // ĐƠN TẠI QUẦY → CHỈ LẤY ĐƠN HOÀN THÀNH
     },
   });
 };
-
 /**
  * Hàm tiện: trả về thẳng PageResult<OrderListDTO> đã unwrap
  */

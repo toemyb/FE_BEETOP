@@ -1,11 +1,12 @@
 // src/admin/adminBanHangTaiQuayComponents/InvoiceWorkingArea.jsx
 import React, { useState, useMemo, useEffect } from 'react';
-import { message } from 'antd'; 
+import { message } from 'antd';
 import ProductSelector from '../../components/ProductSelector.jsx';
 import CustomerSelector from '../../components/CustomerSelector.jsx';
 import ConfirmationModal from '../../components/ConfirmationModal.jsx';
 import VoucherSelector from '../../components/VoucherSelector.jsx';
 import userService from '../../service/userService';
+import QrScannerModal from '../../components/QrScannerModal.jsx';
 import {
   getOrderDetail,
   addItemsToOrder,
@@ -16,10 +17,13 @@ import {
   completeOrder,
   cancelOrder,
   unwrapApi,
-  startVnpayPayment,  
+  startVnpayPayment,
   startMomoPayment,
+  addItemsBySeriCode,
 } from '../../service/PosOrderService';
 import { listPaymentMethods } from '../../service/HinhThucThanhToanService';
+// THÊM import này nếu chưa có (cho getSeriByIdSeri)
+import { getSeriByIdSeri } from '../../service/SeriService';
 
 const formatCurrencyDefault = (amount) => {
   if (typeof amount !== 'number') return '0 ₫';
@@ -125,7 +129,7 @@ const InvoiceWorkingArea = ({
 }) => {
   const orderId = invoice?.orderId;
 
-  const notify = showNotification || (() => {});
+  const notify = showNotification || (() => { });
   const formatCurrency = formatCurrencyProp || formatCurrencyDefault;
 
   // Giỏ hàng hiển thị trên FE
@@ -268,42 +272,42 @@ const InvoiceWorkingArea = ({
 
     // 🔧 Sync voucher đang áp dụng trên đơn (List<PosVoucherDTO>)
     if (Array.isArray(data.vouchers)) {
-  const vList = data.vouchers.map((v) => {
-    // BE PosVoucherDTO: idPhieuGiamGia là mã voucher (PGG001...)
-    const codeFromDto =
-      v.idPhieuGiamGia ||  // đúng kiểu từ BE
-      v.idPhieugiamgia ||  // phòng khi BE viết khác camel-case
-      v.idPhieugiamgia;    // fallback nữa
+      const vList = data.vouchers.map((v) => {
+        // BE PosVoucherDTO: idPhieuGiamGia là mã voucher (PGG001...)
+        const codeFromDto =
+          v.idPhieuGiamGia ||  // đúng kiểu từ BE
+          v.idPhieugiamgia ||  // phòng khi BE viết khác camel-case
+          v.idPhieugiamgia;    // fallback nữa
 
-    const uuid =
-      codeFromDto ||       // dùng chính mã này làm "id"
-      v.id ||
-      v.uuid ||
-      v.idVoucher;
+        const uuid =
+          codeFromDto ||       // dùng chính mã này làm "id"
+          v.id ||
+          v.uuid ||
+          v.idVoucher;
 
-    const code =
-      codeFromDto ||
-      v.ma ||
-      v.maPhieu ||
-      v.maPhieuGiamGia ||
-      v.maVoucher ||
-      v.code ||
-      uuid;
+        const code =
+          codeFromDto ||
+          v.ma ||
+          v.maPhieu ||
+          v.maPhieuGiamGia ||
+          v.maVoucher ||
+          v.code ||
+          uuid;
 
-    return {
-      id: uuid,           // 🚩 ID dùng cho FE & gửi lên BE
-      code,
-      name: v.ten || v.name || code,
-      kieuGiamGia: v.kieuGiamGia,
-      discount: Number(v.giaTriGiam || 0),
-      giaTriMin: Number(v.giaTriMin || 0),
-      trangThai: v.trangThai,
-    };
-  });
-  setAppliedVouchers(vList);
-} else {
-  setAppliedVouchers([]);
-}
+        return {
+          id: uuid,           // 🚩 ID dùng cho FE & gửi lên BE
+          code,
+          name: v.ten || v.name || code,
+          kieuGiamGia: v.kieuGiamGia,
+          discount: Number(v.giaTriGiam || 0),
+          giaTriMin: Number(v.giaTriMin || 0),
+          trangThai: v.trangThai,
+        };
+      });
+      setAppliedVouchers(vList);
+    } else {
+      setAppliedVouchers([]);
+    }
 
     // Nếu invoice hiện chưa có customer nhưng OrderDetail có tên/sđt thì hiển thị
     if (!invoice.customer && (data.tenKhachHang || data.sdtKhachHang)) {
@@ -416,8 +420,36 @@ const InvoiceWorkingArea = ({
       notify(
         'error',
         err?.response?.data?.message ||
-          'Không thể thêm sản phẩm vào đơn, vui lòng thử lại!'
+        'Không thể thêm sản phẩm vào đơn, vui lòng thử lại!'
       );
+    }
+  };
+
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const handleScanQr = async (decodedText) => {
+    if (!orderId) {
+      notify('warning', 'Chưa có đơn hàng, vui lòng tạo đơn trước.');
+      return;
+    }
+
+    const seriCode = decodedText?.trim().toUpperCase();
+    if (!seriCode) {
+      notify('error', 'Mã QR không hợp lệ.');
+      return;
+    }
+
+    try {
+      await addItemsBySeriCode(orderId, [seriCode]);
+      await refreshOrderFromServer();
+      notify('success', `Đã thêm seri: ${seriCode}`);
+
+      // TỰ ĐỘNG ĐÓNG MODAL SAU KHI THÀNH CÔNG (QrScannerModal cũng tự đóng)
+      setShowQrScanner(false);
+
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Seri không hợp lệ hoặc đã bán!';
+      notify('error', msg);
+      // Không đóng modal → cho phép quét lại nếu sai
     }
   };
 
@@ -490,7 +522,7 @@ const InvoiceWorkingArea = ({
           notify(
             'error',
             err?.response?.data?.message ||
-              'Không thể huỷ đơn hàng, vui lòng thử lại!'
+            'Không thể huỷ đơn hàng, vui lòng thử lại!'
           );
         }
       },
@@ -545,7 +577,7 @@ const InvoiceWorkingArea = ({
       notify(
         'error',
         err?.response?.data?.message ||
-          'Không thể áp dụng voucher, vui lòng thử lại!'
+        'Không thể áp dụng voucher, vui lòng thử lại!'
       );
     } finally {
       setShowVoucherSelector(false);
@@ -601,97 +633,95 @@ const InvoiceWorkingArea = ({
       (invoice.customerCash || 0) < orderSummary.total);
 
   const handleConfirmPayment = async () => {
-  if (!orderId) return;
+    if (!orderId) return;
 
-  try {
-    // 👉 Nếu chọn VNPay
-    if (invoice.paymentMethod === 'VNPay') {
-      const res = await startVnpayPayment(orderId);
+    try {
+      // 👉 Nếu chọn VNPay
+      // VNPAY – MỞ TRONG CÙNG TAB (khách quét QR ngon lành)
+      if (invoice.paymentMethod === 'VNPay') {
+        const res = await startVnpayPayment(orderId);
+        const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
 
-      const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
+        const payUrl =
+          data?.payUrl ||
+          data?.paymentUrl ||
+          data?.url ||
+          res?.data?.data?.payUrl ||
+          res?.data?.payUrl ||
+          res?.payUrl;
 
-      const payUrl =
-        data?.payUrl ||
-        data?.paymentUrl ||
-        data?.url ||
-        res?.data?.data?.payUrl ||
-        res?.data?.payUrl ||
-        res?.payUrl;
+        if (!payUrl || typeof payUrl !== 'string') {
+          message.error('Không tạo được link VNPay. Vui lòng thử lại!');
+          setShowConfirmation(false);
+          return;
+        }
 
-      if (!payUrl || typeof payUrl !== 'string') {
-        message.error('Không tạo được link VNPay. Vui lòng thử lại!');
-        setShowConfirmation(false);
+        // MỞ TRONG CÙNG TAB → KHÁCH DỄ QUÉT QR TRÊN ĐIỆN THOẠI
+        window.location.href = payUrl;
+
+        // Không đóng modal ngay, chờ khách thanh toán xong quay lại
+        // (Backend sẽ tự redirect về trang hoàn tất)
         return;
       }
 
-      window.open(payUrl, '_blank', 'noopener,noreferrer');
+      // MOMO – MỞ TRONG CÙNG TAB (tuyệt vời trên mobile)
+      if (invoice.paymentMethod === 'MoMo') {
+        const res = await startMomoPayment(orderId);
+        const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
 
-      setShowConfirmation(false);
-      return;
-    }
+        const payUrl =
+          data?.payUrl ||
+          data?.paymentUrl ||
+          data?.url ||
+          res?.data?.data?.payUrl ||
+          res?.data?.payUrl ||
+          res?.payUrl;
 
-    // 👉 Nếu chọn MoMo
-    if (invoice.paymentMethod === 'MoMo') {
-      const res = await startMomoPayment(orderId);
+        if (!payUrl || typeof payUrl !== 'string') {
+          message.error('Không tạo được link MoMo. Vui lòng thử lại!');
+          setShowConfirmation(false);
+          return;
+        }
 
-      const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
-
-      const payUrl =
-        data?.payUrl ||
-        data?.paymentUrl ||
-        data?.url ||
-        res?.data?.data?.payUrl ||
-        res?.data?.payUrl ||
-        res?.payUrl;
-
-      if (!payUrl || typeof payUrl !== 'string') {
-        message.error('Không tạo được link MoMo. Vui lòng thử lại!');
-        setShowConfirmation(false);
+        // MỞ TRONG CÙNG TAB → KHÁCH QUÉT QR SIÊU DỄ
+        window.location.href = payUrl;
         return;
       }
 
-      window.open(payUrl, '_blank', 'noopener,noreferrer');
+      // 🧾 Các phương thức còn lại (Tiền mặt, etc...)
+      const methodEntity = getCurrentPaymentMethodEntity();
+      if (!methodEntity) {
+        message.error(
+          'Không tìm thấy hình thức thanh toán tương ứng. Vui lòng kiểm tra lại danh mục hình thức thanh toán.'
+        );
+        return;
+      }
 
+      const total = orderSummary.total;
+      const khachDua =
+        invoice.paymentMethod === 'Tiền mặt'
+          ? invoice.customerCash || total
+          : total;
+
+      await addPaymentToOrder(orderId, {
+        idHinhThucThanhToan: methodEntity.id,
+        khachDua,
+      });
+
+      await completeOrder(orderId);
+      await refreshOrderFromServer();
+
+      onConfirmOrder();
       setShowConfirmation(false);
-      // ⛔ Không complete/ghi thanh toán ở FE.
-      // BE xử lý trong /api/pos/payment/momo-ipn
-      return;
-    }
-
-    // 🧾 Các phương thức còn lại (Tiền mặt, etc...)
-    const methodEntity = getCurrentPaymentMethodEntity();
-    if (!methodEntity) {
+      message.success('Thanh toán đơn hàng thành công.');
+    } catch (err) {
+      console.error('Lỗi xác nhận thanh toán POS:', err);
       message.error(
-        'Không tìm thấy hình thức thanh toán tương ứng. Vui lòng kiểm tra lại danh mục hình thức thanh toán.'
-      );
-      return;
-    }
-
-    const total = orderSummary.total;
-    const khachDua =
-      invoice.paymentMethod === 'Tiền mặt'
-        ? invoice.customerCash || total
-        : total;
-
-    await addPaymentToOrder(orderId, {
-      idHinhThucThanhToan: methodEntity.id,
-      khachDua,
-    });
-
-    await completeOrder(orderId);
-    await refreshOrderFromServer();
-
-    onConfirmOrder();
-    setShowConfirmation(false);
-    message.success('Thanh toán đơn hàng thành công.');
-  } catch (err) {
-    console.error('Lỗi xác nhận thanh toán POS:', err);
-    message.error(
-      err?.response?.data?.message ||
+        err?.response?.data?.message ||
         'Không thể hoàn tất thanh toán, vui lòng thử lại!'
-    );
-  }
-};
+      );
+    }
+  };
 
 
   // ===== STYLE =====
@@ -799,7 +829,19 @@ const InvoiceWorkingArea = ({
               Hủy giỏ hàng
             </button>
             <button
-              onClick={() => setShowProductSelector(true)}
+              onClick={() => setShowQrScanner(true)}
+              style={{
+                ...buttonPrimary,
+                backgroundColor: '#e67e22',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>QR Code</span>
+            </button>
+            <button
+              onClick={() => setShowProductSelector(true)}  // Giữ nguyên cho chọn sản phẩm
               style={buttonPrimary}
             >
               + Chọn sản phẩm
@@ -1037,11 +1079,10 @@ const InvoiceWorkingArea = ({
           {(() => {
             const hasCustomer = !!invoice.customer;
             const displayValue = hasCustomer
-              ? `${invoice.customer.name || invoice.customer.ten || ''} - ${
-                  invoice.customer.phone ||
-                  invoice.customer.soDienThoai ||
-                  ''
-                }`
+              ? `${invoice.customer.name || invoice.customer.ten || ''} - ${invoice.customer.phone ||
+              invoice.customer.soDienThoai ||
+              ''
+              }`
               : customerSearch;
 
             return (
@@ -1492,6 +1533,13 @@ const InvoiceWorkingArea = ({
       </div>
 
       {/* MODALS */}
+
+      {showQrScanner && (
+        <QrScannerModal
+          onScan={handleScanQr}
+          onClose={() => setShowQrScanner(false)}
+        />
+      )}
       {showProductSelector && (
         <ProductSelector
           idLaptop={null}
@@ -1500,6 +1548,8 @@ const InvoiceWorkingArea = ({
           formatCurrency={formatCurrency}
         />
       )}
+
+
 
       {showVoucherSelector && (
         <VoucherSelector
@@ -1511,41 +1561,41 @@ const InvoiceWorkingArea = ({
         />
       )}
 
- {showCustomerForm && (
-  <CustomerSelector
-    initialCustomer={null}
-    onClose={() => setShowCustomerForm(false)}
-    walkInOnly={true}              // ✅ khách vãng lai, không tạo tài khoản
-    onSaveCustomer={async (data) => {
-      // data: { id: null, idTaiKhoan: null, ten, name, soDienThoai, phone }
-      updateInvoice({ customer: data });
+      {showCustomerForm && (
+        <CustomerSelector
+          initialCustomer={null}
+          onClose={() => setShowCustomerForm(false)}
+          walkInOnly={true}              // ✅ khách vãng lai, không tạo tài khoản
+          onSaveCustomer={async (data) => {
+            // data: { id: null, idTaiKhoan: null, ten, name, soDienThoai, phone }
+            updateInvoice({ customer: data });
 
-      // Không push vào danh sách khách có tài khoản nếu không có id
-      setCustomers((prev) => {
-        if (!data?.id && !data?.idTaiKhoan) return prev;
-        const idCus = data.id || data.idTaiKhoan;
-        const mapped = {
-          id: idCus,
-          idTaiKhoan: idCus,
-          ten: data.ten || data.name,
-          soDienThoai: data.soDienThoai || data.phone,
-        };
-        const idx = prev.findIndex(
-          (c) => (c.id || c.idTaiKhoan) === idCus
-        );
-        if (idx !== -1) {
-          const clone = [...prev];
-          clone[idx] = { ...clone[idx], ...mapped };
-          return clone;
-        }
-        return [mapped, ...prev];
-      });
+            // Không push vào danh sách khách có tài khoản nếu không có id
+            setCustomers((prev) => {
+              if (!data?.id && !data?.idTaiKhoan) return prev;
+              const idCus = data.id || data.idTaiKhoan;
+              const mapped = {
+                id: idCus,
+                idTaiKhoan: idCus,
+                ten: data.ten || data.name,
+                soDienThoai: data.soDienThoai || data.phone,
+              };
+              const idx = prev.findIndex(
+                (c) => (c.id || c.idTaiKhoan) === idCus
+              );
+              if (idx !== -1) {
+                const clone = [...prev];
+                clone[idx] = { ...clone[idx], ...mapped };
+                return clone;
+              }
+              return [mapped, ...prev];
+            });
 
-      setShowCustomerForm(false);
-      await attachCustomerToOrder(data); // idTaiKhoan = null → khách vãng lai
-    }}
-  />
-)}
+            setShowCustomerForm(false);
+            await attachCustomerToOrder(data); // idTaiKhoan = null → khách vãng lai
+          }}
+        />
+      )}
 
       {showConfirmation && (
         <ConfirmationModal

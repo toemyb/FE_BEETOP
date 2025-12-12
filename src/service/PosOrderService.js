@@ -52,3 +52,6 @@ export const startVnpayPayment = (orderId) =>
 // 11. Tạo link MoMo
 export const startMomoPayment = (orderId) =>
   api.post(`/api/pos/orders/${orderId}/pay/momo`);
+
+export const addItemsBySeriCode = (orderId, seriCodes) =>
+  api.post(`/api/pos/orders/${orderId}/items/by-seri-code`, seriCodes);

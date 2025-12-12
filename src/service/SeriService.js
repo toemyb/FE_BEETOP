@@ -24,3 +24,7 @@ export const getAllSeri = () =>
 // Lấy chi tiết 1 seri theo id
 export const getSeriDetail = (id) =>
   api.get(`${REST_API_URL}/detail/${id}`);
+
+
+export const getSeriByIdSeri = (idSeri) =>
+  api.get(`${REST_API_URL}/by-id-seri/${idSeri}`);

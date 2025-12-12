@@ -5,12 +5,14 @@ import {
   EditOutlined,
   PlusOutlined,
   PictureOutlined,
+  QrcodeOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getLaptopCTByLaptop } from '../../service/LapTopCTService';
-import { getAnhByLaptopCt } from '../../service/AnhService';   // ✅ service ảnh
+import { getAnhByLaptopCt } from '../../service/AnhService';
 import AddSeriComponent from './AddSeriComponent';
 import AddAnhComponent from './AddAnhComponent';
+import ListSeriComponent from './ListSeriComponent';
 
 const ListLaptopCTComponent = () => {
   const navigate = useNavigate();
@@ -25,7 +27,10 @@ const ListLaptopCTComponent = () => {
   // modal quản lý ảnh
   const [openAnhModal, setOpenAnhModal] = useState(false);
 
-  // id biến thể đang thao tác (dùng chung cho cả seri & ảnh)
+  // modal danh sách seri & QR
+  const [openSeriListModal, setOpenSeriListModal] = useState(false);
+
+  // id biến thể đang thao tác
   const [currentLaptopCtId, setCurrentLaptopCtId] = useState(null);
 
   const fetchData = async () => {
@@ -37,7 +42,7 @@ const ListLaptopCTComponent = () => {
 
     setLoading(true);
     try {
-      // ===== 1. Lấy list biến thể =====
+      // 1. Lấy list biến thể
       const response = await getLaptopCTByLaptop(idLaptop);
 
       const raw =
@@ -65,7 +70,7 @@ const ListLaptopCTComponent = () => {
         soLuongSeri: item.soLuongSeri ?? 0,
       }));
 
-      // ===== 2. Với mỗi biến thể, gọi API ảnh để lấy thumbnail =====
+      // 2. Lấy ảnh thumbnail cho mỗi biến thể
       const withImage = await Promise.all(
         mapped.map(async (v) => {
           try {
@@ -104,7 +109,6 @@ const ListLaptopCTComponent = () => {
   const columns = [
     { title: 'STT', dataIndex: 'stt', width: 60 },
 
-    // ✅ CỘT ẢNH SAU STT
     {
       title: 'Ảnh',
       dataIndex: 'anhUrl',
@@ -170,7 +174,7 @@ const ListLaptopCTComponent = () => {
     {
       title: 'Thao tác',
       fixed: 'right',
-      width: 220,
+      width: 260,
       render: (_, record) => (
         <Space>
           {/* Sửa biến thể */}
@@ -199,6 +203,17 @@ const ListLaptopCTComponent = () => {
             onClick={() => {
               setCurrentLaptopCtId(record.id);
               setOpenSeriModal(true);
+            }}
+          />
+
+          {/* Danh sách Seri + QR */}
+          <Button
+            icon={<QrcodeOutlined />}
+            type="text"
+            title="Danh sách seri & QR"
+            onClick={() => {
+              setCurrentLaptopCtId(record.id);
+              setOpenSeriListModal(true);
             }}
           />
         </Space>
@@ -275,9 +290,22 @@ const ListLaptopCTComponent = () => {
             idLaptopCt={currentLaptopCtId}
             onClose={() => {
               setOpenAnhModal(false);
-              // nếu sau này cần dùng số lượng ảnh trong list thì có thể gọi fetchData() ở đây
             }}
           />
+        )}
+      </Modal>
+
+      {/* MODAL DANH SÁCH SERI & QR */}
+      <Modal
+        open={openSeriListModal}
+        onCancel={() => setOpenSeriListModal(false)}
+        footer={null}
+        width={900}
+        destroyOnClose
+        title="Danh sách Serial Numbers & QR"
+      >
+        {currentLaptopCtId && (
+          <ListSeriComponent idLaptopCt={currentLaptopCtId} />
         )}
       </Modal>
     </div>
