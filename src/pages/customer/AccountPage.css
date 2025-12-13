@@ -1,0 +1,95 @@
+.account-page {
+    min-height: 100vh;
+    background: #f5f5f5;
+    padding: 24px;
+}
+
+.account-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+}
+
+.account-sidebar {
+    position: sticky;
+    top: 24px;
+    height: fit-content;
+}
+
+.profile-card {
+    overflow: hidden;
+}
+
+.sidebar-menu {
+    background: white;
+    border-radius: 12px;
+    padding: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 4px;
+    color: #595959;
+    font-weight: 500;
+}
+
+.menu-item:hover {
+    background: #f0f0f0;
+    color: #1890ff;
+}
+
+.menu-item.active {
+    background: #e6f7ff;
+    color: #1890ff;
+    font-weight: 600;
+}
+
+.menu-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+}
+
+.menu-label {
+    font-size: 14px;
+}
+
+.account-content {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    min-height: 600px;
+}
+
+@media (max-width: 768px) {
+    .account-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .account-sidebar {
+        position: relative;
+        top: 0;
+    }
+    
+    .sidebar-menu {
+        display: flex;
+        overflow-x: auto;
+        gap: 8px;
+    }
+    
+    .menu-item {
+        white-space: nowrap;
+        min-width: fit-content;
+    }
+}
+

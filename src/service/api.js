@@ -1,19 +1,20 @@
-import axios from 'axios';
-import { message } from 'antd';
+// src/service/api.js
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: "http://localhost:8080",
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
-  withCredentials: true,
+  withCredentials: true, // để cookie refresh hoạt động
 });
 
-// Request interceptor để thêm token
+// ✅ Request interceptor: gắn accessToken nếu có
 api.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('accessToken');
+    const token = sessionStorage.getItem("accessToken");
     if (token) {
+      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -21,45 +22,72 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor để xử lý lỗi 401 và làm mới token
+// ✅ Response interceptor: refresh khi 401
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    // Chỉ xử lý lỗi 401 cho các request không phải là refresh token
-    if (error.response?.status === 401 && !originalRequest._retry && 
-        !originalRequest.url.includes('/auth/refresh')) {
-      originalRequest._retry = true;
-      
-      try {
-        const response = await axios.post(
-          'http://localhost:8080/auth/refresh',
-          {},
-          { 
-            withCredentials: true,
-            
-          }
-        );
-        
-        const { accessToken, refreshToken } = response.data.data;
-        
-        // Lưu token mới vào sessionStorage của tab hiện tại
-        sessionStorage.setItem('accessToken', accessToken);
-        sessionStorage.setItem('refreshToken', refreshToken);
-        
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Xử lý lỗi refresh token
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('user');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
+    const url = originalRequest?.url || "";
+
+    // Không xử lý nếu:
+    // - không phải 401
+    // - đã retry rồi
+    // - hoặc request đang là refresh
+    if (
+      error.response?.status !== 401 ||
+      originalRequest?._retry ||
+      url.includes("/auth/refresh")
+    ) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    originalRequest._retry = true;
+
+    try {
+      // Gọi refresh bằng axios thường để tránh interceptor loop
+      const refreshRes = await axios.post(
+        "http://localhost:8080/auth/refresh",
+        {},
+        { withCredentials: true }
+      );
+
+      // ✅ Hỗ trợ nhiều format response (tránh undefined)
+      const tokenInfo =
+        refreshRes.data?.meta?.tokenInfo ||
+        refreshRes.data?.data?.tokenInfo ||
+        refreshRes.data?.data ||
+        refreshRes.data?.meta ||
+        {};
+
+      const accessToken = tokenInfo.accessToken;
+      const refreshToken = tokenInfo.refreshToken;
+
+      if (!accessToken) {
+        // Không lấy được accessToken => logout
+        sessionStorage.removeItem("accessToken");
+        sessionStorage.removeItem("refreshToken");
+        sessionStorage.removeItem("user");
+        window.location.href = "/login";
+        return Promise.reject(error);
+      }
+
+      // Lưu token mới
+      sessionStorage.setItem("accessToken", accessToken);
+      if (refreshToken) sessionStorage.setItem("refreshToken", refreshToken);
+
+      // Gắn token mới và retry request cũ
+      originalRequest.headers = originalRequest.headers || {};
+      originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+
+      return api(originalRequest);
+    } catch (refreshError) {
+      // Refresh fail => logout
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("refreshToken");
+      sessionStorage.removeItem("user");
+      window.location.href = "/login";
+      return Promise.reject(refreshError);
+    }
   }
 );
 

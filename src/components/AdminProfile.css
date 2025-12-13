@@ -1,0 +1,109 @@
+.profileWrap {
+  padding: 18px;
+}
+
+.profileCard {
+  max-width: 980px;
+  margin: 0 auto;
+  border-radius: 16px;
+  box-shadow: 0 14px 40px rgba(17, 24, 39, 0.08);
+}
+
+.profileTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.06);
+  margin-bottom: 14px;
+}
+
+.profileIdentity {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.profileAvatar {
+  border: 1px solid rgba(17, 24, 39, 0.10);
+  background: #f3f4f6;
+}
+
+.profileNameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profileNameRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profileName {
+  font-size: 20px;
+  font-weight: 900;
+  color: #111827;
+}
+
+.profileRole {
+  margin: 0;
+  font-weight: 800;
+}
+
+.profileSub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: rgba(17, 24, 39, 0.60);
+  font-size: 13px;
+}
+
+.muted {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.profileActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.profileDesc .ant-descriptions-title {
+  font-weight: 900;
+  color: #111827;
+}
+
+.descRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profileEmpty {
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  padding: 36px 12px;
+  color: rgba(17, 24, 39, 0.65);
+}
+
+@media (max-width: 768px) {
+  .profileTop {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .profileActions {
+    justify-content: flex-start;
+  }
+}

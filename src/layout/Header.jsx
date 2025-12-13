@@ -17,7 +17,7 @@ const AppHeader = ({ collapsed, setCollapsed, user, onLogout }) => {
   };
 
   const handleProfileClick = () => {
-    navigate('/profile');
+    navigate('/admin/profile');
   };
 
   const userMenuItems = [

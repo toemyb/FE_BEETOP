@@ -4,21 +4,7 @@ import { unwrapApi } from './PosOrderService';
 
 const BASE_URL = '/api/order-management/orders';
 
-/**
- * Gọi BE lấy danh sách đơn hàng (trả về ApiResponse<PageResult<OrderListDTO>>)
- * params:
- *  {
- *    keyword,
- *    loaiDon,
- *    trangThaiDon,
- *    trangThaiThanhToan,
- *    fromDate, // 'YYYY-MM-DD'
- *    toDate,   // 'YYYY-MM-DD'
- *    page,     // 0-based
- *    size,
- *    sort      // ví dụ: 'ngayTao,desc' | 'ngayTao,asc'
- *  }
- */
+
 export const searchOrdersRaw = (params = {}) => {
   const {
     keyword,

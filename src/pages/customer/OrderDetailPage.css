@@ -1,0 +1,364 @@
+.order-detail-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+.order-detail-header {
+  margin-bottom: 32px;
+}
+
+.order-detail-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: #262626;
+}
+
+.order-detail-header p {
+  color: #8c8c8c;
+  font-size: '14px';
+}
+
+.order-detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 24px;
+}
+
+.order-detail-card {
+  background: #ffffff;
+  border-radius: '16px';
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.order-detail-card:last-child {
+  margin-bottom: 0;
+}
+
+/* Products List */
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.product-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
+}
+
+.product-item:hover {
+  background: #f0f0f0;
+  border-color: #d9d9d9;
+}
+
+.product-image {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.product-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.product-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.product-quantity {
+  font-size: 14px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+}
+
+.product-price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f5222d;
+}
+
+/* Order Summary */
+.order-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.summary-label {
+  color: #595959;
+}
+
+.summary-value {
+  font-weight: 600;
+  color: #262626;
+}
+
+.summary-value.discount {
+  color: #f5222d;
+  font-weight: 700;
+}
+
+.summary-row.total {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.summary-row.total .summary-label {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.summary-row.total .summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f5222d;
+}
+
+.summary-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 8px 0;
+}
+
+/* Customer Info */
+.customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.info-label {
+  font-size: 14px;
+  color: #8c8c8c;
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.info-value {
+  font-size: 14px;
+  color: #262626;
+  font-weight: 500;
+  text-align: right;
+  flex: 1;
+}
+
+/* Timeline - sử dụng lại từ OrderInformationPage */
+.order-timeline-wrapper {
+  margin-bottom: 0;
+  padding: 24px 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #f0f0f0;
+}
+
+.order-timeline {
+  position: relative;
+  padding: 20px 0 0;
+}
+
+.timeline-connector {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  display: flex;
+  z-index: 1;
+}
+
+.timeline-connector-segment {
+  flex: 1;
+  height: 100%;
+  background: #e5e7eb;
+  position: relative;
+  margin-right: 2px;
+}
+
+.timeline-connector-segment:last-child {
+  margin-right: 0;
+}
+
+.timeline-connector-segment.completed {
+  background: #1890ff;
+}
+
+.timeline-arrow-head {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid #e5e7eb;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+}
+
+.timeline-connector-segment.completed .timeline-arrow-head {
+  border-left-color: #1890ff;
+}
+
+.timeline-steps {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+  gap: 8px;
+}
+
+.timeline-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.timeline-icon-circle {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #d9d9d9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #d9d9d9;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+  position: relative;
+  z-index: 3;
+}
+
+.timeline-icon-circle.completed {
+  background: #1890ff;
+  border-color: #1890ff;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.timeline-icon-circle.current {
+  background: #1890ff;
+  border-color: #1890ff;
+  color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2), 0 2px 8px rgba(24, 144, 255, 0.3);
+  animation: timelinePulse 2s infinite;
+}
+
+@keyframes timelinePulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2), 0 2px 8px rgba(24, 144, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(24, 144, 255, 0.15), 0 2px 8px rgba(24, 144, 255, 0.3);
+  }
+}
+
+.timeline-step-text {
+  font-size: 12px;
+  color: #8c8c8c;
+  text-align: center;
+  margin-bottom: 4px;
+  font-weight: 400;
+  line-height: 1.4;
+  max-width: 100px;
+  word-break: break-word;
+}
+
+.timeline-step-text.completed {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.timeline-step-text.current {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.timeline-step-date {
+  font-size: 11px;
+  color: #8c8c8c;
+  text-align: center;
+  line-height: 1.3;
+  max-width: 100px;
+  word-break: break-word;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .order-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .order-detail-right {
+    position: sticky;
+    top: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .order-detail-page {
+    padding: 16px 12px 32px;
+  }
+
+  .order-detail-card {
+    padding: 16px;
+  }
+
+  .product-item {
+    flex-direction: column;
+  }
+
+  .product-image {
+    width: 100%;
+    height: 200px;
+  }
+
+  .timeline-steps {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .timeline-step {
+    min-width: 80px;
+  }
+}
+

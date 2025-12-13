@@ -116,6 +116,41 @@ const userService = {
       throw error.response?.data?.message || 'Không thể lấy thông tin tài khoản!';
     }
   },
+  ///----------------Code huy---------/
+
+    // API customer update account - chỉ nhận JSON với anhUrl (string)
+  updateCustomerAccount: async (id, data) => {
+    try {
+      const response = await api.put(`/api/v1/laptops/account/update/${id}`, data, {
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem('accessToken')}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data.data || response.data;
+    } catch (error) {
+      throw error.response?.data?.message || 'Không thể cập nhật tài khoản!';
+    }
+  },
+
+  // API upload ảnh riêng (nếu có endpoint riêng)
+  uploadAvatar: async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append('anh', file);
+      
+      const response = await api.post('/api/v1/laptops/account/upload-avatar', formData, {
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem('accessToken')}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data.data || response.data;
+    } catch (error) {
+      throw error.response?.data?.message || 'Không thể upload ảnh!';
+    }
+  },
+
 };
 
 export default userService;
