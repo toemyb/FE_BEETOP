@@ -1,419 +1,242 @@
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Form, Input, Select, DatePicker, Button, message } from 'antd';
 import { toast } from 'react-toastify';
-import React, { useEffect, useState } from 'react'
-import { addEmployee, getVoucher, updateVoucher, checkMaTrung } from '../../service/PhieuGiamGiaService'
+import moment from 'moment';
+import { addEmployee, getVoucher, updateVoucher, checkMaTrung } from '../../service/PhieuGiamGiaService';
+
+const { Option } = Select;
 
 const PhieuGiamGiaComponent = () => {
-
-
-    const [idPhieugiamgia, setidPhieugiamgia] = useState('')
-    const [ten, setten] = useState('')
-    const [soLuong, setsoLuong] = useState('')
-    const [kieuGiamGia, setkieuGiamGia] = useState('')
-    const [giaTriGiam, setgiaTriGiam] = useState('')
-    const [ngayBatDau, setngayBatDau] = useState('')
-    const [ngayKetThuc, setngayKetThuc] = useState('')
-    const [giaTriMin, setgiaTriMin] = useState('')
-    const [giaTriMax, setgiaTriMax] = useState('')
-    const [moTa, setmoTa] = useState('')
-    const [errors, setErrors] = useState({});
-
-
-
-    const { idPhieugiamgia: paramid } = useParams();
-
+    const [form] = Form.useForm();
     const navigator = useNavigate();
-
-    const location = useLocation();
-
+    const { idPhieugiamgia: paramid } = useParams();
 
     useEffect(() => {
         const user = JSON.parse(sessionStorage.getItem('user'));
-    if (!user || user.role !== 'ADMIN') {
-      message.error('Bạn không có quyền truy cập trang này!');
-      navigator('/login');
-      return;
-    }
-
-        if (paramid) {
-
-            getVoucher(paramid).then((respone) => {
-
-
-                setidPhieugiamgia(respone.data.idPhieugiamgia)
-                setten(respone.data.ten)
-                setsoLuong(respone.data.soLuong)
-                setkieuGiamGia(respone.data.kieuGiamGia)
-                setgiaTriGiam(respone.data.giaTriGiam)
-                setngayBatDau(respone.data.ngayBatDau)
-                setngayKetThuc(respone.data.ngayKetThuc)
-                setgiaTriMin(respone.data.giaTriMin)
-                setgiaTriMax(respone.data.giaTriMax)
-                setmoTa(respone.data.moTa)
-
-            })
-
-
-        }
-
-
-
-    }, [paramid])
-
-
-
-
-
-    function handleidPhieuGiamGia(v) {
-
-
-        setidPhieugiamgia(v.target.value);
-
-    }
-
-    function handleTen(v) {
-
-
-        setten(v.target.value);
-
-    }
-
-    function handleSoLuong(v) {
-
-
-        setsoLuong(v.target.value);
-
-    }
-
-    function handleKieuGiamGia(v) {
-
-
-        setkieuGiamGia(v.target.value);
-
-    }
-
-    function handleGiaTriGiam(v) {
-
-
-        setgiaTriGiam(v.target.value);
-
-    }
-
-    function handleNgayBatDau(v) {
-
-
-        setngayBatDau(v.target.value);
-
-    }
-
-    function handleNgayKetThuc(v) {
-
-
-        setngayKetThuc(v.target.value);
-
-    }
-
-
-    function handleGiaTriMin(v) {
-
-
-        setgiaTriMin(v.target.value);
-
-    }
-
-    function handleGiaTriMax(v) {
-
-
-        setgiaTriMax(v.target.value);
-
-    }
-
-    function handleMoTa(v) {
-
-
-        setmoTa(v.target.value);
-
-    }
-
-
-
-    const saveOrUpdateVoucher = async (v) => {
-
-
-        v.preventDefault();
-
-
-        const errors = await validateFields();
-        if (Object.keys(errors).length > 0) {
-            setErrors(errors);
+        if (!user || user.role !== 'ADMIN') {
+            message.error('Bạn không có quyền truy cập trang này!');
+            navigator('/login');
             return;
         }
 
-        setErrors({});
-
-
-
-        const voucher = { idPhieugiamgia, ten, soLuong, kieuGiamGia, giaTriGiam, ngayBatDau, ngayKetThuc, giaTriMin, giaTriMax, moTa }
-        console.log(voucher)
-
         if (paramid) {
-
-            const isConfirmed = window.confirm("Bạn có muốn cập nhật phiếu giảm giá không?");
-
-            if (!isConfirmed) return;
-
-            updateVoucher(paramid, voucher)
-                .then((respone) => {
-
-                    console.log(respone.date);
-                    toast.success(" Cập nhật phiếu giảm giá thành công!");
-                    navigator('/admin/phieu-giam-gia')
-
-
-
-                }).catch(error => {
-                    console.error(error);
-                })
-
-
-        } else {
-
-            const isConfirmed = window.confirm("Bạn có chắc muốn thêm phiếu giảm giá không?");
-            if (!isConfirmed) return;
-
-            addEmployee(voucher).then((respone) => {
-
-
-                console.log(respone.data)
-                toast.success("Thêm phiếu giảm giá thành công!");
-                navigator('/admin/phieu-giam-gia', { state: { newVoucher: respone.data } })
-
-            }).catch(error => {
-                console.error(error);
-                toast.error("Lỗi khi thêm phiếu giảm giá!");
-            })
-
+            getVoucher(paramid).then((res) => {
+                const data = res.data;
+                form.setFieldsValue({
+                    idPhieugiamgia: data.idPhieugiamgia,
+                    ten: data.ten,
+                    soLuong: data.soLuong,
+                    kieuGiamGia: data.kieuGiamGia,
+                    giaTriGiam: data.giaTriGiam,
+                    ngayBatDau: moment(data.ngayBatDau),
+                    ngayKetThuc: moment(data.ngayKetThuc),
+                    giaTriMin: data.giaTriMin,
+                    // giaTriMax: data.giaTriMax,
+                    moTa: data.moTa,
+                });
+            });
         }
+    }, [paramid, navigator, form]);
 
-
-    }
-
-
-
-    function pageTitle() {
-
-        if (paramid) {
-
-            return <h2 className='text-center'>Update Voucher</h2>
-        } else {
-
-            return <h2 className='text-center'>Thêm phiếu giảm giá</h2>
-
-
-        }
-
-    }
-
-
-
-    const validateFields = async () => {
-        const newErrors = {};
-        const today = new Date().toISOString().split('T')[0]; // yyyy-MM-dd
-
-
-
-
-        // Validate trống
-        if (!idPhieugiamgia.trim()) {
-            newErrors.idPhieugiamgia = "Mã không được để trống";
-        } else {
-            try {
-                const res = await checkMaTrung(idPhieugiamgia);
-                if (res.data === true && !paramid) { // Chỉ check khi thêm mới
-                    newErrors.idPhieugiamgia = "Mã phiếu đã tồn tại";
-                }
-            } catch (err) {
-                console.error(err);
+    const validateUniqueId = async (_, value) => {
+        if (!value) return Promise.reject('Mã không được để trống');
+        try {
+            const res = await checkMaTrung(value);
+            if (res.data === true && !paramid) {
+                return Promise.reject('Mã phiếu đã tồn tại');
             }
+            return Promise.resolve();
+        } catch (err) {
+            console.error(err);
+            return Promise.resolve();
         }
-
-
-
-
-        if (!ten.trim()) newErrors.ten = "Tên không được để trống";
-        if (!soLuong) newErrors.soLuong = "Số lượng không được để trống";
-        if (!kieuGiamGia.trim()) newErrors.kieuGiamGia = "Kiểu giảm giá không được để trống";
-        if (!giaTriGiam) newErrors.giaTriGiam = "Giá trị giảm không được để trống";
-        if (!ngayBatDau) newErrors.ngayBatDau = "Ngày bắt đầu không được để trống";
-        if (!ngayKetThuc) newErrors.ngayKetThuc = "Ngày kết thúc không được để trống";
-        if (!giaTriMin) newErrors.giaTriMin = "Giá trị tối thiểu không được để trống";
-        if (!giaTriMax) newErrors.giaTriMax = "Giá trị tối đa không được để trống";
-        if (!moTa) newErrors.moTa = "Mô tả không được để trống";
-
-        // Số lượng ≥ 1
-        if (soLuong && parseInt(soLuong) < 1) {
-            newErrors.soLuong = "Số lượng phải ≥ 1";
-        }
-
-        // Giá trị giảm > 0
-        if (giaTriGiam && parseFloat(giaTriGiam) <= 0) {
-            newErrors.giaTriGiam = "Giá trị giảm phải > 0";
-        }
-
-        // Ngày bắt đầu phải trước ngày kết thúc
-        if (ngayBatDau && ngayKetThuc && ngayBatDau > ngayKetThuc) {
-            newErrors.ngayBatDau = "Ngày bắt đầu phải trước ngày kết thúc";
-            newErrors.ngayKetThuc = "Ngày kết thúc phải sau ngày bắt đầu";
-        }
-
-        // Ngày bắt đầu không được trong quá khứ
-        if (ngayBatDau && ngayBatDau < today) {
-            newErrors.ngayBatDau = "Ngày bắt đầu không được ở quá khứ";
-        }
-
-        // Giá trị tối thiểu và tối đa phải > 0
-        if (giaTriMin && parseFloat(giaTriMin) <= 0) {
-            newErrors.giaTriMin = "Giá trị tối thiểu phải > 0";
-        }
-        if (giaTriMax && parseFloat(giaTriMax) <= 0) {
-            newErrors.giaTriMax = "Giá trị tối đa phải > 0";
-        }
-
-        // Giá trị tối thiểu phải nhỏ hơn giá trị tối đa
-        if (giaTriMin && giaTriMax && parseFloat(giaTriMin) >= parseFloat(giaTriMax)) {
-            newErrors.giaTriMin = "Giá trị tối thiểu phải nhỏ hơn giá trị tối đa";
-        }
-
-        return newErrors;
     };
 
+    const onFinish = async (values) => {
+        const voucher = {
+            ...values,
+            ngayBatDau: values.ngayBatDau.format('YYYY-MM-DD'),
+            ngayKetThuc: values.ngayKetThuc.format('YYYY-MM-DD'),
+        };
 
+        if (paramid) {
+            if (!window.confirm("Bạn có muốn cập nhật phiếu giảm giá không?")) return;
+            updateVoucher(paramid, voucher)
+                .then(() => {
+                    toast.success("Cập nhật phiếu giảm giá thành công!");
+                    navigator('/admin/phieu-giam-gia');
+                })
+                .catch((err) => {
+                    console.error(err);
+                    toast.error("Lỗi khi cập nhật phiếu giảm giá");
+                });
+        } else {
+            if (!window.confirm("Bạn có chắc muốn thêm phiếu giảm giá không?")) return;
+            addEmployee(voucher)
+                .then((res) => {
+                    toast.success("Thêm phiếu giảm giá thành công!");
+                    navigator('/admin/phieu-giam-gia', { state: { newVoucher: res.data } });
+                })
+                .catch((err) => {
+                    console.error(err);
+                    toast.error("Lỗi khi thêm phiếu giảm giá!");
+                });
+        }
+    };
 
     return (
-
-
         <div className='container'>
+            <h2 className='text-center mb-4'>{paramid ? 'Update Voucher' : 'Thêm phiếu giảm giá'}</h2>
+            <Form
+                form={form}
+                layout="vertical"
+                onFinish={onFinish}
+            >
+                <Form.Item
+                    label="Mã"
+                    name="idPhieugiamgia"
+                    rules={[{ validator: validateUniqueId }]}
+                >
+                    <Input />
+                </Form.Item>
 
-            <div className='row'>
+                <Form.Item
+                    label="Tên"
+                    name="ten"
+                    rules={[{ required: true, message: 'Tên không được để trống' }]}
+                >
+                    <Input />
+                </Form.Item>
 
-                <div className='card col-md-6 offset-md-3 offset-md-3 '>
+                <Form.Item
+                    label="Số lượng"
+                    name="soLuong"
+                    rules={[
+                        { required: true, message: 'Số lượng không được để trống' },
+                        { type: 'number', min: 1, message: 'Số lượng phải ≥ 1', transform: (value) => Number(value) },
+                    ]}
+                >
+                    <Input type="number" />
+                </Form.Item>
 
-                    {
+                <Form.Item
+                    label="Kiểu giảm giá"
+                    name="kieuGiamGia"
+                    rules={[{ required: true, message: 'Chọn kiểu giảm giá' }]}
+                >
+                    <Select placeholder="-- Chọn kiểu giảm --">
+                        <Option value="GIAM_CO_DINH">Giảm cố định</Option>
+                        <Option value="GIAM_PHAN_TRAM">Giảm phần trăm</Option>
+                    </Select>
+                </Form.Item>
 
-                        pageTitle()
-                    }
+                <Form.Item
+                    label="Giá trị giảm"
+                    name="giaTriGiam"
+                    rules={[
+                        { required: true, message: 'Giá trị giảm không được để trống' },
+                        ({ getFieldValue }) => ({
+                            validator(_, value) {
+                                const kieu = getFieldValue('kieuGiamGia');
+                                const val = parseFloat(value);
+                                if (!value) return Promise.reject('Giá trị giảm không được để trống');
+                                if (kieu === 'GIAM_PHAN_TRAM' && (val < 1 || val > 100)) {
+                                    return Promise.reject('Giá trị giảm phần trăm phải từ 1% đến 100%');
+                                }
+                                if (kieu === 'GIAM_CO_DINH' && val <= 0) {
+                                    return Promise.reject('Giá trị giảm cố định phải > 0');
+                                }
+                                return Promise.resolve();
+                            }
+                        })
+                    ]}
+                >
+                    <Input type="number" />
+                </Form.Item>
 
-                    <div className='card-body'>
+                <Form.Item
+                    label="Ngày bắt đầu"
+                    name="ngayBatDau"
+                    rules={[
+                        { required: true, message: 'Ngày bắt đầu không được để trống' },
+                        ({ getFieldValue }) => ({
+                            validator(_, value) {
+                                const today = moment().startOf('day');
+                                const end = getFieldValue('ngayKetThuc');
+                                if (value && value.isBefore(today)) {
+                                    return Promise.reject('Ngày bắt đầu không được ở quá khứ');
+                                }
+                                if (value && end && value.isAfter(end)) {
+                                    return Promise.reject('Ngày bắt đầu phải trước ngày kết thúc');
+                                }
+                                return Promise.resolve();
+                            }
+                        })
+                    ]}
+                >
+                    <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+                </Form.Item>
 
-                        <form>
+                <Form.Item
+                    label="Ngày kết thúc"
+                    name="ngayKetThuc"
+                    rules={[
+                        { required: true, message: 'Ngày kết thúc không được để trống' },
+                        ({ getFieldValue }) => ({
+                            validator(_, value) {
+                                const start = getFieldValue('ngayBatDau');
+                                if (value && start && value.isBefore(start)) {
+                                    return Promise.reject('Ngày kết thúc phải sau ngày bắt đầu');
+                                }
+                                return Promise.resolve();
+                            }
+                        })
+                    ]}
+                >
+                    <DatePicker format="YYYY-MM-DD" style={{ width: '100%' }} />
+                </Form.Item>
 
+                <Form.Item
+                    label="Giá trị tối thiểu"
+                    name="giaTriMin"
+                    rules={[
+                        { required: true, message: 'Giá trị tối thiểu không được để trống' },
+                        { type: 'number', min: 0, message: 'Giá trị tối thiểu phải > 0', transform: (value) => Number(value) },
 
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Mã</label>
-                                <input type='text' className='form-control' name='idPhieugiamgia' value={idPhieugiamgia} onChange={handleidPhieuGiamGia}></input>
-                                {errors.idPhieugiamgia && <div className="text-danger">{errors.idPhieugiamgia}</div>}
-
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Tên</label>
-                                <input type='text' className='form-control' name='ten' value={ten} onChange={handleTen}></input>
-                                {errors.ten && <div className="text-danger">{errors.ten}</div>}
-
-                            </div>
-
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Số lượng</label>
-                                <input type='text' className='form-control' name='soLuong' value={soLuong} onChange={handleSoLuong}></input>
-                                {errors.soLuong && <div className="text-danger">{errors.soLuong}</div>}
-
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Kiểu giảm giá</label>
-                                <select
-                                    className='form-control'
-                                    name='kieuGiamGia'
-                                    value={kieuGiamGia}
-                                    onChange={handleKieuGiamGia}
-                                >
-                                    <option value=''>-- Chọn kiểu giảm --</option>
-                                    <option value='GIAM_CO_DINH'>Giảm cố định</option>
-                                    <option value='GIAM_PHAN_TRAM'>Giảm phần trăm</option>
-                                </select>
-
-                                {errors.kieuGiamGia && <div className="text-danger">{errors.kieuGiamGia}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Giá trị giảm</label>
-                                <input type='text' className='form-control' name='giaTriGiam' value={giaTriGiam} onChange={handleGiaTriGiam}></input>
-                                {errors.giaTriGiam && <div className="text-danger">{errors.giaTriGiam}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Ngày bắt đầu</label>
-                                <input type='date' className='form-control' name='ngayBatDau' value={ngayBatDau} onChange={handleNgayBatDau}></input>
-                                {errors.ngayBatDau && <div className="text-danger">{errors.ngayBatDau}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Ngày kết thúc</label>
-                                <input type='date' className='form-control' name='ngayKetThuc' value={ngayKetThuc} onChange={handleNgayKetThuc}></input>
-                                {errors.ngayKetThuc && <div className="text-danger">{errors.ngayKetThuc}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Giá trị tối thiểu</label>
-                                <input type='text' className='form-control' name='giaTriMin' value={giaTriMin} onChange={handleGiaTriMin}></input>
-                                {errors.giaTriMin && <div className="text-danger">{errors.giaTriMin}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Giá trị tối đa</label>
-                                <input type='text' className='form-control' name='giaTriMax' value={giaTriMax} onChange={handleGiaTriMax}></input>
-                                {errors.giaTriMax && <div className="text-danger">{errors.giaTriMax}</div>}
-                            </div>
-
-                            <div className='form-group mb-2'>
-
-                                <label className='form-label'>Mô tả</label>
-                                <input type='text' className='form-control' name='moTa' value={moTa} onChange={handleMoTa}></input>
-                                {errors.moTa && <div className="text-danger">{errors.moTa}</div>}
-                            </div>
-
-
-                            <button className='btn btn-success' onClick={saveOrUpdateVoucher}>Xác nhận</button>
-
-                        </form>
-
-                    </div>
-
-
-                </div>
-
-
-            </div>
+                    ]}
+                >
+                    <Input type="number" />
+                </Form.Item>
 
 
+                {/* <Form.Item
+                    label="Giá trị tối đa"
+                    name="giaTriMax"
+                    rules={[
+                        { required: true, message: 'Giá trị tối đa không được để trống' },
+                        { type: 'number', min: 0, message: 'Giá trị tối đa phải > 0', transform: (value) => Number(value) },
+                    ]}
+                >
+                    <Input type="number" />
+                </Form.Item> */}
+
+                <Form.Item
+                    label="Mô tả"
+                    name="moTa"
+                    rules={[{ required: true, message: 'Mô tả không được để trống' }]}
+                >
+                    <Input.TextArea rows={3} />
+                </Form.Item>
+
+                <Form.Item>
+                    <Button type="primary" htmlType="submit">
+                        Xác nhận
+                    </Button>
+                </Form.Item>
+            </Form>
         </div>
+    );
+};
 
-
-
-    )
-
-
-
-}
-
-export default PhieuGiamGiaComponent
+export default PhieuGiamGiaComponent;

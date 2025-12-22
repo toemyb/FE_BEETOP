@@ -1,34 +1,31 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { deleteVoucher, listVouchers, searchVoucher, filterVouchers, getPagedVouchers, deactivateVoucher } from '../../service/PhieuGiamGiaService'
-import { FaEdit, FaSyncAlt } from 'react-icons/fa';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { deleteVoucher, listVouchers, searchVoucher, filterVouchers, getPagedVouchers, deactivateVoucher } from '../../service/PhieuGiamGiaService';
+import { EditOutlined, StopOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Input, Button, Select, Tag, DatePicker, Space, message, Pagination } from 'antd';
+import dayjs from 'dayjs';
 
-
+const { RangePicker } = DatePicker;
+const { Option } = Select;
 
 const ListPhieuGiamGiaComponent = () => {
-
-
-  const [vouchers, setVouchers] = useState([])
-  const navigator = useNavigate();
-
-  const [keyword, setKeyword] = useState('')
+  const [vouchers, setVouchers] = useState([]);
+  const [keyword, setKeyword] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [trangThai, setTrangThai] = useState('');
   const [sortBy, setSortBy] = useState('');
-
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const size = 5;
 
-  const location = useLocation();
-
+  const navigator = useNavigate();
 
   const statusMap = {
-    0: <span className="badge bg-primary">Chưa Kích Hoạt</span>,
-    1: <span className="badge bg-success">Đang Hoạt động</span>,
-    2: <span className="badge bg-secondary">Hết Hạn</span>,
-    3: <span className="badge bg-danger">Ngưng Hoạt Động</span>
+    0: <Tag color="blue">Chưa Kích Hoạt</Tag>,
+    1: <Tag color="green">Đang Hoạt động</Tag>,
+    2: <Tag color="gray">Hết Hạn</Tag>,
+    3: <Tag color="red">Ngưng Hoạt Động</Tag>,
   };
 
   const kieuGiamGiaMap = {
@@ -36,9 +33,14 @@ const ListPhieuGiamGiaComponent = () => {
     GIAM_PHAN_TRAM: 'Giảm phần trăm',
   };
 
-  const renderStatus = (status) => statusMap[status] || <span className="badge bg-light text-dark">Không rõ</span>;
+  const formatCurrency = (value) => {
+    if (value == null || isNaN(value)) return '';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', minimumFractionDigits: 0 }).format(value);
+  };
 
-
+  const formatGiaTriGiam = (giaTriGiam, kieuGiamGia) => {
+    return kieuGiamGia === 'GIAM_PHAN_TRAM' ? `${giaTriGiam}%` : formatCurrency(giaTriGiam);
+  };
 
   useEffect(() => {
     const user = JSON.parse(sessionStorage.getItem('user'));
@@ -47,10 +49,13 @@ const ListPhieuGiamGiaComponent = () => {
       navigator('/login');
       return;
     }
-
     fetchPagedVouchers(0);
   }, [navigator]);
-  
+
+  useEffect(() => {
+    handleFilter();
+  }, [trangThai, startDate, endDate, sortBy]);
+
   const fetchPagedVouchers = (page) => {
     getPagedVouchers(page, size)
       .then((res) => {
@@ -61,125 +66,25 @@ const ListPhieuGiamGiaComponent = () => {
       .catch((err) => console.error(err));
   };
 
-
-  const formatCurrency = (value) => {
-    if (value == null || isNaN(value)) return '';
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0,
-    }).format(value);
-  };
-
-  useEffect(() => {
-    if (location.state && location.state.newVoucher) {
-      setVouchers(prev => [location.state.newVoucher, ...prev]);
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state]);
-
-
-  useEffect(() => {
-
-
-    fetchPagedVouchers(0);
-
-  }, [])
-
-  useEffect(() => {
-    handleFilter();
-  }, [keyword, startDate, endDate, trangThai, sortBy]);
-
-
-  
-
-  function getAllVoucher() {
-
-
-    listVouchers().then((respone) => {
-
-
-      setVouchers(respone.data);
-
-
-    }).catch(error => {
-
-      console.error(error)
-    })
-
-
-  }
-
-  function addVoucher() {
-
-
-    navigator('/admin/add-phieu-giam-gia')
-
-
-  }
-
-
-  function updateVoucher(idPhieugiamgia) {
-
-
-    navigator(`/admin/edit-phieu-giam-gia/${idPhieugiamgia}`);
-
-
-  }
-
-
-  // function removeVoucher(idPhieugiamgia) {
-
-  //   const isConfirmed = window.confirm("Bạn có muốn xóa phiếu giảm giá này không?");
-  //   if (!isConfirmed) return;
-
-  //   console.log(idPhieugiamgia)
-
-  //   deleteVoucher(idPhieugiamgia).then((respone) => {
-
-  //     alert("✅ Đã xóa phiếu giảm giá thành công!");
-  //     fetchPagedVouchers(0);
-
-  //   }).catch(error => {
-  //     alert("❌ Xóa thất bại. Vui lòng thử lại!");
-  //     console.error(error)
-  //   })
-
-  // }
-
-  const formatGiaTriGiam = (giaTriGiam, kieuGiamGia) => {
-    if (kieuGiamGia === 'GIAM_PHAN_TRAM') {
-      return `${giaTriGiam}%`;
-    } else {
-      return formatCurrency(giaTriGiam);
-    }
-  };
-
-
-
-  function handleSearch() {
+  const handleSearch = () => {
     if (!keyword.trim()) {
-      fetchPagedVouchers(0); // nếu rỗng thì load lại tất cả
+      fetchPagedVouchers(0);
       return;
     }
-
     searchVoucher(keyword)
-      .then((response) => {
-        setVouchers(response.data);
-      })
-      .catch((error) => {
-        alert("❌ Tìm kiếm thất bại");
-        console.error(error);
+      .then((res) => setVouchers(res.data))
+      .catch((err) => {
+        message.error('Tìm kiếm thất bại');
+        console.error(err);
       });
-  }
-
+  };
 
   const handleFilter = () => {
     const params = {
       keyword: keyword || null,
       startDate: startDate || null,
       endDate: endDate || null,
-      trangThai: trangThai !== '' ? parseInt(trangThai) : null,
+      trangThai: trangThai === "" ? null : Number(trangThai),
       sortBy: sortBy || null,
     };
 
@@ -189,292 +94,130 @@ const ListPhieuGiamGiaComponent = () => {
       .then((res) => setVouchers(res.data))
       .catch((err) => {
         console.error(err);
-        alert('❌ Lọc thất bại!');
+        message.error('Lọc thất bại');
       });
   };
 
-
-  const handleDeactivate = async (idPhieugiamgia) => {
-
+  const handleDeactivate = async (id) => {
     const isConfirmed = window.confirm("Bạn có muốn chuyển trạng thái sang 'Ngưng hoạt động' không?");
     if (!isConfirmed) return;
-
-
     try {
-      await deactivateVoucher(idPhieugiamgia);
-      alert("Đã chuyển trạng thái sang 'Ngưng hoạt động'");
+      await deactivateVoucher(id);
+      message.success("Đã chuyển trạng thái sang 'Ngưng hoạt động'");
       fetchPagedVouchers(currentPage);
     } catch (error) {
-      alert("Lỗi khi đổi trạng thái");
+      message.error("Lỗi khi đổi trạng thái");
     }
   };
 
+  const addVoucher = () => navigator('/admin/add-phieu-giam-gia');
+  const updateVoucher = (id) => navigator(`/admin/edit-phieu-giam-gia/${id}`);
 
+  const columns = [
+    { title: 'STT', render: (_, __, index) => index + 1 },
+    { title: 'Mã', dataIndex: 'idPhieugiamgia' },
+    { title: 'Tên', dataIndex: 'ten' },
+    { title: 'Số lượng', dataIndex: 'soLuong' },
+    { title: 'Kiểu giảm giá', render: (_, record) => kieuGiamGiaMap[record.kieuGiamGia] || record.kieuGiamGia },
+    { title: 'Giá trị giảm', render: (_, record) => <span style={{ color: 'red' }}>{formatGiaTriGiam(record.giaTriGiam, record.kieuGiamGia)}</span> },
+    { title: 'Thời gian', render: (_, record) => `${record.ngayBatDau} - ${record.ngayKetThuc}` },
+    { title: 'Điều kiện áp dụng', render: (_, record) => `Tối thiểu: ${formatCurrency(record.giaTriMin)}` },
+    { title: 'Mô tả', dataIndex: 'moTa' },
+    { title: 'Trạng thái', render: (_, record) => statusMap[record.trangThai] || <Tag>Không rõ</Tag> },
+    {
+      title: 'Hành động',
+      render: (_, record) => (
+        <Space size="middle">
+          <EditOutlined style={{ color: 'orange', cursor: 'pointer' }} onClick={() => updateVoucher(record.idPhieugiamgia)} />
+          <StopOutlined
+            style={{
+              color: 'red',
+              cursor: record.trangThai === 3 ? 'not-allowed' : 'pointer',
+              opacity: record.trangThai === 3 ? 0.3 : 1
+            }}
+            onClick={() => { if (record.trangThai !== 3) handleDeactivate(record.idPhieugiamgia); }}
+          />
+        </Space>
+      )
+    }
+  ];
 
   return (
-
-
     <div className='container mt-4'>
+      <h1 style={{ textAlign: 'center' }}>Phiếu Giảm Giá</h1>
 
-      <h1 className="text-center">Phiếu Giảm Giá</h1>
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Input.Search
+          placeholder="Tìm Phiếu Giảm Giá"
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onSearch={handleSearch}
+          enterButton
+          style={{ width: 200 }}
+        />
 
-      {/* Dòng 1: Tìm kiếm + ngày + nút tạo */}
-      <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-        <div className="d-flex align-items-center flex-wrap gap-2">
-          {/* Tìm kiếm */}
-          <input
-            type="text"
-            className="form-control"
-            placeholder="Tìm Phiếu Giảm Giá"
-            style={{ height: '40px', width: '180px' }}
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSearch();
-            }}
-          />
+        <Button icon={<ReloadOutlined />} onClick={() => { setKeyword(''); fetchPagedVouchers(0); }}>Làm mới</Button>
 
-          {/* Làm mới */}
-          <button
-            className="btn text-dark"
-            onClick={() => {
-              setKeyword('');
-              fetchPagedVouchers(0);
-            }}
-            style={{
-              backgroundColor: '#ffc107',
-              height: '40px',
-              fontWeight: '500',
-              padding: '0 16px',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            Làm Mới
-          </button>
-
-          {/* Ngày bắt đầu */}
-          <input
-            type="date"
-            className="form-control"
-            style={{ height: '40px', width: '140px' }}
-            value={startDate}
-            onChange={(e) => {
-              setStartDate(e.target.value);
-              handleFilter();
-            }}
-          />
-
-          {/* Ngày kết thúc */}
-          <input
-            type="date"
-            className="form-control"
-            style={{ height: '40px', width: '140px' }}
-            value={endDate}
-            onChange={(e) => {
-              setEndDate(e.target.value);
-              handleFilter();
-            }}
-          />
-        </div>
-
-        {/* Nút tạo phiếu */}
-        <button
-          className="btn btn-success"
-          style={{
-            height: '40px',
-            fontWeight: '500',
-            padding: '0 16px',
-            whiteSpace: 'nowrap'
+        <RangePicker
+          onChange={(dates) => {
+            if (!dates) {
+              setStartDate(''); setEndDate('');
+            } else {
+              setStartDate(dates[0].format('YYYY-MM-DD'));
+              setEndDate(dates[1].format('YYYY-MM-DD'));
+            }
+            handleFilter();
           }}
-          onClick={addVoucher}
+        />
+
+
+        <Select
+          placeholder="Trạng Thái"
+          style={{ width: 180 }}
+          value={trangThai}
+          onChange={(value) => setTrangThai(value)}
         >
-          + Tạo phiếu giảm giá
-        </button>
+          <Option value="">Tất cả</Option>
+          <Option value={0}>Chưa Kích Hoạt</Option>
+          <Option value={1}>Đang Hoạt động</Option>
+          <Option value={2}>Hết Hạn</Option>
+          <Option value={3}>Ngưng Hoạt Động</Option>
+        </Select>
+
+
+
+
+        <Select placeholder="Sắp Xếp" style={{ width: 180 }} value={sortBy} onChange={(val) => { setSortBy(val); handleFilter(); }}>
+          <Option value="">Mặc định</Option>
+          <Option value="ten_asc">Tên (A-Z)</Option>
+          <Option value="ten_desc">Tên (Z-A)</Option>
+          <Option value="ngayBatDau_asc">Ngày Bắt Đầu ↑</Option>
+          <Option value="ngayBatDau_desc">Ngày Bắt Đầu ↓</Option>
+          <Option value="ngayKetThuc_asc">Ngày Kết Thúc ↑</Option>
+          <Option value="ngayKetThuc_desc">Ngày Kết Thúc ↓</Option>
+        </Select>
+
+        <Button type="primary" onClick={addVoucher}>+ Tạo phiếu giảm giá</Button>
+      </Space>
+
+      <Table
+        columns={columns}
+        dataSource={vouchers}
+        rowKey="idPhieugiamgia"
+        pagination={false}
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+        <Pagination
+          current={currentPage + 1}
+          pageSize={size}
+          total={totalPages * size}
+          onChange={(page) => fetchPagedVouchers(page - 1)}
+          showSizeChanger={false}
+        />
       </div>
-
-      {/* Dòng 2: Trạng thái + Sắp xếp – căn giữa + cách bảng */}
-      <div className="d-flex justify-content-center align-items-center flex-wrap gap-3 mb-4 mt-2">
-        <div className="d-flex align-items-center">
-          <span className="me-2">Trạng Thái:</span>
-          <select
-            className="form-select"
-            style={{ width: '150px', height: '40px' }}
-            value={trangThai}
-            onChange={(e) => setTrangThai(e.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="0">Chưa Kích Hoạt</option>
-            <option value="1">Đang Hoạt động</option>
-            <option value="2">Hết Hạn</option>
-            <option value="3">Ngưng Hoạt Động</option>
-
-          </select>
-        </div>
-
-        <div className="d-flex align-items-center">
-          <span className="me-2">Sắp Xếp:</span>
-          <select
-            className="form-select"
-            style={{ width: '160px', height: '40px' }}
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value);
-              handleFilter();
-            }}
-          >
-            <option value="">Mặc định</option>
-            <option value="ten_asc">Tên (A-Z)</option>
-            <option value="ten_desc">Tên (Z-A)</option>
-            <option value="ngayBatDau_asc">Ngày Bắt Đầu ↑</option>
-            <option value="ngayBatDau_desc">Ngày Bắt Đầu ↓</option>
-            <option value="ngayKetThuc_asc">Ngày Kết Thúc ↑</option>
-            <option value="ngayKetThuc_desc">Ngày Kết Thúc ↓</option>
-          </select>
-        </div>
-      </div>
-
-
-
-      <table className='table table-bordered table-hover text-center'>
-
-        <thead className='table-light'>
-
-          <tr >
-            <th >STT</th>
-            <th>Mã</th>
-            <th>Tên</th>
-            <th>Số lượng</th>
-            <th>Kiểu giảm giá</th>
-            <th>Giá trị giảm</th>
-            <th>Thời gian</th>
-            {/* <th>Giá trị tối thiểu</th>
-            <th>Giá trị tối đa</th> */}
-            <th>Điều kiện áp dụng</th>
-            <th>Mô tả</th>
-            <th>Trạng thái</th>
-            <th>Hành động</th>
-          </tr>
-
-        </thead>
-
-
-        <tbody>
-
-          {
-
-
-            vouchers.map((vouchers, index) =>
-
-              <tr key={vouchers.idPhieugiamgia}>
-
-                <td>{index + 1}</td>
-                <td>{vouchers.idPhieugiamgia}</td>
-                <td>{vouchers.ten}</td>
-                <td>{vouchers.soLuong}</td>
-                <td>{kieuGiamGiaMap[vouchers.kieuGiamGia] || vouchers.kieuGiamGia}</td>
-
-                <td style={{ color: 'red' }}>
-                  {formatGiaTriGiam(vouchers.giaTriGiam, vouchers.kieuGiamGia)}
-                </td>
-
-                <td>
-                  {vouchers.ngayBatDau} - {vouchers.ngayKetThuc}
-
-                </td>
-
-                {/* <td>{formatCurrency(vouchers.giaTriMin)}</td>
-                <td>{formatCurrency(vouchers.giaTriMax)}</td> */}
-                <td>
-                  {formatCurrency(vouchers.giaTriMin)} - {formatCurrency(vouchers.giaTriMax)}
-                </td>
-                <td>{vouchers.moTa}</td>
-                <td>
-
-                  {renderStatus(vouchers.trangThai)}
-
-                </td>
-
-                <td>
-                  <FaEdit
-                    className="me-3 text-warning"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => updateVoucher(vouchers.idPhieugiamgia)}
-                    title="Chỉnh sửa"
-                  />
-
-                  <FaSyncAlt
-                    className={`text-danger ${vouchers.trangThai === 3 ? 'opacity-25' : ''}`}
-                    style={{ cursor: vouchers.trangThai === 3 ? 'not-allowed' : 'pointer' }}
-                    onClick={() => {
-                      if (vouchers.trangThai !== 3) handleDeactivate(vouchers.idPhieugiamgia);
-                    }}
-                    title="Ngưng hoạt động"
-                  />
-                </td>
-
-
-
-
-
-
-
-
-
-              </tr>)
-
-
-
-          }
-
-
-        </tbody>
-
-
-      </table>
-
-      {/* Thanh phân trang */}
-      <div className="d-flex justify-content-center mt-4">
-        <nav>
-          <ul className="pagination">
-
-            <li className={`page-item ${currentPage === 0 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => fetchPagedVouchers(currentPage - 1)}>«</button>
-            </li>
-
-            {[...Array(totalPages).keys()].map((pageNum) => (
-              <li
-                key={pageNum}
-                className={`page-item ${pageNum === currentPage ? 'active' : ''}`}
-              >
-                <button
-                  className="page-link"
-                  onClick={() => fetchPagedVouchers(pageNum)}
-                >
-                  {pageNum + 1}
-                </button>
-              </li>
-            ))}
-
-            <li className={`page-item ${currentPage === totalPages - 1 ? 'disabled' : ''}`}>
-              <button className="page-link" onClick={() => fetchPagedVouchers(currentPage + 1)}>»</button>
-            </li>
-
-          </ul>
-        </nav>
-      </div>
-
-
     </div>
+  );
+};
 
-
-
-
-  )
-
-
-
-
-
-}
-
-export default ListPhieuGiamGiaComponent
+export default ListPhieuGiamGiaComponent;
