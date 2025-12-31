@@ -9,22 +9,25 @@ const Login = ({ setToken, setUser }) => {
   const [err, setErr] = useState("");
   const navigate = useNavigate();
 
- const handleSubmit = async (values) => {
-  try {
-    const res = await api.post("/auth/signin", {
-      tenDangNhap: values.username,
-      matKhau: values.password,
-    });
+  const handleSubmit = async (values) => {
+    try {
+      const res = await api.post("/auth/signin", {
+        tenDangNhap: values.username,
+        matKhau: values.password,
+      });
 
-    const { data, meta } = res.data;
-    const { accessToken, refreshToken } = meta.tokenInfo;
+      const { data, meta } = res.data;
+        localStorage.setItem("isUser", data.id);
+      
+      const { accessToken, refreshToken } = meta.tokenInfo;
 
-    // Sử dụng sessionStorage thay vì localStorage
-    sessionStorage.setItem('accessToken', accessToken);
-    sessionStorage.setItem('refreshToken', refreshToken);
-    setToken(accessToken);
+      // Sử dụng sessionStorage thay vì localStorage
+      sessionStorage.setItem('accessToken', accessToken);
+      sessionStorage.setItem('refreshToken', refreshToken);
+      setToken(accessToken);
 
       const loggedInUser = {
+        id : data.id,
         ten: data.ten || data.tenDangNhap || values.username,
         tenDangNhap: data.tenDangNhap,
         email: data.email,
@@ -34,14 +37,15 @@ const Login = ({ setToken, setUser }) => {
         role: data.tenChucVu ? data.tenChucVu.toUpperCase() : 'USER',
         anh: data.anh || null // Thêm trường anh
       };
-      
-       sessionStorage.setItem('user', JSON.stringify(loggedInUser));
-    setUser(loggedInUser);
+
+      sessionStorage.setItem('user', JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
 
       message.success('Đăng nhập thành công!');
       // Redirect based on role
       if (loggedInUser.role === 'KHACH_HANG') {
-        navigate('/customer/home');
+        navigate('/');
+        localStorage.setItem('isCustomer', 'true');
       } else {
         navigate('/admin/thong-ke');
       }

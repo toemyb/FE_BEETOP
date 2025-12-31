@@ -1,8 +1,7 @@
 import api from "./api";
-
+import axios from "axios";
 const REST_API_URL = '/api/phieu-giam-gia'
-
-
+const BASEURL = 'http://localhost:8080';
 export const listVouchers = () => api.get(REST_API_URL)
 
 export const addEmployee = (voucher) => api.post(REST_API_URL, voucher)
@@ -22,3 +21,14 @@ export const getPagedVouchers = (page, size) => api.get(REST_API_URL + '/phan-tr
 export const checkMaTrung = (ma) => {return api.get(REST_API_URL + '/check-ma?ma=' + ma);};
 
 export const deactivateVoucher = (voucherId) => { return api.put(REST_API_URL + '/ngung-hoat-dong/' + voucherId);}
+
+export const getVoucherForBill = async (total) => {
+    try {
+        const response = await axios.get(`${BASEURL}/api/v1/laptops/get-voucher?tongTien=${total}`);
+        return response.data;
+    }catch (error) {
+        console.error("Lỗi khi lấy voucher cho hóa đơn:", error);
+        throw error;
+    }
+    
+}
