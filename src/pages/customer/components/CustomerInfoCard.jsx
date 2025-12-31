@@ -250,11 +250,18 @@ const CustomerInfoCard = ({ orders = [] }) => {
   const totalOrders = orders.length;
   const totalSpent = orders.reduce((sum, order) => {
     const orderAmount = order.tongTienThuHo || 0;
+
  
     if (order.trangThai === 7) {
       return sum - orderAmount;
     }
   
+    // Nếu đơn hàng bị hủy (trangThai === 7), trừ tiền đi
+    if (order.trangThai === 7) {
+      return sum - orderAmount;
+    }
+    // Các đơn hàng khác, cộng tiền vào
+
     return sum + orderAmount;
   }, 0);
 

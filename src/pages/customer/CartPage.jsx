@@ -234,7 +234,7 @@ const CartPage = () => {
         let provinceId = a.provinceId || a.tinhThanhId || a.province_id || null;
         let districtId = a.districtId || a.quanHuyenId || a.district_id || null;
         let wardCode = a.wardCode || a.phuongXaCode || a.ward_code || null;
-        
+
         // Nếu không có ID field, kiểm tra xem tinhThanh/quanHuyen/phuongXa có phải là ID không
         // Ưu tiên kiểm tra tinhThanh/quanHuyen/phuongXa vì API có thể trả về ID ở đây
         if (!provinceId && a.tinhThanh) {
@@ -262,7 +262,7 @@ const CartPage = () => {
                 console.log(`✅ Extract wardCode từ phuongXa: "${phuongXaValue}" → ${wardCode}`);
             }
         }
-        
+
         console.log("🔍 extractAddressIds result:", { provinceId, districtId, wardCode });
         return { provinceId, districtId, wardCode };
     };
@@ -281,16 +281,16 @@ const CartPage = () => {
                 try {
                     // Chuyển đổi ID sang số nếu cần
                     const provinceIdNum = typeof provinceId === 'string' ? parseInt(provinceId) : provinceId;
-                    
+
                     const resProvince = await axios.get(urlProvince, {
                         headers: { token: tokenApiGHN }
                     });
-                    
+
                     // Xử lý cả trường hợp API trả về object đơn lẻ hoặc array
                     let province = null;
                     if (Array.isArray(resProvince.data.data)) {
-                        province = resProvince.data.data.find(p => 
-                            p.ProvinceID === provinceIdNum || 
+                        province = resProvince.data.data.find(p =>
+                            p.ProvinceID === provinceIdNum ||
                             p.ProvinceID === provinceId ||
                             String(p.ProvinceID) === String(provinceId)
                         );
@@ -301,7 +301,7 @@ const CartPage = () => {
                             province = p;
                         }
                     }
-                    
+
                     if (province && province.ProvinceName) {
                         result.provinceName = province.ProvinceName;
                         console.log(`✅ Load tên tỉnh: ID ${provinceId} → ${province.ProvinceName}`);
@@ -317,18 +317,18 @@ const CartPage = () => {
             if (districtId) {
                 try {
                     const districtIdNum = typeof districtId === 'string' ? parseInt(districtId) : districtId;
-                    
+
                     // Nếu có provinceId, dùng nó để filter, nếu không thì load tất cả
                     const params = provinceId ? { province_id: provinceId } : {};
                     const resDistrict = await axios.get(urlDistricts, {
                         params: params,
                         headers: { token: tokenApiGHN }
                     });
-                    
+
                     let district = null;
                     if (Array.isArray(resDistrict.data.data)) {
-                        district = resDistrict.data.data.find(d => 
-                            d.DistrictID === districtIdNum || 
+                        district = resDistrict.data.data.find(d =>
+                            d.DistrictID === districtIdNum ||
                             d.DistrictID === districtId ||
                             String(d.DistrictID) === String(districtId)
                         );
@@ -338,7 +338,7 @@ const CartPage = () => {
                             district = d;
                         }
                     }
-                    
+
                     if (district && district.DistrictName) {
                         result.districtName = district.DistrictName;
                         console.log(`✅ Load tên huyện: ID ${districtId} → ${district.DistrictName}`);
@@ -354,15 +354,15 @@ const CartPage = () => {
             if (wardCode && districtId) {
                 try {
                     const wardCodeStr = String(wardCode);
-                    
+
                     const resWard = await axios.get(urlWard, {
                         params: { district_id: districtId },
                         headers: { token: tokenApiGHN }
                     });
-                    
+
                     let ward = null;
                     if (Array.isArray(resWard.data.data)) {
-                        ward = resWard.data.data.find(w => 
+                        ward = resWard.data.data.find(w =>
                             String(w.WardCode) === wardCodeStr ||
                             w.WardCode === wardCode ||
                             String(w.WardCode) === String(wardCode)
@@ -373,7 +373,7 @@ const CartPage = () => {
                             ward = w;
                         }
                     }
-                    
+
                     if (ward && ward.WardName) {
                         result.wardName = ward.WardName;
                         console.log(`✅ Load tên xã: Code ${wardCode} → ${ward.WardName}`);
@@ -467,11 +467,11 @@ const CartPage = () => {
                         const provinceIsId = provinceId && (!province || !isNaN(province) || province === String(provinceId) || province === provinceId);
                         const districtIsId = districtId && (!district || !isNaN(district) || district === String(districtId) || district === districtId);
                         const wardIsId = wardCode && (!ward || !isNaN(ward) || ward === String(wardCode) || ward === wardCode);
-                        
+
                         if (provinceId || districtId || wardCode) {
-                            console.log(`🔄 Loading tên địa chỉ từ ID:`, { 
-                                provinceId, 
-                                districtId, 
+                            console.log(`🔄 Loading tên địa chỉ từ ID:`, {
+                                provinceId,
+                                districtId,
                                 wardCode,
                                 currentNames: { province, district, ward }
                             });
@@ -612,16 +612,16 @@ const CartPage = () => {
                 };
             });
             const mapped = await Promise.all(mappedPromises);
-            
+
             // Sắp xếp: địa chỉ mặc định lên đầu
             const sorted = mapped.sort((a, b) => {
                 if (a.isDefault && !b.isDefault) return -1;
                 if (!a.isDefault && b.isDefault) return 1;
                 return 0;
             });
-            
+
             setAddresses(sorted);
-            
+
             // Tự động chọn địa chỉ mặc định
             const defaultAddr = sorted.find(addr => addr.isDefault);
             if (defaultAddr) {
@@ -701,7 +701,7 @@ const CartPage = () => {
     // Hàm fetchCartItems được tách ra để có thể gọi lại từ các hàm khác
     const fetchCartItems = async () => {
         if (!isCustomer) return;
-        
+
         try {
             const idCustomer = localStorage.getItem("isUser");
             const response = await getCartItems(idCustomer);
@@ -716,7 +716,7 @@ const CartPage = () => {
             console.log("📦 normalizedItems sau khi normalize:", normalizedItems);
             console.log("📦 normalizedItems[0] (mẫu):", normalizedItems[0]);
             setOrderProduct(normalizedItems);
-            
+
             // Xử lý "Mua ngay": tự động chọn sản phẩm và chuyển đến bước thanh toán
             const buyNowFlag = sessionStorage.getItem("buyNow");
             if (buyNowFlag) {
@@ -726,7 +726,7 @@ const CartPage = () => {
                         // Tìm sản phẩm theo idSpct hoặc id
                         let productToSelect = null;
                         if (buyNowData.productId) {
-                            productToSelect = normalizedItems.find(item => 
+                            productToSelect = normalizedItems.find(item =>
                                 String(item.idSpct || item.id) === String(buyNowData.productId)
                             );
                         }
@@ -734,7 +734,7 @@ const CartPage = () => {
                         if (!productToSelect) {
                             productToSelect = normalizedItems[normalizedItems.length - 1];
                         }
-                        
+
                         if (productToSelect) {
                             const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${normalizedItems.length - 1}`);
                             setSelectedProducts(new Set([itemId]));
@@ -882,7 +882,7 @@ const CartPage = () => {
     };
     const handleWardChange = async (wardCode) => {
         setFormData((prev) => ({ ...prev, wardCode }));
-        
+
         // Tính phí ship và ngày ship khi có đủ thông tin (districtId và wardCode)
         const currentDistrictId = formData.districtId;
         if (currentDistrictId && wardCode) {
@@ -902,7 +902,7 @@ const CartPage = () => {
                 const parsed = JSON.parse(saved);
                 const items = Array.isArray(parsed) ? parsed : [parsed];
                 setOrderProduct(items);
-                
+
                 const buyNowFlag = sessionStorage.getItem("buyNow");
                 if (buyNowFlag) {
                     try {
@@ -910,7 +910,7 @@ const CartPage = () => {
                         if (buyNowData.enabled && items.length > 0) {
                             let productToSelect = null;
                             if (buyNowData.productId) {
-                                productToSelect = items.find(item => 
+                                productToSelect = items.find(item =>
                                     String(item.id || item.idSpct) === String(buyNowData.productId)
                                 );
                             }
@@ -918,7 +918,7 @@ const CartPage = () => {
                             if (!productToSelect) {
                                 productToSelect = items[items.length - 1];
                             }
-                            
+
                             if (productToSelect) {
                                 const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${items.length - 1}`);
                                 setSelectedProducts(new Set([itemId]));
@@ -957,14 +957,14 @@ const CartPage = () => {
                 if (selectedDiscount.giaTriMin && totalAmount < selectedDiscount.giaTriMin) {
                     // Không đủ điều kiện, không áp dụng giảm giá
                     setAppliedDiscount(0);
-                    const actualShippingFee = totalAmount >= 5000000 ? 0 : shippingFee;
+                    const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
                     setFinalTotal(totalAmount + actualShippingFee);
                     return;
                 }
 
                 // Tính giảm giá theo phần trăm
                 discountValue = totalAmount * (selectedDiscount.giaTriGiam / 100);
-                
+
                 // Giới hạn mức giảm tối đa (giaTriMax) - chỉ áp dụng cho loại phần trăm
                 if (selectedDiscount.giaTriMax && discountValue > selectedDiscount.giaTriMax) {
                     discountValue = selectedDiscount.giaTriMax;
@@ -978,12 +978,12 @@ const CartPage = () => {
             setAppliedDiscount(discountValue);
             const totalAfterDiscount = totalAmount - discountValue;
             // Kiểm tra free ship: nếu tổng tiền sau giảm giá >= 5 triệu thì free ship
-            const actualShippingFee = totalAfterDiscount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAfterDiscount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(Math.max(totalAfterDiscount + actualShippingFee, 0));
         } else {
             setAppliedDiscount(0);
             // Kiểm tra free ship: nếu tổng tiền >= 5 triệu thì free ship
-            const actualShippingFee = totalAmount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(totalAmount + actualShippingFee);
         }
     }, [totalAmount, selectedDiscount, shippingFee]);
@@ -1051,10 +1051,10 @@ const CartPage = () => {
             okType: "danger",
             onOk: async () => {
                 try {
-                    
+
                     // Tìm item để lấy idGiohang
                     const item = orderProduct.find(p => p.id === id);
-                    
+
                     if (!item) {
                         message.error("Không tìm thấy sản phẩm!");
                         return;
@@ -1072,17 +1072,17 @@ const CartPage = () => {
                     if (item.idGiohang) {
                         await removeCartItem(item.idGiohang);
                         message.success("Đã xóa sản phẩm khỏi giỏ hàng");
-                        
+
                         // Reload lại danh sách giỏ hàng từ API
                         if (isCustomer) {
                             await fetchCartItems();
                         }
-                        
+
                         window.dispatchEvent(new Event('cartUpdated'));
                     } else {
                         const updated = orderProduct.filter(item => item.id !== id);
                         setOrderProduct(updated);
-                        
+
                         if (!isCustomer) {
                             if (updated.length > 0) {
                                 localStorage.setItem("orderProduct", JSON.stringify(updated));
@@ -1110,7 +1110,7 @@ const CartPage = () => {
     // Mở form edit địa chỉ và tự động load districts/wards
     const handleEditAddress = async (address) => {
         const { provinceId, districtId, wardCode } = extractAddressIds(address);
-        
+
         setEditAddressForm({
             name: address.name || address.hoTen || "",
             phone: address.phone || address.soDienThoai || "",
@@ -1119,10 +1119,10 @@ const CartPage = () => {
             districtId: districtId,
             wardCode: wardCode,
         });
-        
+
         setEditingAddressId(address.id || address.idDiaChi || address.idAddress);
         setShowAddAddressForm(false); // Đóng form thêm nếu đang mở
-        
+
         // Load districts và wards nếu có provinceId
         if (provinceId) {
             await loadDistrictsForNewAddress(provinceId);
@@ -1153,7 +1153,7 @@ const CartPage = () => {
     const performUpdateAddress = async () => {
         try {
             setAddressLoading(true);
-            
+
             const addressData = {
                 hoTen: editAddressForm.name.trim(),
                 soDienThoai: editAddressForm.phone.trim(),
@@ -1170,7 +1170,7 @@ const CartPage = () => {
             const customerId = localStorage.getItem("isUser");
             const updated = await getAllAddress(customerId);
             const raw = Array.isArray(updated) ? updated : updated?.data || [];
-            
+
             if (!raw || raw.length === 0) {
                 console.warn("⚠️ Không có địa chỉ nào được trả về");
                 setAddresses([]);
@@ -1211,23 +1211,23 @@ const CartPage = () => {
                     };
                 });
                 const mapped = await Promise.all(mappedPromises);
-                
+
                 const sorted = mapped.sort((a, b) => {
                     const aId = String(a.id || '');
                     const bId = String(b.id || '');
                     const editId = String(editingAddressId || '');
                     const aIsUpdated = aId === editId;
                     const bIsUpdated = bId === editId;
-                    
+
                     if (a.isDefault && !b.isDefault) return -1;
                     if (!a.isDefault && b.isDefault) return 1;
-                    
+
                     if (aIsUpdated && !bIsUpdated) return -1;
                     if (!aIsUpdated && bIsUpdated) return 1;
-                    
+
                     return 0;
                 });
-                
+
                 setAddresses(sorted);
             }
 
@@ -1413,7 +1413,7 @@ const CartPage = () => {
             onOk: async () => {
                 try {
                     setAddressLoading(true);
-                    
+
                     const addressData = {
                         hoTen: newAddressForm.name.trim(),
                         soDienThoai: newAddressForm.phone.trim(),
@@ -1434,7 +1434,7 @@ const CartPage = () => {
                     const customerId = localStorage.getItem("isUser");
                     const updated = await getAllAddress(customerId);
                     const raw = Array.isArray(updated) ? updated : updated?.data || [];
-                    
+
                     if (!raw || raw.length === 0) {
                         console.warn("⚠️ Không có địa chỉ nào được trả về");
                         setAddresses([]);
@@ -1475,7 +1475,7 @@ const CartPage = () => {
                             };
                         });
                         const mapped = await Promise.all(mappedPromises);
-                        
+
                         const newAddressId = response?.id || response?.data?.id || response?.data?.idDiaChi || response?.data?.idAddress;
                         const sorted = mapped.sort((a, b) => {
                             const aId = String(a.id || '');
@@ -1497,16 +1497,16 @@ const CartPage = () => {
                                 b.phone.trim() === newAddressForm.phone.trim() &&
                                 b.address.trim() === newAddressForm.address.trim()
                             );
-                            
+
                             if (a.isDefault && !b.isDefault) return -1;
                             if (!a.isDefault && b.isDefault) return 1;
-                            
+
                             if (aIsNew && !bIsNew) return -1;
                             if (!aIsNew && bIsNew) return 1;
-                            
+
                             return 0;
                         });
-                        
+
                         setAddresses(sorted);
                     }
 
@@ -1556,27 +1556,27 @@ const CartPage = () => {
             console.warn('Invalid product ID:', productId);
             return;
         }
-        
+
         const normalizedId = String(productId).trim();
         if (!normalizedId || normalizedId === 'undefined' || normalizedId === 'null' || normalizedId === '') {
             console.warn('Invalid normalized product ID:', normalizedId, 'from:', productId);
             return;
         }
-        
+
         let wasSelected = false;
         setSelectedProducts(prev => {
             wasSelected = prev.has(normalizedId);
             return prev; // Không thay đổi, chỉ để lấy giá trị
         });
-        
+
         console.log('🔵 wasSelected:', wasSelected);
-        
+
         // Khi uncheck, chỉ bỏ chọn, không xóa sản phẩm khỏi giỏ hàng
-        
+
         setSelectedProducts(prev => {
             const newSet = new Set(prev);
             console.log('🔵 Current selectedProducts:', Array.from(newSet));
-            
+
             if (newSet.has(normalizedId)) {
                 newSet.delete(normalizedId);
                 console.log('🔵 Removed:', normalizedId, 'New set:', Array.from(newSet));
@@ -1588,16 +1588,16 @@ const CartPage = () => {
                         return newSet.has(itemId);
                     })
                     .reduce((sum, item) => sum + item.price, 0);
-                
+
                 const productToAdd = orderProduct.find((item, index) => {
                     const itemId = String(item.idSpct || item.id || `temp-${index}`);
                     return itemId === normalizedId;
                 });
-                
+
                 if (productToAdd) {
                     const newTotal = currentTotal + productToAdd.price;
                     const maxAmount = 100000000; // 100 triệu
-                    
+
                     if (newTotal > maxAmount) {
                         message.warning({
                             content: `Tổng tiền đơn hàng không được vượt quá 100 triệu đồng. Vui lòng chọn sản phẩm khác hoặc bỏ bớt sản phẩm đã chọn.`,
@@ -1606,7 +1606,7 @@ const CartPage = () => {
                         return prev; // Không thay đổi, giữ nguyên trạng thái cũ
                     }
                 }
-                
+
                 newSet.add(normalizedId);
                 console.log('🔵 Added:', normalizedId, 'New set:', Array.from(newSet));
                 return newSet;
@@ -1618,7 +1618,7 @@ const CartPage = () => {
         if (checked) {
             const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + item.price, 0);
             const maxAmount = 100000000; // 100 triệu
-            
+
             if (totalIfSelectAll > maxAmount) {
                 message.warning({
                     content: `Tổng tiền đơn hàng không được vượt quá 100 triệu đồng. Vui lòng chọn một số sản phẩm phù hợp.`,
@@ -1626,7 +1626,7 @@ const CartPage = () => {
                 });
                 return; // Không cho chọn tất cả
             }
-            
+
             const allIds = new Set();
             orderProduct.forEach((item, index) => {
                 let itemId = null;
@@ -1658,29 +1658,29 @@ const CartPage = () => {
 
     const buildDiaChiDayDu = (diaChiChiTiet, ward, district, province) => {
         const parts = [];
-        
+
         // Địa chỉ chi tiết
         if (diaChiChiTiet && diaChiChiTiet.trim()) {
             parts.push(diaChiChiTiet.trim());
         }
-        
+
         // Xã/Phường
         if (ward && ward.trim()) {
             parts.push(ward.trim());
         }
-        
+
         // Quận/Huyện
         if (district && district.trim()) {
             parts.push(district.trim());
         }
-        
+
         // Tỉnh/Thành phố
         if (province && province.trim()) {
             parts.push(province.trim());
         }
-        
+
         parts.push("Việt Nam");
-        
+
         return parts.join(", ");
     };
 
@@ -1689,7 +1689,7 @@ const CartPage = () => {
             message.warning('Vui lòng chọn ít nhất một sản phẩm để thanh toán!');
             return;
         }
-        
+
         // Validate giỏ hàng
         if (orderProduct.length === 0) {
             message.warning('Giỏ hàng trống!');
@@ -1713,11 +1713,11 @@ const CartPage = () => {
             customerName = formData.fullName;
             customerPhone = formData.phone;
             addressId = null;
-            
+
             let wardName = "";
             let districtName = "";
             let provinceName = "";
-            
+
             if (formData.provinceId || formData.districtId || formData.wardCode) {
                 const addressNames = await loadAddressNamesFromIds(
                     formData.provinceId,
@@ -1728,7 +1728,7 @@ const CartPage = () => {
                 districtName = addressNames.districtName || "";
                 provinceName = addressNames.provinceName || "";
             }
-            
+
             // Tạo diaChiDayDu từ formData
             diaChiDayDu = buildDiaChiDayDu(
                 formData.address,
@@ -1742,7 +1742,7 @@ const CartPage = () => {
                 return;
             }
 
-            const selectedAddr = addresses.find(addr => 
+            const selectedAddr = addresses.find(addr =>
                 (addr.id || addr.idDiaChi || addr.idAddress) === selectedAddressId
             );
 
@@ -1759,9 +1759,9 @@ const CartPage = () => {
                 message.warning('Thông tin địa chỉ không đầy đủ!');
                 return;
             }
-            
+
             const { provinceId, districtId, wardCode } = extractAddressIds(selectedAddr);
-            
+
             console.log("🔍 Địa chỉ đã chọn (trước khi load tên):", {
                 selectedAddr,
                 extractedIds: { provinceId, districtId, wardCode },
@@ -1771,11 +1771,11 @@ const CartPage = () => {
                     phuongXa: selectedAddr.phuongXa
                 }
             });
-            
+
             let wardName = "";
             let districtName = "";
             let provinceName = "";
-            
+
             if (provinceId || districtId || wardCode) {
                 console.log("🔄 Đang load tên từ ID...");
                 const addressNames = await loadAddressNamesFromIds(
@@ -1786,14 +1786,14 @@ const CartPage = () => {
                 wardName = addressNames.wardName || "";
                 districtName = addressNames.districtName || "";
                 provinceName = addressNames.provinceName || "";
-                
+
                 console.log("✅ Đã load tên từ ID:", {
                     wardName,
                     districtName,
                     provinceName,
                     fromIds: { provinceId, districtId, wardCode }
                 });
-                
+
                 // Nếu vẫn không có tên sau khi load, cảnh báo
                 if (!wardName && !districtName && !provinceName) {
                     console.error("❌ Không load được tên từ ID, có thể ID không hợp lệ:", {
@@ -1813,7 +1813,7 @@ const CartPage = () => {
                     provinceName
                 });
             }
-            
+
             if ((!wardName || !districtName || !provinceName) && (provinceId || districtId || wardCode)) {
                 console.error("❌ CẢNH BÁO: Không load được đầy đủ tên từ ID!", {
                     provinceId,
@@ -1822,14 +1822,14 @@ const CartPage = () => {
                     loadedNames: { wardName, districtName, provinceName }
                 });
             }
-            
+
             diaChiDayDu = buildDiaChiDayDu(
                 selectedAddr.address || selectedAddr.diaChiChiTiet || "",
                 wardName, // Chỉ dùng tên đã load, không dùng selectedAddr.ward
                 districtName, // Chỉ dùng tên đã load, không dùng selectedAddr.district
                 provinceName // Chỉ dùng tên đã load, không dùng selectedAddr.province
             );
-            
+
             // VALIDATION: Kiểm tra xem diaChiDayDu có chứa ID (số 3-4 chữ số) không
             const containsIdPattern = /\b\d{3,4}\b/.test(diaChiDayDu);
             if (containsIdPattern) {
@@ -1839,7 +1839,7 @@ const CartPage = () => {
                     loadedNames: { wardName, districtName, provinceName }
                 });
             }
-            
+
             console.log("📦 diaChiDayDu đã tạo (FINAL):", diaChiDayDu);
             console.log("📦 Validation diaChiDayDu:", {
                 containsIdPattern,
@@ -1856,7 +1856,7 @@ const CartPage = () => {
 
             // Tính phí ship thực tế (có thể free ship nếu >= 5tr)
             const totalAfterDiscount = totalAmount - appliedDiscount;
-            const actualShippingFee = totalAfterDiscount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAfterDiscount >= 15000000 ? 0 : shippingFee;
 
             // Lấy voucher ID từ selectedDiscount
             let voucherId = null;
@@ -1890,8 +1890,8 @@ const CartPage = () => {
                 listHinhThucThanhToan: [{
                     idHinhThucThanhToan: getPaymentMethodId(formData.paymentMethod),
                     soTien: finalTotal, // Tổng tiền cần thanh toán
-                    ghiChu: formData.paymentMethod === "delivery" 
-                        ? "Thanh toán khi nhận hàng" 
+                    ghiChu: formData.paymentMethod === "delivery"
+                        ? "Thanh toán khi nhận hàng"
                         : "Thanh toán online VNPAY"
                 }]
             };
@@ -1941,7 +1941,7 @@ const CartPage = () => {
                     console.log("✅ Tạo đơn hàng thành công (chờ thanh toán VNPay):", response);
 
                     const idOrder = response?.data?.id || response?.id || response?.idOrder;
-                    
+
                     if (!idOrder) {
                         throw new Error("Không nhận được ID đơn hàng từ server");
                     }
@@ -1966,7 +1966,7 @@ const CartPage = () => {
                     console.log("✅ Tạo URL thanh toán VNPay thành công:", paymentResponse);
 
                     const paymentUrl = paymentResponse?.data?.paymentUrl || paymentResponse?.paymentUrl;
-                    
+
                     if (paymentUrl) {
                         // Chuyển hướng đến trang thanh toán VNPay
                         window.location.href = paymentUrl;
@@ -1984,7 +1984,7 @@ const CartPage = () => {
                 }
             } else {
                 setIsDeliveryProcessing(true);
-                
+
                 try {
                     const deliveryOrderDataForDebug = {
                         ...orderData,
@@ -1995,33 +1995,33 @@ const CartPage = () => {
                     localStorage.setItem("lastDeliveryOrderData", JSON.stringify(deliveryOrderDataForDebug));
 
                     const response = await createOrder(orderData);
-                console.log("✅ Tạo đơn hàng thành công:", response);
-                message.success({ 
-                    content: 'Đặt hàng thành công!', 
-                    key: 'creatingOrder',
-                    duration: 3
-                });
+                    console.log("✅ Tạo đơn hàng thành công:", response);
+                    message.success({
+                        content: 'Đặt hàng thành công!',
+                        key: 'creatingOrder',
+                        duration: 3
+                    });
 
-                const remainingProducts = orderProduct.filter(
-                    (item, index) => {
-                        const itemId = String(item.idSpct || item.id || `temp-${index}`);
-                        return !selectedProducts.has(itemId);
+                    const remainingProducts = orderProduct.filter(
+                        (item, index) => {
+                            const itemId = String(item.idSpct || item.id || `temp-${index}`);
+                            return !selectedProducts.has(itemId);
+                        }
+                    );
+                    setOrderProduct(remainingProducts);
+
+                    if (!isCustomer) {
+                        if (remainingProducts.length > 0) {
+                            localStorage.setItem("orderProduct", JSON.stringify(remainingProducts));
+                        } else {
+                            localStorage.removeItem("orderProduct");
+                        }
                     }
-                );
-                setOrderProduct(remainingProducts);
-                
-                if (!isCustomer) {
-                    if (remainingProducts.length > 0) {
-                        localStorage.setItem("orderProduct", JSON.stringify(remainingProducts));
-                    } else {
-                        localStorage.removeItem("orderProduct");
-                    }
-                }
-                
-                setSelectedProducts(new Set());
-                
-                sessionStorage.removeItem("buyNow");
-                setIsBuyNow(false);
+
+                    setSelectedProducts(new Set());
+
+                    sessionStorage.removeItem("buyNow");
+                    setIsBuyNow(false);
                     setCurrentStep(2);
                     window.scrollTo(0, 0);
                 } finally {
@@ -2033,8 +2033,8 @@ const CartPage = () => {
             console.error("❌ Lỗi khi tạo đơn hàng:", error);
             setIsVNPayProcessing(false);
             setIsDeliveryProcessing(false);
-            message.error({ 
-                content: error.response?.data?.message || 'Tạo đơn hàng thất bại. Vui lòng thử lại!', 
+            message.error({
+                content: error.response?.data?.message || 'Tạo đơn hàng thất bại. Vui lòng thử lại!',
                 key: 'creatingOrder',
                 duration: 5
             });
@@ -2094,9 +2094,9 @@ const CartPage = () => {
     }
 
     const defaultAddress = addresses.find(addr => addr.isDefault) || addresses[0];
-    
+
     // Địa chỉ đã chọn (ưu tiên selectedAddressId, nếu không có thì dùng defaultAddress)
-    const selectedAddress = selectedAddressId 
+    const selectedAddress = selectedAddressId
         ? addresses.find(addr => (addr.id || addr.idDiaChi) === selectedAddressId)
         : defaultAddress;
 
@@ -2131,7 +2131,7 @@ const CartPage = () => {
 
     return (
         <div className="cart-page">
-          
+
             {currentStep === 1 && (
                 <button onClick={handleBack} className="back-btn">
                     <ArrowLeftOutlined /> Quay lại
@@ -2191,7 +2191,7 @@ const CartPage = () => {
                                         const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + item.price, 0);
                                         const maxAmount = 100000000; // 100 triệu
                                         const isSelectAllDisabled = totalIfSelectAll > maxAmount;
-                                        
+
                                         return (
                                             <Checkbox
                                                 checked={selectedProducts.size > 0 && selectedProducts.size === orderProduct.length}
@@ -2221,7 +2221,7 @@ const CartPage = () => {
                                     };
                                     const itemId = getItemId();
                                     const isSelected = selectedProducts.has(itemId);
-                                    
+
                                     // Tính tổng tiền hiện tại của các sản phẩm đã chọn
                                     const currentTotal = orderProduct
                                         .filter((prod, idx) => {
@@ -2229,21 +2229,21 @@ const CartPage = () => {
                                             return selectedProducts.has(prodId);
                                         })
                                         .reduce((sum, prod) => sum + prod.price, 0);
-                                    
+
                                     const maxAmount = 100000000; // 100 triệu
                                     // Disable checkbox nếu tổng tiền đã >= 100tr và sản phẩm này chưa được chọn
                                     const isDisabled = !isSelected && currentTotal >= maxAmount;
-                                    
-                                    console.log(`Item ${index}:`, { 
-                                        idSpct: item.idSpct, 
-                                        id: item.id, 
-                                        itemId, 
+
+                                    console.log(`Item ${index}:`, {
+                                        idSpct: item.idSpct,
+                                        id: item.id,
+                                        itemId,
                                         isSelected,
                                         currentTotal,
                                         isDisabled,
                                         selectedProducts: Array.from(selectedProducts)
                                     });
-                                    
+
                                     return (
                                         <div key={item.id || item.idSpct || `item-${index}`} className={`cart-item ${isSelected ? 'selected' : ''}`}>
                                             <Checkbox
@@ -2258,7 +2258,7 @@ const CartPage = () => {
                                                 className="product-checkbox"
                                                 onClick={(e) => e.stopPropagation()}
                                             />
-                                            
+
                                             <img
                                                 src={item.image || item.anhDaiDien || "https://1pro.vn/wp-content/uploads/2025/01/Pro-1422-M1-silver-600x500.png"}
                                                 alt={item.name}
@@ -2409,7 +2409,7 @@ const CartPage = () => {
                                     <div style={{
                                         background: '#1890ff',
                                         borderRadius: '50%',
-                          
+
                                         width: '48px',
                                         height: '48px',
                                         display: 'flex',
@@ -2422,16 +2422,16 @@ const CartPage = () => {
                                         <EnvironmentOutlined />
                                     </div>
                                     <div className="address-details" style={{ flex: 1 }}>
-                                        <div style={{ 
-                                            display: 'flex', 
-                                            justifyContent: 'space-between', 
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
                                             alignItems: 'flex-start',
                                             marginBottom: '12px'
                                         }}>
                                             <div>
-                                                <div style={{ 
-                                                    fontSize: '16px', 
-                                                    fontWeight: '600', 
+                                                <div style={{
+                                                    fontSize: '16px',
+                                                    fontWeight: '600',
                                                     color: '#262626',
                                                     marginBottom: '8px',
                                                     display: 'flex',
@@ -2441,8 +2441,8 @@ const CartPage = () => {
                                                     <UserOutlined style={{ color: '#1890ff' }} />
                                                     {selectedAddress.name}
                                                 </div>
-                                                <div style={{ 
-                                                    fontSize: '14px', 
+                                                <div style={{
+                                                    fontSize: '14px',
                                                     color: '#595959',
                                                     marginBottom: '4px',
                                                     display: 'flex',
@@ -2452,8 +2452,8 @@ const CartPage = () => {
                                                     <PhoneOutlined style={{ color: '#52c41a' }} />
                                                     {selectedAddress.phone}
                                                 </div>
-                                                <div style={{ 
-                                                    fontSize: '14px', 
+                                                <div style={{
+                                                    fontSize: '14px',
                                                     color: '#595959',
                                                     lineHeight: '1.6',
                                                     marginTop: '8px'
@@ -2489,7 +2489,7 @@ const CartPage = () => {
                                 </div>
                             </div>
                         )}
-{/* 
+                        {/* 
                         <div className="deliver-other-option">
                             <Checkbox
                                 checked={deliverToOther}
@@ -2638,9 +2638,9 @@ const CartPage = () => {
                         )}
 
                         <div className="form-section" style={{ marginTop: '20px' }}>
-                            <label style={{ 
-                                display: 'block', 
-                                marginBottom: '8px', 
+                            <label style={{
+                                display: 'block',
+                                marginBottom: '8px',
                                 fontWeight: '500',
                                 color: '#262626'
                             }}>
@@ -2670,17 +2670,17 @@ const CartPage = () => {
                             padding: '20px',
                             marginTop: '24px'
                         }}>
-                            <h3 style={{ 
-                                marginBottom: '16px', 
-                                fontSize: '16px', 
+                            <h3 style={{
+                                marginBottom: '16px',
+                                fontSize: '16px',
                                 fontWeight: '600',
                                 color: '#262626'
                             }}>
                                 Tóm tắt đơn hàng
                             </h3>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                <div style={{ 
-                                    display: 'flex', 
+                                <div style={{
+                                    display: 'flex',
                                     justifyContent: 'space-between',
                                     fontSize: '14px',
                                     color: '#595959'
@@ -2690,7 +2690,7 @@ const CartPage = () => {
                                         {formatPrice(totalAmount)}
                                     </span>
                                 </div>
-                                
+
                                 {(() => {
                                     if (isBuyNow) {
                                         return (
@@ -2748,11 +2748,11 @@ const CartPage = () => {
                                     }
                                     return null;
                                 })()}
-                                
+
                                 {/* Giảm giá - hiển thị nếu có */}
                                 {appliedDiscount > 0 && (
-                                    <div style={{ 
-                                        display: 'flex', 
+                                    <div style={{
+                                        display: 'flex',
                                         justifyContent: 'space-between',
                                         fontSize: '14px',
                                         color: '#595959'
@@ -2763,10 +2763,10 @@ const CartPage = () => {
                                         </span>
                                     </div>
                                 )}
-                                
+
                                 {/* Phí ship */}
-                                <div style={{ 
-                                    display: 'flex', 
+                                <div style={{
+                                    display: 'flex',
                                     justifyContent: 'space-between',
                                     fontSize: '14px',
                                     color: '#595959'
@@ -2778,7 +2778,7 @@ const CartPage = () => {
                                         ) : (
                                             (() => {
                                                 const totalAfterDiscount = totalAmount - appliedDiscount;
-                                                const isFreeShip = totalAfterDiscount >= 5000000;
+                                                const isFreeShip = totalAfterDiscount >= 15000000;
                                                 return isFreeShip ? (
                                                     <span style={{ color: '#52c41a', fontWeight: '600' }}>Miễn phí</span>
                                                 ) : (
@@ -2788,15 +2788,15 @@ const CartPage = () => {
                                         )}
                                     </span>
                                 </div>
-                                
-                                <div style={{ 
-                                    height: '1px', 
-                                    background: '#e0e0e0', 
-                                    margin: '12px 0' 
+
+                                <div style={{
+                                    height: '1px',
+                                    background: '#e0e0e0',
+                                    margin: '12px 0'
                                 }}></div>
-                                
-                                <div style={{ 
-                                    display: 'flex', 
+
+                                <div style={{
+                                    display: 'flex',
                                     justifyContent: 'space-between',
                                     fontSize: '18px',
                                     fontWeight: '600',
@@ -2813,7 +2813,7 @@ const CartPage = () => {
                     </div>
 
                     <div className="form-section" style={{ marginTop: '32px' }}>
-                        <h2 className="form-section-title" style={{ 
+                        <h2 className="form-section-title" style={{
                             marginBottom: '20px',
                             fontSize: '18px',
                             fontWeight: '600',
@@ -2858,7 +2858,7 @@ const CartPage = () => {
                                     Thanh toán khi nhận hàng
                                 </div>
                             </div>
-                            
+
                             <div
                                 className={`payment-option ${formData.paymentMethod === "vnpay" ? "active" : ""}`}
                                 onClick={() => handleInputChange("paymentMethod", "vnpay")}
@@ -3048,20 +3048,20 @@ const CartPage = () => {
                                         className={`address-item ${selectedAddressId === (address.id || address.idDiaChi) ? 'selected' : ''}`}
                                         onClick={() => handleSelectAddress(address)}
                                         style={{
-                                            border: address.isDefault 
-                                                ? '2px solid #52c41a' 
-                                                : (selectedAddressId === (address.id || address.idDiaChi) 
-                                                    ? '2px solid #1890ff' 
+                                            border: address.isDefault
+                                                ? '2px solid #52c41a'
+                                                : (selectedAddressId === (address.id || address.idDiaChi)
+                                                    ? '2px solid #1890ff'
                                                     : '1px solid #e8e8e8'),
                                             borderRadius: '8px',
                                             padding: '16px',
                                             marginBottom: '12px',
                                             cursor: 'pointer',
                                             transition: 'all 0.2s ease',
-                                            background: address.isDefault 
-                                                ? '#f6ffed' 
-                                                : (selectedAddressId === (address.id || address.idDiaChi) 
-                                                    ? '#f0f7ff' 
+                                            background: address.isDefault
+                                                ? '#f6ffed'
+                                                : (selectedAddressId === (address.id || address.idDiaChi)
+                                                    ? '#f0f7ff'
                                                     : '#ffffff'),
                                             position: 'relative',
                                             boxShadow: address.isDefault
@@ -3289,11 +3289,11 @@ const CartPage = () => {
                                 className="form-input"
                                 style={{ width: "100%", marginBottom: editAddressErrors.provinceId ? 4 : 12 }}
                                 onChange={async (value) => {
-                                    setEditAddressForm(prev => ({ 
-                                        ...prev, 
-                                        provinceId: value, 
-                                        districtId: null, 
-                                        wardCode: null 
+                                    setEditAddressForm(prev => ({
+                                        ...prev,
+                                        provinceId: value,
+                                        districtId: null,
+                                        wardCode: null
                                     }));
                                     if (editAddressErrors.provinceId) {
                                         setEditAddressErrors(prev => ({ ...prev, provinceId: '' }));
@@ -3325,10 +3325,10 @@ const CartPage = () => {
                                 className="form-input"
                                 style={{ width: "100%", marginBottom: editAddressErrors.districtId ? 4 : 12 }}
                                 onChange={async (value) => {
-                                    setEditAddressForm(prev => ({ 
-                                        ...prev, 
-                                        districtId: value, 
-                                        wardCode: null 
+                                    setEditAddressForm(prev => ({
+                                        ...prev,
+                                        districtId: value,
+                                        wardCode: null
                                     }));
                                     if (editAddressErrors.districtId) {
                                         setEditAddressErrors(prev => ({ ...prev, districtId: '' }));
@@ -3361,9 +3361,9 @@ const CartPage = () => {
                                 className="form-input"
                                 style={{ width: "100%", marginBottom: editAddressErrors.wardCode ? 4 : 12 }}
                                 onChange={(value) => {
-                                    setEditAddressForm(prev => ({ 
-                                        ...prev, 
-                                        wardCode: value 
+                                    setEditAddressForm(prev => ({
+                                        ...prev,
+                                        wardCode: value
                                     }));
                                     if (editAddressErrors.wardCode) {
                                         setEditAddressErrors(prev => ({ ...prev, wardCode: '' }));
@@ -3481,11 +3481,11 @@ const CartPage = () => {
                                 style={{ width: "100%", marginBottom: newAddressErrors.provinceId ? 4 : 12 }}
                                 onChange={async (value) => {
                                     console.log("📍 Chọn tỉnh:", value);
-                                    setNewAddressForm(prev => ({ 
-                                        ...prev, 
-                                        provinceId: value, 
-                                        districtId: null, 
-                                        wardCode: null 
+                                    setNewAddressForm(prev => ({
+                                        ...prev,
+                                        provinceId: value,
+                                        districtId: null,
+                                        wardCode: null
                                     }));
                                     if (newAddressErrors.provinceId) {
                                         setNewAddressErrors(prev => ({ ...prev, provinceId: '' }));
@@ -3519,10 +3519,10 @@ const CartPage = () => {
                                 style={{ width: "100%", marginBottom: newAddressErrors.districtId ? 4 : 12 }}
                                 onChange={async (value) => {
                                     console.log("📍 Chọn huyện:", value);
-                                    setNewAddressForm(prev => ({ 
-                                        ...prev, 
-                                        districtId: value, 
-                                        wardCode: null 
+                                    setNewAddressForm(prev => ({
+                                        ...prev,
+                                        districtId: value,
+                                        wardCode: null
                                     }));
                                     if (newAddressErrors.districtId) {
                                         setNewAddressErrors(prev => ({ ...prev, districtId: '' }));
@@ -3558,9 +3558,9 @@ const CartPage = () => {
                                 onChange={async (value) => {
                                     console.log("📍 Chọn xã:", value);
                                     const currentDistrictId = newAddressForm.districtId;
-                                    setNewAddressForm(prev => ({ 
-                                        ...prev, 
-                                        wardCode: value 
+                                    setNewAddressForm(prev => ({
+                                        ...prev,
+                                        wardCode: value
                                     }));
                                     if (newAddressErrors.wardCode) {
                                         setNewAddressErrors(prev => ({ ...prev, wardCode: '' }));
@@ -3611,7 +3611,7 @@ const CartPage = () => {
                         </div>
 
                         <div className="form-actions">
-                            <Button                             onClick={() => {
+                            <Button onClick={() => {
                                 setShowAddAddressForm(false);
                                 setEditingAddressId(null);
                                 setDeliverToOther(false); // Đảm bảo checkbox không bị check khi hủy

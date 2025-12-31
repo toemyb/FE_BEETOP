@@ -24,8 +24,3 @@ export const createVNPayPayment = async (paymentData) => {
 
 
 
-
-
-
-
-

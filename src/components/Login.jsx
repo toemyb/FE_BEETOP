@@ -43,7 +43,7 @@ const Login = ({ setToken, setUser }) => {
 
       message.success('Đăng nhập thành công!');
       // Redirect based on role
-      if (loggedInUser.role === 'KHÁCH HÀNG') {
+      if (loggedInUser.role === 'KHACH_HANG') {
         navigate('/');
         localStorage.setItem('isCustomer', 'true');
       } else {

@@ -47,7 +47,7 @@ const Header = () => {
                 if (customerId) {
                     const response = await getCartItems(customerId);
                     console.log("📦 Cart response:", response);
-                    
+
                     // Xử lý nhiều cấu trúc dữ liệu có thể có
                     let items = [];
                     if (Array.isArray(response)) {
@@ -61,7 +61,7 @@ const Header = () => {
                             items = response.data.sanPhams;
                         }
                     }
-                    
+
                     // Tính tổng số lượng sản phẩm (tổng số items trong giỏ hàng)
                     const total = items.length || 0;
                     console.log("📊 Total cart items:", total);
@@ -85,14 +85,14 @@ const Header = () => {
     // Lấy số lượng sản phẩm trong giỏ hàng
     useEffect(() => {
         loadCartQuantity();
-        
+
         // Lắng nghe event cartUpdated để reload lại số lượng khi có thay đổi
         const handleCartUpdate = () => {
             loadCartQuantity();
         };
-        
+
         window.addEventListener('cartUpdated', handleCartUpdate);
-        
+
         return () => {
             window.removeEventListener('cartUpdated', handleCartUpdate);
         };
@@ -118,8 +118,8 @@ const Header = () => {
     }, [keyword]);
 
     const menuItems = [
-        { key: "1", label: <Link to="/profile" style={{textDecoration:'none'}}>Thông tin cá nhân</Link> },
-        { key: "2", label: <Link to="/orders"  style={{textDecoration:'none'}}>Đơn hàng của bạn</Link> },
+        { key: "1", label: <Link to="/profile" style={{ textDecoration: 'none' }}>Thông tin cá nhân</Link> },
+        { key: "2", label: <Link to="/orders" style={{ textDecoration: 'none' }}>Đơn hàng của bạn</Link> },
         {
             key: "3",
             danger: true,
@@ -192,11 +192,11 @@ const Header = () => {
                                         onMouseEnter={() => handleHoverBrand(b.id)}
                                     >
                                         <div className="brand-info">
-                                            <img 
-                                                src={BRAND_LOGOS[b.ten] || "https://via.placeholder.com/24"} 
-                                                alt={b.ten} 
-                                                className="brand-logo" 
-                                                style={{height:"30px"  , objectFit:'contain'}}
+                                            <img
+                                                src={BRAND_LOGOS[b.ten] || "https://via.placeholder.com/24"}
+                                                alt={b.ten}
+                                                className="brand-logo"
+                                                style={{ height: "30px", objectFit: 'contain' }}
                                             />
                                             <span className="brand-name">{b.ten}</span>
                                         </div>
@@ -229,8 +229,8 @@ const Header = () => {
                                                     }}
                                                 >
                                                     <div className="product-item-image">
-                                                        <img 
-                                                            src={item.image || item.anhDaiDien || "https://1pro.vn/wp-content/uploads/2025/01/Pro-1422-M1-silver-600x500.png"} 
+                                                        <img
+                                                            src={item.image || item.anhDaiDien || "https://1pro.vn/wp-content/uploads/2025/01/Pro-1422-M1-silver-600x500.png"}
                                                             alt={item.tenSanPham}
                                                         />
                                                     </div>
@@ -282,8 +282,8 @@ const Header = () => {
                                     }}
                                 >
                                     <div className="search-item-image">
-                                        <img 
-                                            src={item.image || "https://1pro.vn/wp-content/uploads/2025/01/Pro-1422-M1-silver-600x500.png"} 
+                                        <img
+                                            src={item.image || "https://1pro.vn/wp-content/uploads/2025/01/Pro-1422-M1-silver-600x500.png"}
                                             alt={item.tenSanPham}
                                         />
                                     </div>
@@ -308,21 +308,21 @@ const Header = () => {
                     </Link>
 
                     <Link to="/cart" className="header-cart">
-                        <Badge 
+                        <Badge
                             count={totalQuantity > 0 ? totalQuantity : null}
                             showZero={false}
-                            size="default" 
+                            size="default"
                             offset={[-8, -8]}
-                            style={{ 
+                            style={{
                                 fontSize: '12px',
                                 fontWeight: '700',
                                 minWidth: '20px',
                                 height: '20px',
                                 lineHeight: '20px',
                                 boxShadow: '0 2px 8px rgba(255, 0, 0, 0.4)',
-                                left : '0px',
-                                right : '0px' , 
-                                marginTop : '0px'
+                                left: '0px',
+                                right: '0px',
+                                marginTop: '0px'
                             }}
                         >
                             <ShoppingCartOutlined className="cart-icon" />

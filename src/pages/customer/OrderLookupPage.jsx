@@ -543,8 +543,10 @@ const OrderLookupPage = () => {
                           }}
                         />
                       </div>
+
                       <div className="product-info">
                         <div className="product-name">{item.tenSanPham}</div>
+                        <div className="product-quantity">Seri : {item.idSeri} </div>
                         <div className="product-quantity">Số lượng: {item.soLuong}</div>
                       </div>
                       <div className="product-price">
