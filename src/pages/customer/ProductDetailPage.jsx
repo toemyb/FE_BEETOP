@@ -46,52 +46,34 @@ const ProductDetailPage = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [id]);
 
-    const getIdTaiKhoan = () =>
-        sessionStorage.getItem("idTaiKhoan") || localStorage.getItem("customerId");
+    const idCustomer = localStorage.getItem("isUser");
 
-    const addCart = async () => {
+    const addCart = () => {
         if (!isCustomer) {
             message.error("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.");
             navigate("/login");
             return;
         }
-
-        const idTaiKhoan = getIdTaiKhoan();
-        if (!idTaiKhoan) {
-            message.error("Không tìm thấy id tài khoản, vui lòng đăng nhập lại!");
-            return;
-        }
-
-        if (!productDetail?.ctId) {
-            message.error("Không xác định được phiên bản sản phẩm (ctId).");
-            return;
-        }
-
+        if (!productDetail) return;
         const cartItem = {
-            idTaiKhoan,
+            idTaiKhoan: idCustomer,
             idSpct: productDetail.ctId,
             soLuong: 1,
         };
-
-        try {
-            await addToCart(cartItem);
-            message.success("Thêm sản phẩm vào giỏ hàng thành công!");
-        } catch (error) {
-            // chỉ báo “đã có trong giỏ” khi BE thật sự trả thông báo đó
-            const msg = error?.response?.data?.message || error?.message || "";
-            if (String(msg).toLowerCase().includes("đã có trong giỏ")) {
-                message.warning("Sản phẩm đã có trong giỏ hàng");
-            } else {
-                message.error("Thêm vào giỏ thất bại!");
-            }
-        }
+        addToCart(cartItem)
+            .then(() => {
+                message.success("Thêm sản phẩm vào giỏ hàng thành công!");
+            })
+            .catch((error) => {
+                message.success("Sản phẩm đã có trong giỏ hàng");
+            });
     };
 
     useEffect(() => {
         const fetchProductDetail = async () => {
             try {
                 const data = await CustomerLaptopDetail(id);
-
+                
                 // Lọc chỉ hiển thị sản phẩm có trangThaiSeri === 1
                 const availableVariants = data.filter(item => item.trangThaiSeri === 1);
                 setVariants(availableVariants);
@@ -120,7 +102,7 @@ const ProductDetailPage = () => {
                 // xử lý ảnh
                 const imgList = current.images && Array.isArray(current.images) && current.images.length > 0
                     ? current.images
-                    : current.image
+                    : current.image 
                         ? [current.image]
                         : [];
 
@@ -130,7 +112,7 @@ const ProductDetailPage = () => {
                 console.error("Lỗi khi lấy chi tiết:", error);
             }
         };
-
+        
         fetchProductDetail();
     }, [id]);
 
@@ -138,17 +120,17 @@ const ProductDetailPage = () => {
     const handleSelectConfig = (item) => {
         setSelectedConfig(item.ctId);
         setProductDetail(item);
-
+        
         // Cập nhật ảnh khi chuyển variant
         const imgList = item.images && Array.isArray(item.images) && item.images.length > 0
             ? item.images
-            : item.image
+            : item.image 
                 ? [item.image]
                 : [];
-
+        
         setImages(imgList);
         setSelectedImage(imgList.length > 0 ? imgList[0] : null);
-
+        
         navigate(`/product-detail/${id}?ctId=${item.ctId}`, { replace: true });
     };
 
@@ -156,28 +138,23 @@ const ProductDetailPage = () => {
     const handleBuyNow = async () => {
         if (!productDetail) return;
 
-        const idTaiKhoan = getIdTaiKhoan();
-
-        if (isCustomer && idTaiKhoan) {
+        if (isCustomer && idCustomer) {
             // Nếu đã đăng nhập: thêm vào giỏ hàng qua API
             try {
                 const cartItem = {
-                    idTaiKhoan,
+                    idTaiKhoan: idCustomer,
                     idSpct: productDetail.ctId,
                     soLuong: 1,
                 };
-
                 await addToCart(cartItem);
-
-                sessionStorage.setItem(
-                    "buyNow",
-                    JSON.stringify({
-                        enabled: true,
-                        productId: productDetail.ctId,
-                        timestamp: Date.now(),
-                    })
-                );
-
+                
+                // Lưu flag để CartPage tự động chuyển đến bước thanh toán
+                sessionStorage.setItem("buyNow", JSON.stringify({
+                    enabled: true,
+                    productId: productDetail.ctId,
+                    timestamp: Date.now()
+                }));
+                
                 navigate("/cart");
             } catch (error) {
                 console.error("Lỗi khi thêm vào giỏ hàng:", error);
@@ -185,37 +162,37 @@ const ProductDetailPage = () => {
             }
         } else {
             // Nếu chưa đăng nhập: thêm vào localStorage
-            let existing = JSON.parse(localStorage.getItem("orderProduct") || "[]");
+        let existing = JSON.parse(localStorage.getItem("orderProduct") || "[]");
 
-            const firstImage = productDetail.images && Array.isArray(productDetail.images) && productDetail.images.length > 0
-                ? productDetail.images[0]
-                : selectedImage || productDetail.image || null;
+        const firstImage = productDetail.images && Array.isArray(productDetail.images) && productDetail.images.length > 0
+            ? productDetail.images[0]
+            : selectedImage || productDetail.image || null;
 
-            const newCartItem = {
-                id: id,
-                idSpct: productDetail.ctId,
-                name: productDetail.productName,
-                cpu: productDetail.cpu,
-                ram: productDetail.ram,
-                ssd: productDetail.ssd,
-                card: productDetail.card,
-                price: productDetail.price,
-                color: productDetail.color,
-                image: firstImage,
-                quantity: 1,
-            };
+        const newCartItem = {
+            id: id,
+            idSpct: productDetail.ctId,
+            name: productDetail.productName,
+            cpu: productDetail.cpu,
+            ram: productDetail.ram,
+            ssd: productDetail.ssd,
+            card: productDetail.card,
+            price: productDetail.price,
+            color: productDetail.color,
+            image: firstImage,
+            quantity: 1,
+        };
 
-            existing.push(newCartItem);
-            localStorage.setItem("orderProduct", JSON.stringify(existing));
-
+        existing.push(newCartItem);
+        localStorage.setItem("orderProduct", JSON.stringify(existing));
+            
             // Lưu flag để CartPage tự động chuyển đến bước thanh toán
             sessionStorage.setItem("buyNow", JSON.stringify({
                 enabled: true,
                 productId: newCartItem.id || newCartItem.idSpct,
                 timestamp: Date.now()
             }));
-
-            navigate("/cart");
+            
+        navigate("/cart");
         }
     };
 
@@ -282,9 +259,9 @@ const ProductDetailPage = () => {
                         <div className="main-image-container" onClick={() => setImageZoom(!imageZoom)}>
                             <Badge.Ribbon text="HOT" color="red">
                                 <div className="main-image-wrapper">
-                                    <img
-                                        src={selectedImage || (productDetail.images && productDetail.images.length > 0 ? productDetail.images[0] : productDetail.image)}
-                                        alt={productDetail.productName}
+                                    <img 
+                                        src={selectedImage || (productDetail.images && productDetail.images.length > 0 ? productDetail.images[0] : productDetail.image)} 
+                                        alt={productDetail.productName} 
                                         className={`main-image ${imageZoom ? 'zoomed' : ''}`}
                                     />
                                     {imageZoom && (
@@ -295,15 +272,15 @@ const ProductDetailPage = () => {
                                 </div>
                             </Badge.Ribbon>
                             <div className="image-actions">
-                                <Button
-                                    type="text"
-                                    icon={<HeartOutlined />}
+                                <Button 
+                                    type="text" 
+                                    icon={<HeartOutlined />} 
                                     className="action-btn"
                                     title="Yêu thích"
                                 />
-                                <Button
-                                    type="text"
-                                    icon={<ShareAltOutlined />}
+                                <Button 
+                                    type="text" 
+                                    icon={<ShareAltOutlined />} 
                                     className="action-btn"
                                     title="Chia sẻ"
                                 />
@@ -325,7 +302,7 @@ const ProductDetailPage = () => {
                     </div>
 
                     {/* Thông số kỹ thuật */}
-                    <Card
+                    <Card 
                         className="specs-card"
                         title={
                             <Space>
@@ -348,7 +325,7 @@ const ProductDetailPage = () => {
                     </Card>
 
                     {/* Mô tả sản phẩm */}
-                    <Card
+                    <Card 
                         className="description-card"
                         title="Mô tả sản phẩm"
                     >
@@ -482,7 +459,7 @@ const ProductDetailPage = () => {
                     </Card>
 
                     {/* Buttons */}
-
+          
 
                     {/* Cửa hàng */}
                     <Card className="store-card" size="small" title={

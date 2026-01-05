@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Spin, message, Button, Modal } from "antd";
-import { 
-    CheckCircleOutlined, 
-    FileTextOutlined, 
-    TruckOutlined,
-    CreditCardOutlined,
-    CarOutlined,
-    HomeOutlined,
-    ArrowLeftOutlined,
-    UserOutlined,
-    WalletOutlined,
-    CloseCircleOutlined,
-    ExclamationCircleOutlined
+import {
+  CheckCircleOutlined,
+  FileTextOutlined,
+  TruckOutlined,
+  CreditCardOutlined,
+  CarOutlined,
+  HomeOutlined,
+  ArrowLeftOutlined,
+  UserOutlined,
+  WalletOutlined,
+  CloseCircleOutlined,
+  ExclamationCircleOutlined
 } from "@ant-design/icons";
 import axios from "axios";
 import { getOrderProducts, cancelOrder } from "../../service/OrderService";
@@ -34,15 +34,15 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
     if (provinceId) {
       try {
         const provinceIdNum = typeof provinceId === 'string' ? parseInt(provinceId) : provinceId;
-        
+
         const resProvince = await axios.get(urlProvince, {
           headers: { token: tokenApiGHN }
         });
-        
+
         let province = null;
         if (Array.isArray(resProvince.data.data)) {
-          province = resProvince.data.data.find(p => 
-            p.ProvinceID === provinceIdNum || 
+          province = resProvince.data.data.find(p =>
+            p.ProvinceID === provinceIdNum ||
             p.ProvinceID === provinceId ||
             String(p.ProvinceID) === String(provinceId)
           );
@@ -52,7 +52,7 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
             province = p;
           }
         }
-        
+
         if (province && province.ProvinceName) {
           result.provinceName = province.ProvinceName;
         }
@@ -64,17 +64,17 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
     if (districtId) {
       try {
         const districtIdNum = typeof districtId === 'string' ? parseInt(districtId) : districtId;
-        
+
         const params = provinceId ? { province_id: provinceId } : {};
         const resDistrict = await axios.get(urlDistricts, {
           params: params,
           headers: { token: tokenApiGHN }
         });
-        
+
         let district = null;
         if (Array.isArray(resDistrict.data.data)) {
-          district = resDistrict.data.data.find(d => 
-            d.DistrictID === districtIdNum || 
+          district = resDistrict.data.data.find(d =>
+            d.DistrictID === districtIdNum ||
             d.DistrictID === districtId ||
             String(d.DistrictID) === String(districtId)
           );
@@ -84,7 +84,7 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
             district = d;
           }
         }
-        
+
         if (district && district.DistrictName) {
           result.districtName = district.DistrictName;
         }
@@ -97,34 +97,34 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
       try {
         const wardCodeNum = typeof wardCode === 'string' ? parseInt(wardCode) : wardCode;
         const wardCodeStr = String(wardCode);
-        
+
         const resWard = await axios.get(urlWard, {
           params: { district_id: districtId },
           headers: { token: tokenApiGHN }
         });
-        
+
         let ward = null;
         if (Array.isArray(resWard.data.data)) {
           ward = resWard.data.data.find(w => {
             const wCode = w.WardCode;
             return wCode === wardCodeNum ||
-                   wCode === wardCode ||
-                   Number(wCode) === Number(wardCodeNum) ||
-                   String(wCode) === wardCodeStr ||
-                   String(wCode) === String(wardCode);
+              wCode === wardCode ||
+              Number(wCode) === Number(wardCodeNum) ||
+              String(wCode) === wardCodeStr ||
+              String(wCode) === String(wardCode);
           });
         } else if (resWard.data.data && resWard.data.data.WardCode) {
           const w = resWard.data.data;
           const wCode = w.WardCode;
           if (wCode === wardCodeNum ||
-              wCode === wardCode ||
-              Number(wCode) === Number(wardCodeNum) ||
-              String(wCode) === wardCodeStr ||
-              String(wCode) === String(wardCode)) {
+            wCode === wardCode ||
+            Number(wCode) === Number(wardCodeNum) ||
+            String(wCode) === wardCodeStr ||
+            String(wCode) === String(wardCode)) {
             ward = w;
           }
         }
-        
+
         if (ward && ward.WardName) {
           result.wardName = ward.WardName;
         }
@@ -141,18 +141,18 @@ const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
 
 const extractAddressIds = (addressString) => {
   if (!addressString) return { provinceId: null, districtId: null, wardCode: null };
-  
+
   const addressParts = addressString.split(',').map(p => p.trim());
-  
+
   let provinceId = null;
   let districtId = null;
   let wardCode = null;
-  
+
   if (addressParts.length >= 4) {
     const wardPart = addressParts[1];
     const districtPart = addressParts[2];
     const provincePart = addressParts[3];
-    
+
     if (wardPart && !isNaN(wardPart)) {
       wardCode = String(wardPart);
     }
@@ -163,12 +163,66 @@ const extractAddressIds = (addressString) => {
       provinceId = typeof provincePart === 'string' ? parseInt(provincePart) : provincePart;
     }
   }
-  
+
   return { provinceId, districtId, wardCode };
 };
 
+// Hàm gộp sản phẩm trùng lại
+const mergeDuplicateProducts = (products) => {
+  if (!Array.isArray(products) || products.length === 0) return [];
+
+  // Sử dụng Map để gộp sản phẩm trùng
+  const productMap = new Map();
+
+  products.forEach((product) => {
+    // Tạo key để xác định sản phẩm trùng
+    // Ưu tiên dùng idLaptopChiTiet, nếu không có thì dùng tenSanPham + các thuộc tính khác
+    const key = product.idLaptopChiTiet ||
+      product.idLapTopChiTiet ||
+      `${product.tenSanPham || ''}_${product.giaBan || ''}` ||
+      product.idOrderCT;
+
+    if (productMap.has(key)) {
+      // Nếu đã có sản phẩm này, cộng số lượng và thành tiền
+      const existingProduct = productMap.get(key);
+      const newQuantity = (product.soLuong || 1);
+      const existingQuantity = (existingProduct.soLuong || 1);
+      existingProduct.soLuong = existingQuantity + newQuantity;
+      existingProduct.thanhTien = (existingProduct.thanhTien || 0) + (product.thanhTien || 0);
+
+      // Giữ lại idOrderCT đầu tiên hoặc tạo mảng nếu cần
+      if (!Array.isArray(existingProduct.idOrderCT)) {
+        existingProduct.idOrderCT = [existingProduct.idOrderCT];
+      }
+      if (product.idOrderCT) {
+        existingProduct.idOrderCT.push(product.idOrderCT);
+      }
+
+      // Giữ lại idSeri nếu có
+      if (product.idSeri) {
+        if (!Array.isArray(existingProduct.idSeri)) {
+          existingProduct.idSeri = existingProduct.idSeri ? [existingProduct.idSeri] : [];
+        }
+        existingProduct.idSeri.push(product.idSeri);
+      }
+    } else {
+      // Nếu chưa có, thêm mới vào Map
+      productMap.set(key, {
+        ...product,
+        soLuong: product.soLuong || 1,
+        thanhTien: product.thanhTien || 0,
+        idOrderCT: product.idOrderCT,
+        idSeri: product.idSeri || null
+      });
+    }
+  });
+
+  // Chuyển Map thành mảng
+  return Array.from(productMap.values());
+};
+
 const getStepIcon = (stepName) => {
-  switch(stepName) {
+  switch (stepName) {
     case "Chờ xác nhận":
       return <FileTextOutlined />;
     case "Đã xác nhận":
@@ -189,7 +243,7 @@ const getStepIcon = (stepName) => {
 };
 
 const getStatusInfo = (trangThai) => {
-  switch(trangThai) {
+  switch (trangThai) {
     case 1:
       return {
         label: "Chờ xác nhận",
@@ -301,7 +355,7 @@ const OrderDetailPage = () => {
       try {
         setLoading(true);
         const orderData = JSON.parse(sessionStorage.getItem('selectedOrder') || 'null');
-        
+
         if (!orderData) {
           message.error('Không tìm thấy thông tin đơn hàng');
           navigate('/orders');
@@ -312,7 +366,11 @@ const OrderDetailPage = () => {
 
         // Gọi API lấy danh sách sản phẩm
         const productsData = await getOrderProducts(idOrder);
-        setProducts(Array.isArray(productsData) ? productsData : productsData?.data || []);
+        const rawProducts = Array.isArray(productsData) ? productsData : productsData?.data || [];
+
+        // Gộp sản phẩm trùng lại
+        const mergedProducts = mergeDuplicateProducts(rawProducts);
+        setProducts(mergedProducts);
       } catch (error) {
         console.error("Lỗi khi lấy chi tiết đơn hàng:", error);
         message.error('Không thể tải chi tiết đơn hàng');
@@ -331,13 +389,13 @@ const OrderDetailPage = () => {
       if (orderInfo && orderInfo.customerAddress) {
         try {
           const { provinceId, districtId, wardCode } = extractAddressIds(orderInfo.customerAddress);
-          
+
           let addressDisplay = orderInfo.customerAddress || "";
           if (provinceId || districtId || wardCode) {
             const addressNames = await loadAddressNamesFromIds(provinceId, districtId, wardCode);
-            
+
             const addressParts = [];
-            
+
             let originalAddress = "";
             if (orderInfo.customerAddress) {
               const addressPartsArray = orderInfo.customerAddress.split(',').map(p => p.trim());
@@ -345,7 +403,7 @@ const OrderDetailPage = () => {
                 originalAddress = addressPartsArray[0];
               }
             }
-            
+
             if (originalAddress) {
               addressParts.push(originalAddress);
             }
@@ -358,12 +416,12 @@ const OrderDetailPage = () => {
             if (addressNames.provinceName) {
               addressParts.push(addressNames.provinceName);
             }
-            
+
             if (addressParts.length > 0) {
               addressDisplay = addressParts.join(", ") + ", Việt Nam";
             }
           }
-          
+
           setFormattedAddress(addressDisplay);
         } catch (error) {
           console.error("Lỗi khi load tên địa chỉ:", error);
@@ -385,7 +443,7 @@ const OrderDetailPage = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return "";
-    
+
     const date = new Date(dateString);
     const day = String(date.getUTCDate()).padStart(2, "0");
     const month = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -410,7 +468,7 @@ const OrderDetailPage = () => {
 
   const handleCancelOrder = () => {
     if (!orderInfo) return;
-    
+
     Modal.confirm({
       title: 'Xác nhận hủy đơn hàng',
       icon: <ExclamationCircleOutlined />,
@@ -462,8 +520,8 @@ const OrderDetailPage = () => {
   const shippingFee = Math.max(0, total - (subtotal - discount));
 
   const canCancelOrder = orderInfo.trangThai === 1 || orderInfo.trangThai === 2 || orderInfo.trangThai === 3;
-  const isVNPAY = orderInfo.hinhThucThanhToan && 
-    Array.isArray(orderInfo.hinhThucThanhToan) && 
+  const isVNPAY = orderInfo.hinhThucThanhToan &&
+    Array.isArray(orderInfo.hinhThucThanhToan) &&
     orderInfo.hinhThucThanhToan.some(method => method.includes("VNPAY"));
 
   return (
@@ -515,7 +573,7 @@ const OrderDetailPage = () => {
               <TruckOutlined style={{ color: '#1890ff' }} />
               Trạng thái đơn hàng
             </h2>
-            
+
             {!isCancelled ? (
               <div className="order-timeline-wrapper">
                 <div className="order-timeline">
@@ -525,8 +583,8 @@ const OrderDetailPage = () => {
                       if (index === statusInfo.timeline.length - 1) return null;
                       const isCompleted = statusInfo.timeline[index].completed;
                       return (
-                        <div 
-                          key={`connector-${index}`} 
+                        <div
+                          key={`connector-${index}`}
                           className={`timeline-connector-segment ${isCompleted ? 'completed' : ''}`}
                         >
                           <div className="timeline-arrow-head"></div>
@@ -540,19 +598,19 @@ const OrderDetailPage = () => {
                     {statusInfo.timeline.map((timelineItem, index) => {
                       const isCompleted = timelineItem.completed;
                       const isCurrent = !isCompleted && (index === 0 || statusInfo.timeline[index - 1].completed);
-                      
+
                       return (
                         <div key={index} className="timeline-step">
                           {/* Icon tròn */}
                           <div className={`timeline-icon-circle ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}>
                             {getStepIcon(timelineItem.step)}
                           </div>
-                          
+
                           {/* Text trạng thái */}
                           <div className={`timeline-step-text ${isCompleted ? 'completed' : ''} ${isCurrent ? 'current' : ''}`}>
                             {timelineItem.step}
                           </div>
-                          
+
                           {/* Timestamp */}
                           {timelineItem.date && (
                             <div className="timeline-step-date">
@@ -595,25 +653,33 @@ const OrderDetailPage = () => {
               <TruckOutlined style={{ color: '#1890ff' }} />
               Sản phẩm đã mua ({products.length})
             </h2>
-            
+
             {products.length > 0 ? (
               <div className="products-list">
-                {products.map((item) => (
-                  <div key={item.idOrderCT} className="product-item">
-                    <img 
-                      src={item.anhSanPham || "https://via.placeholder.com/120x120?text=Product"} 
-                      alt={item.tenSanPham}
-                      className="product-image"
-                    />
-                    <div className="product-info">
-                      <div className="product-name">{item.tenSanPham}</div>
-                      <div className="product-quantity">Số lượng: {item.soLuong}</div>
-                      <div className="product-price">
-                        {formatPrice(item.thanhTien)}
+                {products.map((item, index) => {
+                  // Xử lý key cho trường hợp idOrderCT là mảng hoặc không
+                  const itemKey = Array.isArray(item.idOrderCT)
+                    ? item.idOrderCT[0]
+                    : item.idOrderCT || index;
+
+                  return (
+                    <div key={itemKey} className="product-item">
+                      <img
+                        src={item.anhSanPham || "https://via.placeholder.com/120x120?text=Product"}
+                        alt={item.tenSanPham}
+                        className="product-image"
+                      />
+                      <div className="product-info">
+                        <div className="product-name">{item.tenSanPham}</div>
+
+                        <div className="product-quantity">Số lượng: {item.soLuong}</div>
+                        <div className="product-price">
+                          {formatPrice(item.thanhTien)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div style={{ textAlign: 'center', padding: '40px', color: '#8c8c8c' }}>
@@ -644,14 +710,14 @@ const OrderDetailPage = () => {
                 <span className="summary-label">Tổng tiền hàng:</span>
                 <span className="summary-value">{formatPrice(subtotal)}</span>
               </div>
-              
+
               {discount > 0 && (
                 <div className="summary-row">
                   <span className="summary-label">Tổng tiền giảm:</span>
                   <span className="summary-value discount">-{formatPrice(discount)}</span>
                 </div>
               )}
-              
+
               <div className="summary-row">
                 <span className="summary-label">Phí vận chuyển:</span>
                 <span className="summary-value">
@@ -662,9 +728,9 @@ const OrderDetailPage = () => {
                   )}
                 </span>
               </div>
-              
+
               <div className="summary-divider"></div>
-              
+
               <div className="summary-row total">
                 <span className="summary-label">Tổng thanh toán:</span>
                 <span className="summary-value">{formatPrice(total)}</span>

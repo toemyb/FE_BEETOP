@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCartOutlined, CreditCardOutlined, CheckCircleOutlined, DeleteOutlined, ArrowLeftOutlined, ShopOutlined, TruckOutlined, PlusOutlined, EditOutlined, EnvironmentOutlined, WalletOutlined, UserOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
+import { ShoppingCartOutlined, CreditCardOutlined, CheckCircleOutlined, DeleteOutlined, ArrowLeftOutlined, ShopOutlined, TruckOutlined, PlusOutlined, EditOutlined, EnvironmentOutlined, WalletOutlined, UserOutlined, PhoneOutlined, MailOutlined, MinusOutlined } from '@ant-design/icons';
 import { message, Modal, Empty, Radio, Button, Checkbox } from "antd";
 import { Select, Input, Spin } from 'antd';
 import axios from 'axios';
@@ -9,6 +9,7 @@ import { removeCartItem, createOrder } from '../../service/CartCustomerService';
 import { getAllAddress, addAddress, deleteAddress, setDefaultAddress, updateAddress } from '../../service/AddressCustomerService';
 import { createVNPayPayment } from '../../service/VNPayService';
 import './CartPage.css';
+import { checkInvoitory } from '../../service/CartCustomerService';
 const { Option } = Select;
 const tokenApiGHN = "7d67a984-b5fe-11ef-b166-4205c1d15e61";
 const shopIdGHN = "5511482"; // Shop ID của GHN
@@ -131,8 +132,8 @@ const CartPage = () => {
         try {
             const response = await axios.get(urlShippingFee, {
                 params: {
-                    insurance_value: "",        // ← Thêm lại dòng này
-                    coupon: "",                 // ← Thêm lại dòng này
+                    insurance_value: "",
+                    coupon: "",
                     service_type_id: SHOP_CONFIG.service_type_id,
                     from_district_id: SHOP_CONFIG.from_district_id,
                     from_ward_code: SHOP_CONFIG.from_ward_code,
@@ -140,7 +141,7 @@ const CartPage = () => {
                     to_ward_code: String(toWardCode),
                     height: 50,
                     length: 20,
-                    weight: 200,                // ← Đảm bảo là 200 (không phải 1000 hay khác)
+                    weight: 200,
                     width: 20,
                 },
                 headers: {
@@ -441,8 +442,7 @@ const CartPage = () => {
         const fetchAddresses = async () => {
             try {
                 setAddressLoading(true);
-                const customerId = localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
-                if (!customerId || customerId === "null" || customerId === "undefined") return;
+                const customerId = localStorage.getItem("isUser");
                 if (customerId) {
                     const response = await getAllAddress(customerId);
                     console.log("Địa chỉ khách hàng raw:", response);
@@ -573,9 +573,7 @@ const CartPage = () => {
             message.success("Đặt địa chỉ mặc định thành công!");
 
             // Làm mới danh sách
-            const customerId = localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
-            if (!customerId || customerId === "null" || customerId === "undefined") return;
-
+            const customerId = localStorage.getItem("isUser");
             const updatedAddresses = await getAllAddress(customerId);
             const raw = Array.isArray(updatedAddresses) ? updatedAddresses : updatedAddresses?.data || [];
             // Chuẩn hoá như fetchAddresses
@@ -651,8 +649,7 @@ const CartPage = () => {
                     message.success("Xóa địa chỉ thành công!");
 
                     // Làm mới danh sách
-                    const customerId = localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
-                    if (!customerId || customerId === "null" || customerId === "undefined") return;
+                    const customerId = localStorage.getItem("isUser");
                     const updatedAddresses = await getAllAddress(customerId);
                     const raw = Array.isArray(updatedAddresses) ? updatedAddresses : updatedAddresses?.data || [];
                     const mappedPromises = raw.map(async (a) => {
@@ -707,16 +704,10 @@ const CartPage = () => {
         if (!isCustomer) return;
 
         try {
-            const idCustomer =
-                localStorage.getItem("customerId") ||
-                sessionStorage.getItem("idTaiKhoan");
 
-            if (!idCustomer || idCustomer === "null" || idCustomer === "undefined") {
-                console.warn("❌ Missing customerId -> skip getCartItems");
-                setOrderProduct([]);
-                return;
-            }
-
+            const idCustomer = localStorage.getItem("customerId");
+            console.log("Check id customer" , idCustomer);
+            
             const response = await getCartItems(idCustomer);
 
             console.log("API giỏ hàng trả về:", response);
@@ -914,26 +905,31 @@ const CartPage = () => {
             try {
                 const parsed = JSON.parse(saved);
                 const items = Array.isArray(parsed) ? parsed : [parsed];
-                setOrderProduct(items);
+                // Đảm bảo mỗi item có quantity (mặc định là 1)
+                const itemsWithQuantity = items.map(item => ({
+                    ...item,
+                    quantity: item.quantity || 1
+                }));
+                setOrderProduct(itemsWithQuantity);
 
                 const buyNowFlag = sessionStorage.getItem("buyNow");
                 if (buyNowFlag) {
                     try {
                         const buyNowData = JSON.parse(buyNowFlag);
-                        if (buyNowData.enabled && items.length > 0) {
+                        if (buyNowData.enabled && itemsWithQuantity.length > 0) {
                             let productToSelect = null;
                             if (buyNowData.productId) {
-                                productToSelect = items.find(item =>
+                                productToSelect = itemsWithQuantity.find(item =>
                                     String(item.id || item.idSpct) === String(buyNowData.productId)
                                 );
                             }
                             // Nếu không tìm thấy theo ID, lấy sản phẩm cuối cùng
                             if (!productToSelect) {
-                                productToSelect = items[items.length - 1];
+                                productToSelect = itemsWithQuantity[itemsWithQuantity.length - 1];
                             }
 
                             if (productToSelect) {
-                                const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${items.length - 1}`);
+                                const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${itemsWithQuantity.length - 1}`);
                                 setSelectedProducts(new Set([itemId]));
                                 setIsBuyNow(true);
                                 setTimeout(() => {
@@ -991,7 +987,7 @@ const CartPage = () => {
             setAppliedDiscount(discountValue);
             const totalAfterDiscount = totalAmount - discountValue;
             // Kiểm tra free ship: nếu tổng tiền sau giảm giá >= 5 triệu thì free ship
-            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAfterDiscount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(Math.max(totalAfterDiscount + actualShippingFee, 0));
         } else {
             setAppliedDiscount(0);
@@ -1001,14 +997,14 @@ const CartPage = () => {
         }
     }, [totalAmount, selectedDiscount, shippingFee]);
 
-    // Tính tổng tiền chỉ cho sản phẩm được chọn
+    // Tính tổng tiền chỉ cho sản phẩm được chọn (có tính số lượng)
     useEffect(() => {
         const total = orderProduct
             .filter((item, index) => {
                 const itemId = String(item.idSpct || item.id || `temp-${index}`);
                 return selectedProducts.has(itemId);
             })
-            .reduce((sum, item) => sum + item.price, 0);
+            .reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
         setTotalAmount(total);
         console.log("Check totalamount", total);
     }, [orderProduct, selectedProducts]);
@@ -1167,33 +1163,20 @@ const CartPage = () => {
         try {
             setAddressLoading(true);
 
-            const p = provinces.find(x => Number(x.ProvinceID) === Number(editAddressForm.provinceId));
-            const d = districts.find(x => Number(x.DistrictID) === Number(editAddressForm.districtId));
-            const w = wards.find(x => String(x.WardCode) === String(editAddressForm.wardCode));
-
             const addressData = {
-                quocGia: "Việt Nam",
-
                 hoTen: editAddressForm.name.trim(),
                 soDienThoai: editAddressForm.phone.trim(),
                 diaChiChiTiet: editAddressForm.address.trim(),
-
-                tinhThanh: p?.ProvinceName || "",
-                quanHuyen: d?.DistrictName || "",
-                phuongXa: w?.WardName || "",
-
-                provinceId: Number(editAddressForm.provinceId),
-                districtId: Number(editAddressForm.districtId),
-                wardCode: String(editAddressForm.wardCode),
+                tinhThanh: editAddressForm.provinceId,
+                quanHuyen: editAddressForm.districtId,
+                phuongXa: editAddressForm.wardCode,
             };
-
 
 
             await updateAddress(editingAddressId, addressData);
             message.success("Cập nhật địa chỉ thành công!");
 
-            const customerId =
-                localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+            const customerId = localStorage.getItem("isUser");
             const updated = await getAllAddress(customerId);
             const raw = Array.isArray(updated) ? updated : updated?.data || [];
 
@@ -1440,27 +1423,14 @@ const CartPage = () => {
                 try {
                     setAddressLoading(true);
 
-                    const p = provinces.find(x => Number(x.ProvinceID) === Number(newAddressForm.provinceId));
-                    const d = districts.find(x => Number(x.DistrictID) === Number(newAddressForm.districtId));
-                    const w = wards.find(x => String(x.WardCode) === String(newAddressForm.wardCode));
-
                     const addressData = {
-                        idTaiKhoan: localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan"),
-                        quocGia: "Việt Nam",
-
                         hoTen: newAddressForm.name.trim(),
                         soDienThoai: newAddressForm.phone.trim(),
                         diaChiChiTiet: newAddressForm.address.trim(),
-
-                        // ✅ tên (để DB không null)
-                        tinhThanh: p?.ProvinceName || "",
-                        quanHuyen: d?.DistrictName || "",
-                        phuongXa: w?.WardName || "",
-
-                        // ✅ ID GHN
-                        provinceId: Number(newAddressForm.provinceId),
-                        districtId: Number(newAddressForm.districtId),
-                        wardCode: String(newAddressForm.wardCode),
+                        tinhThanh: newAddressForm.provinceId,
+                        quanHuyen: newAddressForm.districtId,
+                        phuongXa: newAddressForm.wardCode,
+                        idTaiKhoan: localStorage.getItem("isUser")
                     };
 
                     console.log("💾 Dữ liệu địa chỉ sẽ gửi lên:", addressData);
@@ -1470,8 +1440,7 @@ const CartPage = () => {
 
                     message.success("Thêm địa chỉ thành công!");
 
-                    const customerId =
-                        localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+                    const customerId = localStorage.getItem("isUser");
                     const updated = await getAllAddress(customerId);
                     const raw = Array.isArray(updated) ? updated : updated?.data || [];
 
@@ -1627,7 +1596,7 @@ const CartPage = () => {
                         const itemId = String(item.idSpct || item.id || `temp-${index}`);
                         return newSet.has(itemId);
                     })
-                    .reduce((sum, item) => sum + item.price, 0);
+                    .reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
 
                 const productToAdd = orderProduct.find((item, index) => {
                     const itemId = String(item.idSpct || item.id || `temp-${index}`);
@@ -1635,7 +1604,8 @@ const CartPage = () => {
                 });
 
                 if (productToAdd) {
-                    const newTotal = currentTotal + productToAdd.price;
+                    const productTotal = productToAdd.price * (productToAdd.quantity || 1);
+                    const newTotal = currentTotal + productTotal;
                     const maxAmount = 100000000; // 100 triệu
 
                     if (newTotal > maxAmount) {
@@ -1656,7 +1626,7 @@ const CartPage = () => {
 
     const handleSelectAll = (checked) => {
         if (checked) {
-            const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + item.price, 0);
+            const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
             const maxAmount = 100000000; // 100 triệu
 
             if (totalIfSelectAll > maxAmount) {
@@ -1686,6 +1656,102 @@ const CartPage = () => {
         } else {
             setSelectedProducts(new Set());
         }
+    };
+
+    const handleIncreaseQuantity = async (itemId) => {
+        try {
+            // Gọi API kiểm tra tồn kho
+            const res = await checkInvoitory(itemId);
+            const inventory = Number(res.data); // số lượng tồn kho
+
+            setOrderProduct(prev => {
+                const item = prev.find(i => String(i.idSpct || i.id) === String(itemId));
+                if (!item) return prev;
+
+                const currentQuantity = item.quantity || 1;
+
+                if (currentQuantity >= 5) {
+                    message.warning({
+                        content: "Số lượng sản phẩm trong đơn không được vượt quá 5",
+                        duration: 3
+                    });
+                    return prev;
+                }
+
+                // ❌ Không đủ tồn kho
+                if (currentQuantity + 1 > inventory) {
+                    message.warning({
+                        content: "Không đủ số lượng trong kho",
+                        duration: 3
+                    });
+                    return prev;
+                }
+
+                const isSelected = selectedProducts.has(String(item.idSpct || item.id));
+
+                if (isSelected) {
+                    const currentTotal = prev
+                        .filter((prod, idx) => {
+                            const prodId = String(prod.idSpct || prod.id || `temp-${idx}`);
+                            return selectedProducts.has(prodId);
+                        })
+                        .reduce((sum, prod) => {
+                            const prodId = String(prod.idSpct || prod.id);
+                            if (prodId === String(itemId)) {
+                                return sum + (prod.price * (currentQuantity + 1));
+                            }
+                            return sum + (prod.price * (prod.quantity || 1));
+                        }, 0);
+
+                    const maxAmount = 100000000;
+                    if (currentTotal > maxAmount) {
+                        message.warning({
+                            content: "Tổng tiền đơn hàng không được vượt quá 100 triệu đồng.",
+                            duration: 3
+                        });
+                        return prev;
+                    }
+                }
+
+                const updated = prev.map(prod => {
+                    const prodId = String(prod.idSpct || prod.id);
+                    if (prodId === String(itemId)) {
+                        return { ...prod, quantity: currentQuantity + 1 };
+                    }
+                    return prod;
+                });
+
+                if (!isCustomer && updated.length > 0) {
+                    localStorage.setItem("orderProduct", JSON.stringify(updated));
+                }
+
+                return updated;
+            });
+        } catch (error) {
+            console.error("Lỗi kiểm tra tồn kho", error);
+        }
+    };
+
+
+    const handleDecreaseQuantity = (itemId) => {
+        setOrderProduct(prev => {
+            const updated = prev.map(item => {
+                const currentItemId = String(item.idSpct || item.id);
+                if (currentItemId === String(itemId)) {
+                    const currentQuantity = item.quantity || 1;
+                    if (currentQuantity > 1) {
+                        return { ...item, quantity: currentQuantity - 1 };
+                    }
+                }
+                return item;
+            });
+
+            if (!isCustomer && updated.length > 0) {
+                localStorage.setItem("orderProduct", JSON.stringify(updated));
+            }
+
+            return updated;
+        });
     };
 
     const getPaymentMethodId = (paymentMethod) => {
@@ -1907,9 +1973,7 @@ const CartPage = () => {
             }
 
             const orderData = {
-                idTaiKhoan:
-                    localStorage.getItem("customerId") ||
-                    sessionStorage.getItem("idTaiKhoan"),
+                idTaiKhoan: localStorage.getItem("isUser"),
                 ...(addressId && { idDiaChi: addressId }), // Chỉ gửi idDiaChi nếu có (khi chọn từ list)
                 diaChiDayDu: diaChiDayDu, // Địa chỉ đầy đủ theo format yêu cầu
                 tenKhachHang: customerName,
@@ -1925,10 +1989,14 @@ const CartPage = () => {
                         const itemId = String(item.idSpct || item.id || `temp-${index}`);
                         return selectedProducts.has(itemId);
                     })
-                    .map(item => ({
-                        idLaptopChiTiet: item.idSpct || item.id || item.idChiTiet, // ID chi tiết laptop
-                        giaBan: item.price
-                    })),
+                    .flatMap(item => {
+                        // Tạo mảng các object giống nhau theo số lượng
+                        const quantity = item.quantity || 1;
+                        return Array(quantity).fill(null).map(() => ({
+                            idLaptopChiTiet: item.idSpct || item.id || item.idChiTiet, // ID chi tiết laptop
+                            giaBan: item.price
+                        }));
+                    }),
                 listHinhThucThanhToan: [{
                     idHinhThucThanhToan: getPaymentMethodId(formData.paymentMethod),
                     soTien: finalTotal, // Tổng tiền cần thanh toán
@@ -2088,7 +2156,7 @@ const CartPage = () => {
             const itemId = String(item.idSpct || item.id || `temp-${index}`);
             return selectedProducts.has(itemId);
         })
-        .reduce((sum, item) => sum + item.price, 0);
+        .reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
 
     const total = subtotal - appliedDiscount;
 
@@ -2110,6 +2178,7 @@ const CartPage = () => {
                     color: item.productInfo.color,
                     image: item.productInfo.image,
                     price: item.productInfo.price,
+                    quantity: item.quantity || 1, // Thêm quantity, mặc định là 1
                 };
                 if (index === 0) {
                     console.log("🔍 Normalize item[0] - Original:", item);
@@ -2130,6 +2199,7 @@ const CartPage = () => {
                     color: item.color,
                     image: item.image,
                     price: item.price,
+                    quantity: item.quantity || 1, // Thêm quantity, mặc định là 1
                 };
             }
         });
@@ -2264,13 +2334,13 @@ const CartPage = () => {
                                     const itemId = getItemId();
                                     const isSelected = selectedProducts.has(itemId);
 
-                                    // Tính tổng tiền hiện tại của các sản phẩm đã chọn
+                                    // Tính tổng tiền hiện tại của các sản phẩm đã chọn (có tính số lượng)
                                     const currentTotal = orderProduct
                                         .filter((prod, idx) => {
                                             const prodId = String(prod.idSpct || prod.id || `temp-${idx}`);
                                             return selectedProducts.has(prodId);
                                         })
-                                        .reduce((sum, prod) => sum + prod.price, 0);
+                                        .reduce((sum, prod) => sum + (prod.price * (prod.quantity || 1)), 0);
 
                                     const maxAmount = 100000000; // 100 triệu
                                     // Disable checkbox nếu tổng tiền đã >= 100tr và sản phẩm này chưa được chọn
@@ -2315,15 +2385,81 @@ const CartPage = () => {
                                                     <p className="cart-item-color">Màu sắc: {item.color}</p>
                                                 )}
                                                 <p className="cart-item-price">
-                                                    {formatPrice(item.price)}
+                                                    {formatPrice(item.price)} / sản phẩm
                                                 </p>
                                             </div>
 
                                             <div className="cart-item-actions">
+                                                {/* Điều chỉnh số lượng */}
+                                                <div className="quantity-control" style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    marginBottom: '12px'
+                                                }}>
+                                                    <span style={{ fontSize: '14px', fontWeight: '500', color: '#595959' }}>Số lượng:</span>
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        border: '1px solid #d9d9d9',
+                                                        borderRadius: '4px',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <button
+                                                            onClick={() => handleDecreaseQuantity(itemId)}
+                                                            style={{
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                border: 'none',
+                                                                background: '#f5f5f5',
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.target.style.background = '#e6e6e6'}
+                                                            onMouseLeave={(e) => e.target.style.background = '#f5f5f5'}
+                                                        >
+                                                            <MinusOutlined style={{ fontSize: '12px' }} />
+                                                        </button>
+                                                        <span style={{
+                                                            width: '50px',
+                                                            textAlign: 'center',
+                                                            padding: '0 8px',
+                                                            fontSize: '14px',
+                                                            fontWeight: '500',
+                                                            borderLeft: '1px solid #d9d9d9',
+                                                            borderRight: '1px solid #d9d9d9',
+                                                            lineHeight: '32px'
+                                                        }}>
+                                                            {item.quantity || 1}
+                                                        </span>
+                                                        <button
+                                                            onClick={() => handleIncreaseQuantity(itemId)}
+                                                            style={{
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                border: 'none',
+                                                                background: '#f5f5f5',
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                transition: 'all 0.2s'
+                                                            }}
+                                                            onMouseEnter={(e) => e.target.style.background = '#e6e6e6'}
+                                                            onMouseLeave={(e) => e.target.style.background = '#f5f5f5'}
+                                                        >
+                                                            <PlusOutlined style={{ fontSize: '12px' }} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
                                                 <div className="item-total">
-                                                    <div className="item-total-label">Giá</div>
+                                                    <div className="item-total-label">Thành tiền</div>
                                                     <div className="item-total-price">
-                                                        {formatPrice(item.price)}
+                                                        {formatPrice(item.price * (item.quantity || 1))}
                                                     </div>
                                                 </div>
 
@@ -3656,7 +3792,7 @@ const CartPage = () => {
                             <Button onClick={() => {
                                 setShowAddAddressForm(false);
                                 setEditingAddressId(null);
-                                setDeliverToOther(false); // Đảm bảo checkbox không bị check khi hủy
+                                setDeliverToOther(false);
                                 setNewAddressForm({
                                     name: "",
                                     phone: "",
@@ -3677,7 +3813,6 @@ const CartPage = () => {
                 )}
             </Modal>
 
-            {/* Fullscreen Loading Overlay cho VNPay và Delivery */}
             {(isVNPayProcessing || isDeliveryProcessing) && (
                 <div className="vnpay-loading-overlay">
                     <div className="vnpay-loading-content">

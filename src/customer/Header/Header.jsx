@@ -381,7 +381,7 @@ const Header = () => {
 
           <Link to="/cart" className="header-cart">
             <Badge
-              count={totalQuantity > 0 ? totalQuantity : null}
+              count={totalQuantity > 0 ? totalQuantity : null}  
               showZero={false}
               size="default"
               offset={[-8, -8]}
