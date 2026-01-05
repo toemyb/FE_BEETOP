@@ -1,75 +1,241 @@
 // src/components/VoucherSelector.jsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { listVouchers } from '../service/PhieuGiamGiaService';
+import React, { useEffect, useMemo, useState } from "react";
+import { listVouchers } from "../service/PhieuGiamGiaService";
 
-// Layout Modal dùng chung
-const ModalLayout = ({ title, onClose, children, width = '550px' }) => (
+const ModalLayout = ({ title, onClose, children, width = 420 }) => (
   <div
     style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
+      position: "fixed",
+      inset: 0,
+      backgroundColor: "rgba(0,0,0,0.45)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
       zIndex: 1000,
-      fontFamily: 'Arial, sans-serif',
+      fontFamily: "Arial, sans-serif",
+      padding: 12,
     }}
   >
     <div
       style={{
-        backgroundColor: '#ffffff',
-        padding: '24px 26px 22px',
-        borderRadius: '12px',
         width,
-        maxWidth: '95%',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.12)',
-        maxHeight: '90vh',
-        overflowY: 'auto',
+        maxWidth: "100%",
+        backgroundColor: "#fff",
+        borderRadius: 12,
+        overflow: "hidden",
+        boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+        maxHeight: "90vh",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
-      <h3
+      {/* Header */}
+      <div
         style={{
-          borderBottom: '1px solid #f0f0f0',
-          paddingBottom: '10px',
-          margin: '0 0 16px 0',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          color: '#333',
-          fontSize: '1.15rem',
+          padding: "12px 12px",
+          borderBottom: "1px solid #f1f3f5",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        {title}
+        <div style={{ fontWeight: 800, color: "#212529", fontSize: 15 }}>
+          {title}
+        </div>
         <button
           onClick={onClose}
           style={{
-            border: 'none',
-            background: 'none',
-            fontSize: '1.5em',
-            cursor: 'pointer',
-            color: '#999',
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            color: "#868e96",
+            fontSize: 22,
+            lineHeight: 1,
           }}
+          aria-label="close"
         >
-          &times;
+          ×
         </button>
-      </h3>
-      {children}
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: 12, overflowY: "auto" }}>{children}</div>
     </div>
   </div>
 );
 
-/**
- * props:
- *  - appliedVouchers: mảng voucher đang áp dụng ở hóa đơn
- *  - onApplyVouchers(listVoucherMoi)
- *  - onClose
- *  - orderSummary: { subtotal, ... }
- *  - formatCurrency: function
- */
+const SectionTitle = ({ icon, title }) => (
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      margin: "10px 0 8px",
+      color: "#495057",
+      fontWeight: 800,
+      fontSize: 13,
+    }}
+  >
+    <span style={{ fontSize: 14 }}>{icon}</span>
+    <span>{title}</span>
+  </div>
+);
+
+const Pill = ({ text }) => (
+  <span
+    style={{
+      fontSize: 11,
+      fontWeight: 800,
+      padding: "3px 8px",
+      borderRadius: 999,
+      background: "#d3f9d8",
+      color: "#2f9e44",
+      whiteSpace: "nowrap",
+    }}
+  >
+    {text}
+  </span>
+);
+
+// Row giống ảnh: gọn, border mỏng, nút + bên phải
+const VoucherRow = ({
+  v,
+  selected,
+  onPick,
+  formatCurrency,
+  labelGiaTriGiam,
+  subtitle,
+  rightActionType = "plus", // "plus" | "x"
+  disabled = false, // dùng cho gợi ý tiết kiệm chưa đủ điều kiện
+  badgeRight, // pill bên phải (vd: lựa chọn tối ưu nhất)
+  extraRedLine, // dòng đỏ (mua thêm...)
+}) => {
+  const primary = "#20c997";
+
+  return (
+    <div
+      onClick={() => {
+        if (disabled) return;
+        onPick?.();
+      }}
+      style={{
+        borderRadius: 10,
+        padding: "9px 10px",
+        border: selected ? `1px solid ${primary}` : "1px solid #e9ecef",
+        background: selected ? "#e6fcf5" : "#fff",
+        opacity: disabled ? 0.6 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        gap: 10,
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {/* line 1: code + pill */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 900,
+              fontSize: 13,
+              color: "#212529",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={v.code}
+          >
+            {v.code}
+          </div>
+
+          {badgeRight ? <Pill text={badgeRight} /> : null}
+        </div>
+
+        {/* line 2: giảm */}
+        <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#12b886" }}>
+          Giảm {labelGiaTriGiam(v)}
+          <span style={{ color: "#868e96", fontWeight: 700 }}>
+            {" "}
+            ({formatCurrency(v.discount || 0)})
+          </span>
+        </div>
+
+        {/* red hint line (ảnh có) */}
+        {extraRedLine ? (
+          <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#e03131" }}>
+            {extraRedLine}
+          </div>
+        ) : null}
+
+        {/* subtitle */}
+        {subtitle ? (
+          <div style={{ marginTop: 4, fontSize: 12, color: "#868e96", fontWeight: 600 }}>
+            {subtitle}
+          </div>
+        ) : null}
+      </div>
+
+      {/* right action */}
+      {rightActionType === "x" ? (
+        selected ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick?.(true); // allow clear
+            }}
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              color: "#fa5252",
+              fontSize: 20,
+              lineHeight: 1,
+              padding: 0,
+            }}
+            title="Bỏ voucher"
+            disabled={disabled}
+          >
+            ×
+          </button>
+        ) : (
+          <div style={{ width: 18 }} />
+        )
+      ) : (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (disabled) return;
+            onPick?.();
+          }}
+          style={{
+            borderRadius: 999,
+            border: "1px solid #dee2e6",
+            width: 28,
+            height: 28,
+            padding: 0,
+            background: selected ? "#20c997" : "#fff",
+            color: selected ? "#fff" : "#343a40",
+            fontWeight: 900,
+            fontSize: 16,
+            cursor: disabled ? "not-allowed" : "pointer",
+          }}
+          title={disabled ? "Chưa đủ điều kiện" : selected ? "Đã chọn" : "Chọn voucher"}
+          disabled={disabled}
+        >
+          {selected ? "✓" : "+"}
+        </button>
+      )}
+    </div>
+  );
+};
+
 const VoucherSelector = ({
   appliedVouchers = [],
   onClose,
@@ -77,29 +243,25 @@ const VoucherSelector = ({
   orderSummary,
   formatCurrency,
 }) => {
-  const primaryColor = '#12b886';
-  const secondaryColor = '#0070f3';
-
+  const primaryColor = "#20c997";
   const [rawVouchers, setRawVouchers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // ✅ selectedIds giờ là LIST UUID (string) của voucher
-  const [selectedIds, setSelectedIds] = useState(() =>
-    appliedVouchers.map((v) => v.id) // id = UUID
-  );
+  // chỉ 1 voucher
+  const [selectedId, setSelectedId] = useState(appliedVouchers?.[0]?.id || null);
 
   const subtotal = orderSummary?.subtotal || 0;
 
-  // ====== LẤY LIST VOUCHER TỪ API /api/phieu-giam-gia ======
   useEffect(() => {
     const fetch = async () => {
       try {
         setLoading(true);
         const res = await listVouchers();
-        const data = Array.isArray(res.data) ? res.data : [];
+        const raw = res?.data?.data ?? res?.data;
+        const data = Array.isArray(raw) ? raw : [];
         setRawVouchers(data);
       } catch (e) {
-        console.error('Lỗi load danh sách voucher:', e);
+        console.error("Lỗi load danh sách voucher:", e);
         setRawVouchers([]);
       } finally {
         setLoading(false);
@@ -108,7 +270,6 @@ const VoucherSelector = ({
     fetch();
   }, []);
 
-  // ====== Helper ======
   const isDateActive = (v) => {
     const today = new Date();
     const startOk = v.ngayBatDau ? new Date(v.ngayBatDau) <= today : true;
@@ -116,127 +277,85 @@ const VoucherSelector = ({
     return startOk && endOk;
   };
 
+  // tính giảm tạm cho UI (BE vẫn là source of truth khi apply)
   const calcDiscount = (v) => {
     const value = Number(v.giaTriGiam ?? 0) || 0;
     if (!subtotal || subtotal <= 0 || value <= 0) return 0;
 
-    if (v.kieuGiamGia === 'GIAM_PHAN_TRAM') {
+    if (v.kieuGiamGia === "GIAM_PHAN_TRAM") {
       const d = (subtotal * value) / 100;
       return d > subtotal ? subtotal : d;
     }
-    // GIAM_CO_DINH
     return value > subtotal ? subtotal : value;
   };
 
   const labelGiaTriGiam = (v) => {
     const value = Number(v.giaTriGiam ?? 0) || 0;
-    if (v.kieuGiamGia === 'GIAM_PHAN_TRAM') return `${value}%`;
+    if (v.kieuGiamGia === "GIAM_PHAN_TRAM") return `${value}%`;
     return formatCurrency(value);
   };
 
-  // ✅ Chuẩn hóa & tính giảm
-  //    - id: UUID dùng cho BE
-  //    - code: mã hiển thị kiểu "PGG0022"
-  const vouchers = useMemo(
-  () =>
-    (rawVouchers || []).map((v) => {
-      // 💡 Với API /phieu-giam-gia hiện tại, mã voucher là idPhieugiamgia (PGG001...)
+  // normalize: id = mã voucher string để gửi BE
+  const vouchers = useMemo(() => {
+    return (rawVouchers || []).map((v) => {
       const codeFromApi =
-        v.idPhieugiamgia ||   // từ ListPhieuGiamGiaComponent
-        v.idPhieuGiamGia ||   // phòng trường hợp BE trả camel-case
-        v.ma ||
-        v.maPhieu ||
+        v.idPhieugiamgia ||
+        v.idPhieuGiamGia ||
         v.maPhieuGiamGia ||
         v.maVoucher ||
-        v.code;
+        v.code ||
+        v.ma;
 
-      const uuid =
-        codeFromApi ||        // dùng chính mã này làm id
-        v.id ||
-        v.uuid ||
-        v.idVoucher;
-
-      const code = codeFromApi || uuid;
+      const id = String(codeFromApi || v.id || v.uuid || "");
+      const code = String(codeFromApi || id || "");
 
       return {
         ...v,
-        id: uuid,              // 🚩 id FE & gửi lên BE (string mã voucher)
-        uuid,
-        code,                  // hiển thị
-        name: v.ten || v.name || v.moTa || code,
+        id,
+        code,
         discount: calcDiscount(v),
       };
-    }),
-  [rawVouchers, subtotal]
-);
+    });
+  }, [rawVouchers, subtotal]);
 
-  // voucher đang hoạt động & trong thời gian
   const activeByStatusAndDate = useMemo(
     () => vouchers.filter((v) => v.trangThai === 1 && isDateActive(v)),
     [vouchers]
   );
 
-  // voucher đủ điều kiện theo đơn hiện tại
   const applicable = useMemo(() => {
     return activeByStatusAndDate.filter((v) => {
       const minOrder = Number(v.giaTriMin || 0);
-      const minOk = minOrder ? subtotal >= minOrder : true;
-
-      return minOk;
+      return minOrder ? subtotal >= minOrder : true;
     });
   }, [activeByStatusAndDate, subtotal]);
 
-  // voucher “gợi ý tiết kiệm” (chưa đủ min)
   const savingSuggestions = useMemo(() => {
     return activeByStatusAndDate.filter((v) => {
       const minOrder = Number(v.giaTriMin || 0);
-      if (!minOrder) return false;
-      return subtotal > 0 && subtotal < minOrder;
+      return minOrder && subtotal > 0 && subtotal < minOrder;
     });
   }, [activeByStatusAndDate, subtotal]);
 
-  // voucher “tự động tốt nhất”
   const bestVoucher = useMemo(() => {
     if (!applicable.length) return null;
     let best = applicable[0];
     applicable.forEach((v) => {
-      if (v.discount > best.discount) best = v;
+      if ((v.discount || 0) > (best.discount || 0)) best = v;
     });
-    return best.discount > 0 ? best : null;
+    return (best.discount || 0) > 0 ? best : null;
   }, [applicable]);
 
-  // Nếu chưa có gì chọn thì auto chọn best
+  // auto chọn best nếu chưa chọn
   useEffect(() => {
     if (!bestVoucher) return;
-    if (selectedIds.length) return;
-    if (!bestVoucher.id) return;
-    setSelectedIds([bestVoucher.id]); // id = UUID
-  }, [bestVoucher, selectedIds.length]);
+    if (selectedId) return;
+    setSelectedId(bestVoucher.id);
+  }, [bestVoucher, selectedId]);
 
   const otherApplicable = bestVoucher
     ? applicable.filter((v) => v.id !== bestVoucher.id)
     : applicable;
-
-  const isSelected = (id) => selectedIds.includes(id);
-
-  const toggleVoucher = (v) => {
-    if (!v.id) return; // không có UUID thì bỏ qua
-    setSelectedIds((prev) =>
-      prev.includes(v.id) ? prev.filter((x) => x !== v.id) : [...prev, v.id]
-    );
-  };
-
-  // ✅ Khi bấm "Áp dụng" → trả về list voucher đã được normalize:
-  //   - v.id  = UUID
-  //   - v.code = mã hiển thị
-  const handleApply = () => {
-    const selected = vouchers.filter((v) => selectedIds.includes(v.id));
-    onApplyVouchers(selected);
-  };
-
-  const tempTotalDiscount = vouchers
-    .filter((v) => selectedIds.includes(v.id))
-    .reduce((sum, v) => sum + (v.discount || 0), 0);
 
   const extraToReachMin = (v) => {
     const minOrder = Number(v.giaTriMin || 0);
@@ -244,422 +363,197 @@ const VoucherSelector = ({
     return minOrder - subtotal;
   };
 
+  const handlePick = (id, allowClear = false) => {
+    setSelectedId((prev) => {
+      if (prev === id) return allowClear ? null : id;
+      return id;
+    });
+  };
+
+  const handleApply = () => {
+    const chosen = vouchers.find((v) => v.id === selectedId);
+    onApplyVouchers(chosen ? [chosen] : []);
+  };
+
+  const selectedVoucher = vouchers.find((v) => v.id === selectedId);
+  const tempTotalDiscount = selectedVoucher?.discount || 0;
+
+  const formatDateVi = (d) => {
+    if (!d) return "";
+    try {
+      return new Date(d).toLocaleDateString("vi-VN");
+    } catch {
+      return "";
+    }
+  };
+
   return (
-    <ModalLayout title="Voucher giảm giá" onClose={onClose}>
-      {/* Tổng đơn */}
+    <ModalLayout title="Voucher giảm giá" onClose={onClose} width={420}>
+      {/* header small like image */}
       <div
         style={{
-          padding: '10px 12px',
-          background: '#e7f5ff',
-          borderRadius: 8,
-          borderLeft: `4px solid ${secondaryColor}`,
-          marginBottom: 14,
-          fontSize: '0.9rem',
+          padding: "10px 10px",
+          borderRadius: 10,
+          background: "#f8f9fa",
+          border: "1px solid #edf2ff",
+          marginBottom: 10,
+          fontSize: 12,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span>Tổng đơn hàng (chưa giảm)</span>
-          <strong style={{ color: secondaryColor }}>
-            {formatCurrency(subtotal)}
-          </strong>
+        <span style={{ color: "#495057", fontWeight: 700 }}>
+          Tạm tính
+        </span>
+        <span style={{ fontWeight: 900, color: "#212529" }}>
+          {formatCurrency(subtotal)}
+        </span>
+      </div>
+
+      {/* Voucher tự động áp dụng */}
+      <SectionTitle icon="✨" title="Voucher tự động áp dụng" />
+      {loading ? (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Đang tải voucher...
         </div>
-      </div>
+      ) : bestVoucher ? (
+        <VoucherRow
+          v={bestVoucher}
+          selected={selectedId === bestVoucher.id}
+          onPick={(allowClear) => handlePick(bestVoucher.id, allowClear)}
+          rightActionType="x"
+          formatCurrency={formatCurrency}
+          labelGiaTriGiam={labelGiaTriGiam}
+          badgeRight="Lựa chọn tối ưu nhất"
+          subtitle={
+            <>
+              {bestVoucher.giaTriMin ? <>Đơn tối thiểu: {formatCurrency(Number(bestVoucher.giaTriMin))}</> : <>Đơn tối thiểu: 0 ₫</>}
+              {bestVoucher.ngayKetThuc ? <> • Hết hạn: {formatDateVi(bestVoucher.ngayKetThuc)}</> : null}
+            </>
+          }
+        />
+      ) : (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Không có voucher phù hợp để tự động áp dụng.
+        </div>
+      )}
 
-      {/* VOUCHER TỰ ĐỘNG ÁP DỤNG */}
-      <div style={{ marginBottom: 14 }}>
-        <p
-          style={{
-            margin: '0 0 6px',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            color: '#495057',
-          }}
-        >
-          Voucher tự động áp dụng
-        </p>
+      {/* Voucher khả dụng */}
+      <SectionTitle icon="🧾" title="Voucher khả dụng" />
+      {loading ? (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Đang tải voucher...
+        </div>
+      ) : !otherApplicable.length ? (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Không có voucher khả dụng.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {otherApplicable.map((v) => (
+            <VoucherRow
+              key={v.id}
+              v={v}
+              selected={selectedId === v.id}
+              onPick={() => handlePick(v.id)}
+              rightActionType="plus"
+              formatCurrency={formatCurrency}
+              labelGiaTriGiam={labelGiaTriGiam}
+              subtitle={
+                <>
+                  {v.giaTriMin ? <>Đơn tối thiểu: {formatCurrency(Number(v.giaTriMin))}</> : <>Đơn tối thiểu: 0 ₫</>}
+                  {v.ngayKetThuc ? <> • Hết hạn: {formatDateVi(v.ngayKetThuc)}</> : null}
+                </>
+              }
+            />
+          ))}
+        </div>
+      )}
 
-        {loading ? (
-          <div
-            style={{
-              padding: 10,
-              borderRadius: 8,
-              background: '#f8f9fa',
-              fontSize: '0.85rem',
-            }}
-          >
-            Đang tải voucher...
-          </div>
-        ) : bestVoucher ? (
-          <div
-            onClick={() => toggleVoucher(bestVoucher)}
-            style={{
-              borderRadius: 10,
-              padding: '10px 12px',
-              border: isSelected(bestVoucher.id)
-                ? `1px solid ${primaryColor}`
-                : '1px solid #e9ecef',
-              backgroundColor: isSelected(bestVoucher.id)
-                ? '#e6fcf5'
-                : '#f4fdf7',
-              cursor: 'pointer',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                type="checkbox"
-                checked={isSelected(bestVoucher.id)}
-                readOnly
-                style={{ accentColor: primaryColor }}
-              />
-              <div>
-                <div
-                  style={{
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    marginBottom: 2,
-                  }}
-                >
-                  {bestVoucher.code}
-                </div>
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    color: '#20c997',
-                    fontWeight: 600,
-                  }}
-                >
-                  Giảm {labelGiaTriGiam(bestVoucher)}{' '}
-                  <span style={{ color: '#868e96' }}>
-                    ({formatCurrency(bestVoucher.discount || 0)} thực tế)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div
-                style={{
-                  padding: '2px 8px',
-                  fontSize: '0.7rem',
-                  borderRadius: 999,
-                  backgroundColor: '#d8f5a2',
-                  color: '#5c940d',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                Lựa chọn tối ưu nhất
-              </div>
-              {isSelected(bestVoucher.id) && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedIds((prev) =>
-                      prev.filter((x) => x !== bestVoucher.id)
-                    );
-                  }}
-                  style={{
-                    cursor: 'pointer',
-                    color: '#f03e3e',
-                    fontSize: '1.1rem',
-                  }}
-                >
-                  ×
-                </span>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: 10,
-              borderRadius: 8,
-              background: '#f8f9fa',
-              fontSize: '0.85rem',
-              color: '#868e96',
-            }}
-          >
-            Không có voucher nào phù hợp để tự động áp dụng.
-          </div>
-        )}
-      </div>
-
-      {/* VOUCHER KHẢ DỤNG */}
-      <div style={{ marginBottom: 10 }}>
-        <p
-          style={{
-            margin: '0 0 6px',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            color: '#495057',
-          }}
-        >
-          Voucher khả dụng
-        </p>
-
-        <div
-          style={{
-            maxHeight: 220,
-            overflowY: 'auto',
-            borderRadius: 8,
-            border: otherApplicable.length ? '1px solid #e9ecef' : 'none',
-          }}
-        >
-          {loading ? (
-            <div
-              style={{
-                padding: 10,
-                fontSize: '0.85rem',
-                background: '#f8f9fa',
-              }}
-            >
-              Đang tải voucher...
-            </div>
-          ) : !otherApplicable.length ? (
-            <div
-              style={{
-                padding: 10,
-                fontSize: '0.85rem',
-                background: '#f8f9fa',
-                color: '#868e96',
-              }}
-            >
-              Không còn voucher khả dụng khác.
-            </div>
-          ) : (
-            otherApplicable.map((v) => (
-              <div
+      {/* Gợi ý tiết kiệm */}
+      <SectionTitle icon="💡" title="Gợi ý tiết kiệm" />
+      {loading ? (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Đang tải voucher...
+        </div>
+      ) : !savingSuggestions.length ? (
+        <div style={{ padding: 10, borderRadius: 10, background: "#f8f9fa", color: "#868e96", fontSize: 12 }}>
+          Chưa có gợi ý tiết kiệm phù hợp.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {savingSuggestions.map((v) => {
+            const extra = extraToReachMin(v);
+            return (
+              <VoucherRow
                 key={v.id}
-                onClick={() => toggleVoucher(v)}
-                style={{
-                  padding: '9px 11px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f1f3f5',
-                  backgroundColor: isSelected(v.id) ? '#f1fdf5' : 'white',
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      fontSize: '0.88rem',
-                      marginBottom: 2,
-                    }}
-                  >
-                    {v.name}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.8rem',
-                      color: '#20c997',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Giảm {labelGiaTriGiam(v)}{' '}
-                    {v.discount ? (
-                      <span style={{ color: '#868e96' }}>
-                        ({formatCurrency(v.discount)} thực tế)
-                      </span>
-                    ) : null}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: '#868e96',
-                      marginTop: 2,
-                    }}
-                  >
-                    Đơn tối thiểu:{' '}
-                    {v.giaTriMin ? formatCurrency(v.giaTriMin) : '0 ₫'}
-                    {v.ngayKetThuc && (
-                      <>
-                        {' '}
-                        • Hết hạn:{' '}
-                        {new Date(v.ngayKetThuc).toLocaleDateString('vi-VN')}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  style={{
-                    borderRadius: '50%',
-                    border: '1px solid #ced4da',
-                    width: 26,
-                    height: 26,
-                    padding: 0,
-                    backgroundColor: isSelected(v.id) ? '#51cf66' : '#fff',
-                    color: isSelected(v.id) ? '#fff' : '#343a40',
-                    fontWeight: 700,
-                    fontSize: '1rem',
-                    lineHeight: 1,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {isSelected(v.id) ? '✓' : '+'}
-                </button>
-              </div>
-            ))
-          )}
+                v={v}
+                selected={false}
+                onPick={() => {}}
+                rightActionType="plus"
+                disabled={true} // giống ảnh: gợi ý -> không pick được khi chưa đủ min
+                formatCurrency={formatCurrency}
+                labelGiaTriGiam={labelGiaTriGiam}
+                extraRedLine={
+                  extra > 0
+                    ? `Mua thêm ${formatCurrency(extra)} để được giảm ${labelGiaTriGiam(v)}`
+                    : null
+                }
+                subtitle={
+                  <>
+                    Đơn tối thiểu: {formatCurrency(Number(v.giaTriMin || 0))}
+                    {v.ngayKetThuc ? <> • Hết hạn: {formatDateVi(v.ngayKetThuc)}</> : null}
+                  </>
+                }
+              />
+            );
+          })}
         </div>
-      </div>
+      )}
 
-      {/* GỢI Ý TIẾT KIỆM */}
-      <div style={{ marginTop: 10 }}>
-        <p
-          style={{
-            margin: '0 0 6px',
-            fontWeight: 600,
-            fontSize: '0.9rem',
-            color: '#495057',
-          }}
-        >
-          Gợi ý tiết kiệm
-        </p>
-
-        <div
-          style={{
-            maxHeight: 200,
-            overflowY: 'auto',
-            borderRadius: 8,
-          }}
-        >
-          {loading ? (
-            <div
-              style={{
-                padding: 10,
-                fontSize: '0.85rem',
-                background: '#f8f9fa',
-              }}
-            >
-              Đang tải voucher...
-            </div>
-          ) : !savingSuggestions.length ? (
-            <div
-              style={{
-                padding: 10,
-                fontSize: '0.85rem',
-                background: '#f8f9fa',
-                color: '#868e96',
-              }}
-            >
-              Chưa có gợi ý tiết kiệm phù hợp.
-            </div>
-          ) : (
-            savingSuggestions.map((v) => {
-              const extra = extraToReachMin(v);
-              return (
-                <div
-                  key={v.id}
-                  style={{
-                    padding: '9px 11px',
-                    borderRadius: 10,
-                    border: '1px dashed #ffd6cc',
-                    background: '#fff5f5',
-                    marginBottom: 8,
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontWeight: 600,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {v.name}
-                  </div>
-                  <div style={{ color: '#f03e3e', marginBottom: 2 }}>
-                    Giảm {labelGiaTriGiam(v)}
-                  </div>
-                  {extra > 0 && (
-                    <div style={{ color: '#e03131' }}>
-                      Mua thêm {formatCurrency(extra)} để được giảm{' '}
-                      {labelGiaTriGiam(v)}
-                    </div>
-                  )}
-                  <div style={{ color: '#868e96', marginTop: 2 }}>
-                    Đơn tối thiểu: {formatCurrency(v.giaTriMin || 0)}
-                    {v.ngayKetThuc && (
-                      <>
-                        {' '}
-                        • Hết hạn:{' '}
-                        {new Date(v.ngayKetThuc).toLocaleDateString('vi-VN')}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* TỔNG GIẢM & BUTTON */}
-      <div
-        style={{
-          borderTop: '1px solid #e9ecef',
-          paddingTop: 12,
-          marginTop: 10,
-        }}
-      >
-        <p
-          style={{
-            margin: '0 0 10px',
-            fontWeight: 600,
-            fontSize: '0.95rem',
-          }}
-        >
-          Tổng giảm tạm tính:{' '}
-          <span style={{ float: 'right', color: '#e03131' }}>
+      {/* Footer */}
+      <div style={{ borderTop: "1px solid #f1f3f5", marginTop: 12, paddingTop: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13 }}>
+          <span style={{ fontWeight: 900, color: "#212529" }}>Tổng giảm tạm tính</span>
+          <span style={{ fontWeight: 900, color: "#e03131" }}>
             {formatCurrency(tempTotalDiscount)}
           </span>
-        </p>
+        </div>
 
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            marginTop: 4,
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button
             onClick={onClose}
             style={{
-              padding: '9px 16px',
-              borderRadius: 6,
-              border: '1px solid #ced4da',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
-              color: '#495057',
-              fontWeight: 600,
-              fontSize: '0.9rem',
+              padding: "9px 14px",
+              borderRadius: 10,
+              border: "1px solid #dee2e6",
+              background: "#fff",
+              cursor: "pointer",
+              color: "#495057",
+              fontWeight: 800,
+              fontSize: 13,
             }}
           >
             Hủy
           </button>
           <button
             onClick={handleApply}
+            disabled={!selectedId}
             style={{
-              padding: '9px 18px',
-              borderRadius: 6,
-              border: 'none',
+              padding: "9px 16px",
+              borderRadius: 10,
+              border: "none",
               backgroundColor: primaryColor,
-              color: '#fff',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: '0.9rem',
-              opacity: selectedIds.length ? 1 : 0.6,
+              color: "#fff",
+              cursor: selectedId ? "pointer" : "not-allowed",
+              fontWeight: 900,
+              fontSize: 13,
+              opacity: selectedId ? 1 : 0.6,
+              minWidth: 120,
             }}
-            disabled={!selectedIds.length}
           >
-            Áp dụng ({selectedIds.length})
+            Áp dụng
           </button>
         </div>
       </div>

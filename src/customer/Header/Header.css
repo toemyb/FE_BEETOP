@@ -33,22 +33,27 @@
     padding: 0 40px;
     gap: 25px;
     position: relative;
+       --item-h: 44px;   /* ✅ THÊM DÒNG NÀY */
 }
 
 /* ======= LOGO ======= */
 .header-logo {
     display: flex;
     align-items: center;
-    transition: transform 0.3s ease;
+    height: var(--item-h); /* ✅ THÊM */
+    flex-shrink: 0;        /* ✅ THÊM */
 }
 
 .header-logo:hover {
-    transform: scale(1.05);
+    transform: none; /* ✅ SỬA (bỏ scale cho khỏi giật) */
 }
 
 .header-logo img {
-    width: 150px;
-    height: auto;
+    height: var(--item-h); /* ✅ SỬA */
+    width: auto;
+    max-width: 240px;
+    object-fit: contain;
+    display: block;
 }
 
 /* ======= CATEGORY CONTAINER ======= */
@@ -60,7 +65,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 20px;
+     height: var(--item-h);   /* ✅ THÊM */
+    padding: 0 20px;  
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(10px);
     color: white;
@@ -442,7 +448,8 @@
     gap: 6px;
     background: rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
-    padding: 8px 16px;
+     height: var(--item-h);  /* ✅ THÊM */
+    padding: 0 16px; 
     border-radius: 24px;
     color: white;
     font-weight: 600;
@@ -468,7 +475,8 @@
     border: 1px solid rgba(255, 255, 255, 0.3) !important;
     color: white !important;
     font-weight: 600 !important;
-    padding: 8px 20px !important;
+      height: var(--item-h) !important; /* ✅ THÊM */
+    padding: 0 20px !important;   
     border-radius: 24px !important;
     transition: all 0.3s ease !important;
     backdrop-filter: blur(10px);
@@ -484,7 +492,8 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px;
+     height: var(--item-h);  /* ✅ THÊM */
+    padding: 0 16px;  
     background: rgba(255, 255, 255, 0.15);
     backdrop-filter: blur(10px);
     border-radius: 24px;
@@ -547,9 +556,12 @@
         padding-bottom: 12px;
     }
 
-    .header-logo img {
-        width: 120px;
-    }
+      .header-logo img {
+    height: 56px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
+}
 
     .category-hover-zone {
         min-width: 100vw;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Card, Steps, Space, Button, Modal, message, Tag } from "antd";
 import { getOrderTimeline, updateOrderStatus } from "../../service/OrderTimelineService";
 
@@ -11,18 +11,30 @@ const stepStatus = (s) => {
   return "wait";
 };
 
+// Heuristic nhận diện luồng theo steps.code (POS thường max <= 3)
+const detectFlow = (timeline) => {
+  const codes = (timeline?.steps || [])
+    .map((x) => Number(x?.code))
+    .filter((n) => !Number.isNaN(n));
+  const maxCode = codes.length ? Math.max(...codes) : 0;
+  return maxCode <= 3 ? "TAI_QUAY" : "ONLINE_OR_DELIVERY";
+};
+
 export default function OrderTimelinePanel({ orderId, onChanged }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const flow = useMemo(() => detectFlow(data), [data]);
+
   const fetchTimeline = async () => {
-    const res = await getOrderTimeline(orderId);
-    setData(res.data);
+    const timeline = await getOrderTimeline(orderId);
+    setData(timeline); // ✅ FIX: unwrap rồi, không có .data
   };
 
   useEffect(() => {
     if (!orderId) return;
     fetchTimeline();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   const doUpdate = async (newStatus, note = "") => {
@@ -31,7 +43,7 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
       await updateOrderStatus(orderId, { newStatus, note });
       message.success("Cập nhật trạng thái thành công");
       await fetchTimeline();
-      onChanged?.(); // để component cha reload detail nếu muốn
+      onChanged?.();
     } catch (e) {
       message.error(e?.response?.data?.message || "Lỗi cập nhật trạng thái");
     } finally {
@@ -49,12 +61,29 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
     });
   };
 
-  const nextMap = { 1: 2, 2: 3, 3: 4, 4: 5, 5: 6 };
+  // ✅ Tính “bước tiếp theo” dựa trên steps trả về từ BE (không hardcode 1->2->3...)
+  const nextCode = useMemo(() => {
+    const steps = data?.steps || [];
+    const idx = steps.findIndex((s) => s.state === "CURRENT");
+    if (idx === -1) return null;
+    // tìm step UPCOMING đầu tiên sau CURRENT
+    for (let i = idx + 1; i < steps.length; i++) {
+      if (steps[i]?.state === "UPCOMING") return steps[i]?.code;
+    }
+    return null;
+  }, [data]);
+
+  const current = Number(data?.trangThai ?? 0);
+
+  // ✅ Quy ước cancel code theo luồng
+  const cancelCode = flow === "TAI_QUAY" ? 3 : 7;
+
+  const isFinal =
+    flow === "TAI_QUAY"
+      ? current === 2 || current === 3
+      : current === 6 || current === 7;
 
   if (!data) return null;
-
-  const current = data.trangThai;
-  const next = nextMap[current];
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "420px 1fr", gap: 16 }}>
@@ -68,10 +97,10 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
         style={{ borderRadius: 12 }}
       >
         <Steps direction="vertical">
-          {data.steps.map((s) => (
+          {(data.steps || []).map((s) => (
             <Step
               key={s.code}
-              title={s.title}
+              title={s.title} // ✅ DTO: title
               status={stepStatus(s.state)}
               description={s.state === "CURRENT" ? `Hiện tại: ${s.title}` : ""}
             />
@@ -79,13 +108,22 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
         </Steps>
 
         <Space style={{ marginTop: 16 }}>
-          {next && (
-            <Button type="primary" loading={loading} onClick={() => confirmUpdate(next, "Chuyển bước tiếp theo")}>
+          {!!nextCode && !isFinal && (
+            <Button
+              type="primary"
+              loading={loading}
+              onClick={() => confirmUpdate(nextCode, "Chuyển bước tiếp theo")}
+            >
               Chuyển bước
             </Button>
           )}
-          {current !== 6 && current !== 7 && (
-            <Button danger loading={loading} onClick={() => confirmUpdate(7, "Hủy đơn hàng")}>
+
+          {!isFinal && (
+            <Button
+              danger
+              loading={loading}
+              onClick={() => confirmUpdate(cancelCode, "Hủy đơn hàng")}
+            >
               Hủy đơn
             </Button>
           )}
@@ -103,7 +141,8 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
                   <div style={{ marginTop: 6, opacity: 0.7 }}>Bởi: {l.by}</div>
                 </div>
                 <div style={{ whiteSpace: "nowrap", opacity: 0.7 }}>
-                  {new Date(l.time).toLocaleString("vi-VN")}
+                  {/* ✅ DTO: time */}
+                  {l.time ? new Date(l.time).toLocaleString("vi-VN") : "-"}
                 </div>
               </div>
             </Card>

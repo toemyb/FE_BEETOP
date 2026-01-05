@@ -1,9 +1,8 @@
 // src/service/OrderManagementService.js
-import api from './api';
-import { unwrapApi } from './PosOrderService';
+import api from "./api";
+import { unwrapApi } from "./PosOrderService";
 
-const BASE_URL = '/api/order-management/orders';
-
+const BASE_URL = "/api/order-management/orders";
 
 export const searchOrdersRaw = (params = {}) => {
   const {
@@ -11,20 +10,17 @@ export const searchOrdersRaw = (params = {}) => {
     loaiDon,
     trangThaiDon,
     trangThaiThanhToan,
+    trangThaiDonForTaiQuay, // ✅ nhận từ caller (optional)
     fromDate,
     toDate,
     page = 0,
     size = 10,
-    sort = 'ngayTao,desc',
+    sort = "ngayTao,desc",
   } = params;
 
-  let sortType = 'newest';
+  let sortType = "newest";
   const lower = sort.toLowerCase();
-  if (lower.includes('asc')) {
-    sortType = 'oldest';
-  } else if (lower.includes('desc')) {
-    sortType = 'newest';
-  }
+  if (lower.includes("asc")) sortType = "oldest";
 
   return api.get(BASE_URL, {
     params: {
@@ -38,20 +34,17 @@ export const searchOrdersRaw = (params = {}) => {
       size,
       sortType,
 
-      // DÒNG DUY NHẤT BẠN CẦN THÊM – SIÊU QUAN TRỌNG
-      trangThaiDonForTaiQuay: [2, 3],   // ĐƠN TẠI QUẦY → CHỈ LẤY ĐƠN HOÀN THÀNH
+      // ✅ chỉ gửi khi có
+      trangThaiDonForTaiQuay: trangThaiDonForTaiQuay?.length
+        ? trangThaiDonForTaiQuay
+        : undefined,
     },
   });
 };
-/**
- * Hàm tiện: trả về thẳng PageResult<OrderListDTO> đã unwrap
- */
+
 export const searchOrders = async (params = {}) => {
   const res = await searchOrdersRaw(params);
-  return unwrapApi(res); // PageResult<OrderListDTO>
+  return unwrapApi(res);
 };
 
-export default {
-  searchOrdersRaw,
-  searchOrders,
-};
+export default { searchOrdersRaw, searchOrders };

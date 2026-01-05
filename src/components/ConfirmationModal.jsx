@@ -45,6 +45,12 @@ const ConfirmationModal = ({
   formatCurrency,
   onClose,
   onConfirm,
+
+  // ✅ thêm prop phí vận chuyển (optional)
+  shippingFee = 0,
+
+  // ✅ FIX: thêm flag giao hàng (optional) để hiển thị đúng kể cả ship=0
+  isDelivery = null,
 }) => {
   const fmt = (v) =>
     typeof formatCurrency === 'function'
@@ -65,7 +71,15 @@ const ConfirmationModal = ({
       ? Math.max(0, customerCash - orderSummary.total)
       : 0;
 
-  const deliveryMethod = 'Lấy tại cửa hàng';
+  // ✅ nếu isDelivery được truyền thì ưu tiên, còn không fallback theo shippingFee
+  const deliveryMethod =
+    isDelivery === true
+      ? 'Giao hàng tận nơi'
+      : isDelivery === false
+        ? 'Lấy tại cửa hàng'
+        : Number(shippingFee || 0) > 0
+          ? 'Giao hàng tận nơi'
+          : 'Lấy tại cửa hàng';
 
   return (
     <div style={overlayStyle}>
@@ -135,9 +149,7 @@ const ConfirmationModal = ({
         {/* SẢN PHẨM */}
         <div style={sectionCard}>
           <div style={{ ...rowBetween, marginBottom: 6 }}>
-            <span
-              style={{ fontWeight: 600, color: '#495057', fontSize: '0.9rem' }}
-            >
+            <span style={{ fontWeight: 600, color: '#495057', fontSize: '0.9rem' }}>
               Sản phẩm ({totalItems} sản phẩm)
             </span>
             <span style={{ fontSize: '0.86rem', color: '#868e96' }}>
@@ -161,10 +173,7 @@ const ConfirmationModal = ({
                   serialText = item.serials.join(', ');
                 } else {
                   serialText = item.serials
-                    .map(
-                      (s) =>
-                        s.code || s.maSeri || s.idSeri || s.id || ''
-                    )
+                    .map((s) => s.code || s.maSeri || s.idSeri || s.id || '')
                     .filter(Boolean)
                     .join(', ');
                 }
@@ -182,66 +191,33 @@ const ConfirmationModal = ({
                   }}
                 >
                   <div style={{ maxWidth: '65%' }}>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        marginBottom: 2,
-                        color: '#212529',
-                      }}
-                    >
+                    <div style={{ fontWeight: 600, marginBottom: 2, color: '#212529' }}>
                       {item.name}
                     </div>
                     {item.version && (
-                      <div
-                        style={{
-                          fontSize: '0.8rem',
-                          color: '#495057',
-                          marginBottom: 2,
-                        }}
-                      >
+                      <div style={{ fontSize: '0.8rem', color: '#495057', marginBottom: 2 }}>
                         {item.version}
                       </div>
                     )}
-                    <div
-                      style={{
-                        fontSize: '0.8rem',
-                        color: '#868e96',
-                        marginTop: 2,
-                      }}
-                    >
+                    <div style={{ fontSize: '0.8rem', color: '#868e96', marginTop: 2 }}>
                       SL: {item.quantity || 1}
-                      {serialText && (
-                        <span> • Seri: {serialText}</span>
-                      )}
+                      {serialText && <span> • Seri: {serialText}</span>}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', minWidth: 130 }}>
-                    {item.originalPrice &&
-                      item.originalPrice !== item.currentPrice && (
-                        <div
-                          style={{
-                            textDecoration: 'line-through',
-                            color: '#adb5bd',
-                            fontSize: '0.78rem',
-                          }}
-                        >
-                          {fmt(
-                            (item.originalPrice || 0) *
-                              (item.quantity || 1)
-                          )}
-                        </div>
-                      )}
-                    <div
-                      style={{
-                        color: '#e03131',
-                        fontWeight: 600,
-                        fontSize: '0.93rem',
-                      }}
-                    >
-                      {fmt(
-                        (item.currentPrice || 0) *
-                          (item.quantity || 1)
-                      )}
+                    {item.originalPrice && item.originalPrice !== item.currentPrice && (
+                      <div
+                        style={{
+                          textDecoration: 'line-through',
+                          color: '#adb5bd',
+                          fontSize: '0.78rem',
+                        }}
+                      >
+                        {fmt((item.originalPrice || 0) * (item.quantity || 1))}
+                      </div>
+                    )}
+                    <div style={{ color: '#e03131', fontWeight: 600, fontSize: '0.93rem' }}>
+                      {fmt((item.currentPrice || 0) * (item.quantity || 1))}
                     </div>
                   </div>
                 </div>
@@ -283,13 +259,7 @@ const ConfirmationModal = ({
           }}
         >
           <div style={{ ...rowBetween, marginBottom: 6 }}>
-            <span
-              style={{
-                fontWeight: 600,
-                color: '#2b8a3e',
-                fontSize: '0.9rem',
-              }}
-            >
+            <span style={{ fontWeight: 600, color: '#2b8a3e', fontSize: '0.9rem' }}>
               Tổng kết đơn hàng
             </span>
           </div>
@@ -309,9 +279,13 @@ const ConfirmationModal = ({
             </div>
             <div style={{ ...rowBetween, marginTop: 4 }}>
               <span style={{ color: '#e03131' }}>Giảm giá voucher:</span>
-              <strong style={{ color: '#e03131' }}>
-                - {fmt(orderSummary.totalDiscount)}
-              </strong>
+              <strong style={{ color: '#e03131' }}>- {fmt(orderSummary.totalDiscount)}</strong>
+            </div>
+
+            {/* ✅ Phí vận chuyển */}
+            <div style={{ ...rowBetween, marginTop: 4 }}>
+              <span>Phí vận chuyển:</span>
+              <strong>{fmt(Number(shippingFee || 0))}</strong>
             </div>
           </div>
 
@@ -324,38 +298,18 @@ const ConfirmationModal = ({
             }}
           >
             <span style={{ fontWeight: 700 }}>Tổng cộng:</span>
-            <span
-              style={{
-                fontWeight: 700,
-                color: '#2b8a3e',
-                fontSize: '1.05rem',
-              }}
-            >
+            <span style={{ fontWeight: 700, color: '#2b8a3e', fontSize: '1.05rem' }}>
               {fmt(orderSummary.total)}
             </span>
           </div>
 
           {paymentMethod === 'Tiền mặt' && (
             <>
-              <div
-                style={{
-                  ...rowBetween,
-                  marginTop: 6,
-                  fontSize: '0.86rem',
-                  color: '#495057',
-                }}
-              >
+              <div style={{ ...rowBetween, marginTop: 6, fontSize: '0.86rem', color: '#495057' }}>
                 <span>Khách hàng đưa:</span>
                 <strong>{fmt(customerCash || 0)}</strong>
               </div>
-              <div
-                style={{
-                  ...rowBetween,
-                  marginTop: 4,
-                  fontSize: '0.86rem',
-                  color: '#495057',
-                }}
-              >
+              <div style={{ ...rowBetween, marginTop: 4, fontSize: '0.86rem', color: '#495057' }}>
                 <span>Tiền trả lại:</span>
                 <strong style={{ color: '#2b8a3e' }}>{fmt(change)}</strong>
               </div>

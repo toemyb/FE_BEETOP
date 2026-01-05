@@ -9,9 +9,9 @@ export const getThongKeTongQuan = (params) => {
 // Thống kê 12 tháng so sánh 2 năm
 export const getThongKe12Thang = (nam1, nam2) => {
   return api.get(`${BASE_URL}/nam`, {
-    params: { 
-      nam1: nam1, 
-      nam2: nam2 
+    params: {
+      nam1: nam1,
+      nam2: nam2
     }
   });
 };
@@ -36,4 +36,14 @@ export const getThongKeSoSanhHaiNgay = (ngay1, ngay2) => {
       ngay2: ngay2.format('YYYY-MM-DD')
     }
   });
+};
+
+// Thống kê đơn hàng theo trạng thái
+export const getThongKeTrangThai = () => {
+  return api.get(`${BASE_URL}/trang-thai`);
+};
+
+// Thống kê truy cập (online/offline users)
+export const getThongKeTruyCap = () => {
+  return api.get(`${BASE_URL}/truy-cap`);
 };

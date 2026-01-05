@@ -1,5 +1,5 @@
 // src/admin/adminLaptopCTComponents/ListSeriComponent.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Table, Button, Modal, Tag, Space, message } from "antd";
 import {
   QrcodeOutlined,
@@ -16,9 +16,9 @@ const SERI_PENDING = 2;
 const SERI_SOLD = 3;
 
 const SERI_STATUS = {
-  [SERI_ACTIVE]: { text: "ACTIVE - Có sẵn", color: "green" },
-  [SERI_PENDING]: { text: "PENDING - Tạm giữ", color: "gold" },
-  [SERI_SOLD]: { text: "SOLD - Đã bán", color: "red" },
+  [SERI_ACTIVE]: { text: "Có sẵn", color: "green" },
+  [SERI_PENDING]: { text: "Tạm giữ", color: "gold" },
+  [SERI_SOLD]: { text: "Đã bán", color: "red" },
 };
 
 const ListSeriComponent = ({ idLaptopCt: propIdLaptopCt }) => {
@@ -60,6 +60,11 @@ const ListSeriComponent = ({ idLaptopCt: propIdLaptopCt }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idLaptopCt]);
 
+  // ✅ đếm số seri theo trạng thái ACTIVE (1)
+  const activeCount = useMemo(() => {
+    return (data || []).filter((x) => Number(x?.trangThai) === SERI_ACTIVE).length;
+  }, [data]);
+
   const openQrModal = (seri) => {
     setCurrentSeri(seri);
     setQrModalOpen(true);
@@ -83,7 +88,7 @@ const ListSeriComponent = ({ idLaptopCt: propIdLaptopCt }) => {
     },
     {
       title: "Mã Seri",
-      dataIndex: "idSeri", // nếu BE trả về tên khác (maSeri) thì đổi ở đây
+      dataIndex: "idSeri",
       render: (val) => <strong>{val}</strong>,
     },
     {
@@ -118,6 +123,11 @@ const ListSeriComponent = ({ idLaptopCt: propIdLaptopCt }) => {
         <strong>ID biến thể:</strong> {idLaptopCt}
       </div>
 
+      {/* ✅ hiển thị số lượng ACTIVE */}
+      <div style={{ marginBottom: 12 }}>
+        <strong>Số seri ACTIVE (trạng thái 1):</strong> {activeCount}
+      </div>
+
       <Button
         icon={<ReloadOutlined />}
         onClick={fetchData}
@@ -143,18 +153,9 @@ const ListSeriComponent = ({ idLaptopCt: propIdLaptopCt }) => {
         footer={null}
         title={`QR Seri: ${currentSeri?.idSeri}`}
       >
-        <div
-          id="qr-print-area"
-          style={{ textAlign: "center", padding: 16 }}
-        >
-          <QRCodeCanvas
-            value={currentSeri?.idSeri || ""}
-            size={200}
-            includeMargin
-          />
-          <div style={{ marginTop: 8, fontWeight: 500 }}>
-            {currentSeri?.idSeri}
-          </div>
+        <div id="qr-print-area" style={{ textAlign: "center", padding: 16 }}>
+          <QRCodeCanvas value={currentSeri?.idSeri || ""} size={200} includeMargin />
+          <div style={{ marginTop: 8, fontWeight: 500 }}>{currentSeri?.idSeri}</div>
         </div>
 
         <Button

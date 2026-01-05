@@ -1,5 +1,4 @@
-// src/admin/adminBanHangTaiQuayComponents/InvoiceWorkingArea.jsx
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { message } from 'antd';
 import ProductSelector from '../../components/ProductSelector.jsx';
 import CustomerSelector from '../../components/CustomerSelector.jsx';
@@ -20,10 +19,14 @@ import {
   startVnpayPayment,
   startMomoPayment,
   addItemsBySeriCode,
+  clearVoucherForOrder,
+  updateShippingForOrder,
+  ghnGetProvinces,
+  ghnGetDistricts,
+  ghnGetWards,
 } from '../../service/PosOrderService';
 import { listPaymentMethods } from '../../service/HinhThucThanhToanService';
 // THÊM import này nếu chưa có (cho getSeriByIdSeri)
-import { getSeriByIdSeri } from '../../service/SeriService';
 
 const formatCurrencyDefault = (amount) => {
   if (typeof amount !== 'number') return '0 ₫';
@@ -153,15 +156,50 @@ const InvoiceWorkingArea = ({
   const [customerSearch, setCustomerSearch] = useState('');
   const [loadingCustomers, setLoadingCustomers] = useState(false);
 
+  //GHN
+  const [giaoHang, setGiaoHang] = useState(false);
+
+  // ✅ THÊM: state lưu địa chỉ (chỉ lưu khi user bấm nút)
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [setAsDefault, setSetAsDefault] = useState(false);
+
+  // ✅ FIX: ref để tránh reset district/ward ngay sau khi sync từ BE
+  const skipResetProvinceRef = useRef(false);
+  const skipResetDistrictRef = useRef(false);
+
+  const [shipForm, setShipForm] = useState({
+    hoTen: '',
+    soDienThoai: '',
+    diaChiChiTiet: '',
+    quocGia: 'Việt Nam',
+    tinhThanh: '',
+    quanHuyen: '',
+    phuongXa: '',
+    provinceId: null,
+    districtId: null,
+    wardCode: '',
+  });
+
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+
+  const [shippingFee, setShippingFee] = useState(0);
+  const [shippingLoading, setShippingLoading] = useState(false);
+
+  // ✅ FIX: chống spam call + spam notify khi tính phí ship
+  const shipTimerRef = useRef(null);
+  const lastFeeRef = useRef(null);
+
   // POS Order
   const [orderDetail, setOrderDetail] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
 
-  // Tổng tiền từ BE
+  // ✅ FIX: Tổng tiền từ BE (dùng null để phân biệt "chưa có" vs "0")
   const [posTotals, setPosTotals] = useState({
-    giaTriChuaGiam: 0,
-    giaTriGiamGia: 0,
-    tongTienThuHo: 0,
+    giaTriChuaGiam: null,
+    giaTriGiamGia: null,
+    tongTienThuHo: null,
   });
 
   // Hình thức thanh toán
@@ -207,25 +245,50 @@ const InvoiceWorkingArea = ({
       setOrderDetail(null);
       setCartItems([]);
       setPosTotals({
-        giaTriChuaGiam: 0,
-        giaTriGiamGia: 0,
-        tongTienThuHo: 0,
+        giaTriChuaGiam: null,
+        giaTriGiamGia: null,
+        tongTienThuHo: null,
       });
       return;
     }
 
     setOrderDetail(data);
+    setShippingFee(Number(data.phiVanChuyen || 0));
 
+    // ✅ FIX: đánh dấu để các effect province/district KHÔNG reset ngay sau khi sync
+    skipResetProvinceRef.current = true;
+    skipResetDistrictRef.current = true;
+
+    setShipForm((prev) => ({
+      ...prev,
+      hoTen: data.hoTen || data.tenNguoiNhan || data.tenKhachHang || prev.hoTen,
+      soDienThoai: data.soDienThoai || data.sdtNguoiNhan || data.sdtKhachHang || prev.soDienThoai,
+
+      diaChiChiTiet: data.diaChiChiTiet || prev.diaChiChiTiet,
+      quocGia: data.quocGia || prev.quocGia,
+      tinhThanh: data.tinhThanh || prev.tinhThanh,
+      quanHuyen: data.quanHuyen || prev.quanHuyen,
+      phuongXa: data.phuongXa || prev.phuongXa,
+
+      provinceId: data.provinceId ?? prev.provinceId,
+      districtId: data.districtId ?? prev.districtId,
+      wardCode: data.wardCode ?? prev.wardCode,
+    }));
+
+    // nếu order đang là giao hàng thì bật toggle
+    setGiaoHang(data.loaiDon === 'GIAO_HANG');
+
+    // ✅ FIX: giữ null nếu BE không trả, tránh falsy 0 làm sai logic tổng kết
     setPosTotals({
-      giaTriChuaGiam: Number(data.giaTriChuaGiam || 0),
-      giaTriGiamGia: Number(data.giaTriGiamGia || 0),
-      tongTienThuHo: Number(data.tongTienThuHo || 0),
+      giaTriChuaGiam: data.giaTriChuaGiam ?? null,
+      giaTriGiamGia: data.giaTriGiamGia ?? null,
+      tongTienThuHo: data.tongTienThuHo ?? null,
     });
 
     // Build giỏ hàng từ items (List<PosOrderItemDTO>)
     if (Array.isArray(data.items)) {
       const groups = {};
-
+      console.log("POS items:", data.items);
       data.items.forEach((it) => {
         const key = it.laptopCtId || it.laptopId || it.seriId || it.orderCtId;
 
@@ -234,12 +297,24 @@ const InvoiceWorkingArea = ({
             idLaptopCt: key,
             name: it.tenSanPham || 'Sản phẩm',
             version: it.cauHinh || '',
+            imageUrl:
+              it.anhUrl ||
+              it.anh ||
+              it.hinhAnh ||
+              it.imageUrl ||
+              it.image ||
+              null,
             serials: [], // mảng string
             orderCtIds: [], // mảng UUID tương ứng từng seri
             quantity: 0,
             currentPrice: Number(it.giaBan || 0),
             originalPrice: Number(it.giaBan || 0),
           };
+        } else {
+          // ✅ nếu group đang chưa có ảnh mà item mới có ảnh thì cập nhật
+          if (!groups[key].imageUrl && it.anhUrl) {
+            groups[key].imageUrl = it.anhUrl;
+          }
         }
 
         const seriCode = it.maSeri || '';
@@ -275,12 +350,12 @@ const InvoiceWorkingArea = ({
       const vList = data.vouchers.map((v) => {
         // BE PosVoucherDTO: idPhieuGiamGia là mã voucher (PGG001...)
         const codeFromDto =
-          v.idPhieuGiamGia ||  // đúng kiểu từ BE
-          v.idPhieugiamgia ||  // phòng khi BE viết khác camel-case
-          v.idPhieugiamgia;    // fallback nữa
+          v.idPhieuGiamGia ||
+          v.idPhieugiamgia ||
+          v.idPhieugiamgia;
 
         const uuid =
-          codeFromDto ||       // dùng chính mã này làm "id"
+          codeFromDto ||
           v.id ||
           v.uuid ||
           v.idVoucher;
@@ -295,7 +370,7 @@ const InvoiceWorkingArea = ({
           uuid;
 
         return {
-          id: uuid,           // 🚩 ID dùng cho FE & gửi lên BE
+          id: uuid,
           code,
           name: v.ten || v.name || code,
           kieuGiamGia: v.kieuGiamGia,
@@ -343,6 +418,13 @@ const InvoiceWorkingArea = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
+  // ✅ FIX: luôn lấy tổng tiền MỚI NHẤT từ BE trước khi thu tiền / complete (chặn lệch ship/voucher)
+  const getLatestOrderFromServer = async () => {
+    if (!orderId) return null;
+    const res = await getOrderDetail(orderId);
+    return unwrapApi(res);
+  };
+
   // ===== GỢI Ý KHÁCH HÀNG =====
   const customerSuggestions = useMemo(() => {
     const keyword = customerSearch.trim().toLowerCase();
@@ -364,23 +446,172 @@ const InvoiceWorkingArea = ({
     [cartItems]
   );
 
+  //GHN
+  useEffect(() => {
+    if (!giaoHang) return;
+
+    (async () => {
+      try {
+        const res = await ghnGetProvinces();
+        const raw = unwrapApi(res) || res?.data?.data || res?.data;
+        // GHN thường trả: {data:[...]}
+        const list = raw?.data || raw || [];
+        setProvinces(Array.isArray(list) ? list : []);
+      } catch (e) {
+        console.error(e);
+        notify('error', 'Không tải được danh sách tỉnh/thành (GHN).');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giaoHang]);
+
+  useEffect(() => {
+    if (!giaoHang) return;
+    if (!shipForm.provinceId) {
+      setDistricts([]);
+      setWards([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await ghnGetDistricts(shipForm.provinceId);
+        const raw = unwrapApi(res) || res?.data?.data || res?.data;
+        const list = raw?.data || raw || [];
+        setDistricts(Array.isArray(list) ? list : []);
+        setWards([]);
+
+        // ✅ FIX: chỉ reset khi USER đổi tỉnh, không reset ngay sau syncFromOrder
+        if (skipResetProvinceRef.current) {
+          skipResetProvinceRef.current = false;
+        } else {
+          setShipForm((p) => ({ ...p, districtId: null, wardCode: '', quanHuyen: '', phuongXa: '' }));
+        }
+      } catch (e) {
+        console.error(e);
+        notify('error', 'Không tải được danh sách quận/huyện (GHN).');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giaoHang, shipForm.provinceId]);
+
+  useEffect(() => {
+    if (!giaoHang) return;
+    if (!shipForm.districtId) {
+      setWards([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await ghnGetWards(shipForm.districtId);
+        const raw = unwrapApi(res) || res?.data?.data || res?.data;
+        const list = raw?.data || raw || [];
+        setWards(Array.isArray(list) ? list : []);
+
+        // ✅ FIX: chỉ reset khi USER đổi huyện, không reset ngay sau syncFromOrder
+        if (skipResetDistrictRef.current) {
+          skipResetDistrictRef.current = false;
+        } else {
+          setShipForm((p) => ({ ...p, wardCode: '', phuongXa: '' }));
+        }
+      } catch (e) {
+        console.error(e);
+        notify('error', 'Không tải được danh sách phường/xã (GHN).');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giaoHang, shipForm.districtId]);
+
+  // ✅ FIX: debounce + chống spam notify khi tính phí
+  useEffect(() => {
+    if (!giaoHang) return;
+    if (!orderId) return;
+    if (!shipForm.districtId || !shipForm.wardCode) return;
+
+    if (shipTimerRef.current) clearTimeout(shipTimerRef.current);
+
+    shipTimerRef.current = setTimeout(async () => {
+      try {
+        setShippingLoading(true);
+
+        const payload = {
+          giaoHang: true,
+          hoTen: shipForm.hoTen,
+          soDienThoai: shipForm.soDienThoai,
+          diaChiChiTiet: shipForm.diaChiChiTiet,
+          quocGia: shipForm.quocGia || "Việt Nam",
+          tinhThanh: shipForm.tinhThanh,
+          quanHuyen: shipForm.quanHuyen,
+          phuongXa: shipForm.phuongXa,
+          provinceId: shipForm.provinceId,
+          districtId: shipForm.districtId,
+          wardCode: shipForm.wardCode,
+
+          // ✅ QUAN TRỌNG: chỉ tính phí, KHÔNG LƯU địa chỉ
+          saveAddress: false,
+          setAsDefault: false,
+        };
+
+        const res = await updateShippingForOrder(orderId, payload);
+        const data = unwrapApi(res); // PosOrderDetailDTO
+        syncFromOrder(data);
+
+        const feeNow = Number(data?.phiVanChuyen || 0);
+        if (lastFeeRef.current !== feeNow) {
+          lastFeeRef.current = feeNow;
+          notify('success', `Tính phí vận chuyển thành công (GHN: ${feeNow.toLocaleString('vi-VN')} ₫)`);
+        }
+      } catch (e) {
+        console.error(e);
+        notify('error', e?.response?.data?.message || 'Tính phí vận chuyển thất bại.');
+        setShippingFee(0);
+      } finally {
+        setShippingLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      if (shipTimerRef.current) clearTimeout(shipTimerRef.current);
+    };
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giaoHang, orderId, shipForm.districtId, shipForm.wardCode]);
+
   // ===== TỔNG KẾT ĐƠN HÀNG (ưu tiên số từ BE) =====
   const orderSummary = useMemo(() => {
-    const subtotal =
-      posTotals.giaTriChuaGiam ||
-      cartItems.reduce(
-        (sum, item) =>
-          sum + (item.currentPrice || 0) * (item.quantity || 1),
+    // ✅ FIX: không dùng "||" vì 0 là falsy -> dễ sai tổng
+    const hasGiaTriChuaGiam =
+      posTotals.giaTriChuaGiam !== null && posTotals.giaTriChuaGiam !== undefined;
+
+    const hasGiaTriGiamGia =
+      posTotals.giaTriGiamGia !== null && posTotals.giaTriGiamGia !== undefined;
+
+    const subtotal = hasGiaTriChuaGiam
+      ? Number(posTotals.giaTriChuaGiam || 0)
+      : cartItems.reduce(
+        (sum, item) => sum + (item.currentPrice || 0) * (item.quantity || 1),
         0
       );
-    const totalDiscount =
-      posTotals.giaTriGiamGia ||
-      appliedVouchers.reduce(
+
+    const totalDiscount = hasGiaTriGiamGia
+      ? Number(posTotals.giaTriGiamGia || 0)
+      : appliedVouchers.reduce(
         (sum, voucher) => sum + (voucher.discount || 0),
         0
       );
-    const total =
-      posTotals.tongTienThuHo || Math.max(0, subtotal - totalDiscount);
+
+    const hasTongTienThuHo =
+      posTotals.tongTienThuHo !== null && posTotals.tongTienThuHo !== undefined;
+
+    const total = hasTongTienThuHo
+      ? Number(posTotals.tongTienThuHo || 0)
+      : Math.max(
+        0,
+        (Number(subtotal) || 0) -
+        (Number(totalDiscount) || 0) +
+        Number(orderDetail?.phiVanChuyen || 0)
+      );
 
     const totalNum = Number(total) || 0;
     const change =
@@ -394,7 +625,7 @@ const InvoiceWorkingArea = ({
       total: totalNum,
       change,
     };
-  }, [cartItems, appliedVouchers, invoice.customerCash, posTotals]);
+  }, [cartItems, appliedVouchers, invoice.customerCash, posTotals, orderDetail?.phiVanChuyen]);
 
   // ===== SẢN PHẨM (seri) =====
   const handleAddProducts = async (selectedSerialItems) => {
@@ -464,19 +695,17 @@ const InvoiceWorkingArea = ({
       message: 'Bạn có chắc muốn xóa toàn bộ phiên bản sản phẩm này khỏi đơn hàng?',
       onConfirm: async () => {
         try {
+          const uniqueIds = Array.from(new Set(group.orderCtIds.filter(Boolean)));
+
           await Promise.all(
-            group.orderCtIds
-              .filter(Boolean)
-              .map((orderCtId) => removeItemFromOrder(orderId, orderCtId))
+            uniqueIds.map((orderCtId) => removeItemFromOrder(orderId, orderCtId))
           );
+
           await refreshOrderFromServer();
           notify('success', 'Đã xóa sản phẩm khỏi đơn hàng.');
         } catch (err) {
           console.error('Lỗi xóa sản phẩm khỏi đơn hàng:', err);
-          notify(
-            'error',
-            'Không thể xóa sản phẩm khỏi đơn, vui lòng thử lại!'
-          );
+          notify('error', err?.response?.data?.message || 'Không thể xóa sản phẩm khỏi đơn, vui lòng thử lại!');
         }
       },
     });
@@ -495,11 +724,17 @@ const InvoiceWorkingArea = ({
           await refreshOrderFromServer();
           notify('success', `Đã xóa seri ${seriCode} khỏi đơn hàng.`);
         } catch (err) {
+          const msg = err?.response?.data?.message || '';
           console.error('Lỗi xóa seri khỏi đơn hàng:', err);
-          notify(
-            'error',
-            'Không thể xóa seri khỏi đơn, vui lòng thử lại!'
-          );
+
+          // ✅ nếu BE báo không tìm thấy, coi như đã xoá rồi
+          if (msg.includes('Không tìm thấy OrderCT')) {
+            await refreshOrderFromServer();
+            notify('success', `Seri ${seriCode} đã được xoá (cập nhật lại).`);
+            return;
+          }
+
+          notify('error', msg || 'Không thể xóa seri khỏi đơn, vui lòng thử lại!');
         }
       },
     });
@@ -554,26 +789,41 @@ const InvoiceWorkingArea = ({
 
   // ===== VOUCHER =====
   const handleApplyVouchers = async (list) => {
-    const normalized = Array.isArray(list) ? list : [];
-    setAppliedVouchers(normalized);
+    // ✅ VoucherSelector sẽ trả về mảng, nhưng mình chỉ lấy 1 voucher đầu tiên
+    const chosen = Array.isArray(list) ? list[0] : null;
 
-    const voucherIds = normalized
-      .map((v) => v.id)
-      .filter(Boolean);
+    // ✅ BE nhận voucherId = mã voucher (ví dụ "PGG001", "VC123")
+    const voucherId = chosen?.id ? String(chosen.id) : '';
 
-    updateInvoice({ voucherIds });
+    // Update UI: chỉ giữ 1 voucher
+    setAppliedVouchers(chosen ? [chosen] : []);
 
-    if (!orderId || !voucherIds.length) {
+    // Nếu bạn muốn lưu vào invoice
+    updateInvoice({ voucherId: voucherId || null });
+
+    // Nếu chưa có orderId thì đóng modal
+    if (!orderId) {
       setShowVoucherSelector(false);
       return;
     }
 
     try {
-      await applyVoucherForOrder(orderId, voucherIds);
+      // Nếu không chọn voucher thì chỉ đóng modal (hoặc gọi API clear nếu bạn có)
+      if (!voucherId) {
+        // ⚠️ Nếu bạn có làm API DELETE /api/pos/orders/{orderId}/voucher thì mở dòng này:
+        // await clearVoucherForOrder(orderId);
+
+        setShowVoucherSelector(false);
+        return;
+      }
+
+      // ✅ Gửi 1 voucherId lên BE
+      await applyVoucherForOrder(orderId, voucherId);
+
       await refreshOrderFromServer();
       notify('success', 'Đã áp dụng voucher cho đơn hàng.');
     } catch (err) {
-      console.error('Lỗi áp dụng voucher hàng:', err);
+      console.error('Lỗi áp dụng voucher:', err);
       notify(
         'error',
         err?.response?.data?.message ||
@@ -613,6 +863,19 @@ const InvoiceWorkingArea = ({
       notify('warning', 'Vui lòng chọn ít nhất một sản phẩm.');
       return;
     }
+
+    // ✅ FIX: đang tính ship thì không cho thanh toán để tránh lệch tổng
+    if (shippingLoading) {
+      notify('info', 'Đang tính phí vận chuyển, vui lòng chờ xong rồi thanh toán.');
+      return;
+    }
+
+    // ✅ FIX: nếu giao hàng mà chưa đủ district/ward thì chặn (tránh tổng ship chưa đúng)
+    if (giaoHang && (!shipForm.districtId || !shipForm.wardCode)) {
+      notify('warning', 'Vui lòng chọn Quận/Huyện và Phường/Xã để tính phí vận chuyển trước khi thanh toán.');
+      return;
+    }
+
     if (orderSummary.total <= 0) {
       notify('warning', 'Tổng tiền phải lớn hơn 0.');
       return;
@@ -628,7 +891,9 @@ const InvoiceWorkingArea = ({
   };
 
   const isPayDisabled =
+    shippingLoading ||
     orderSummary.total === 0 ||
+    (giaoHang && (!shipForm.districtId || !shipForm.wardCode)) ||
     (invoice.paymentMethod === 'Tiền mặt' &&
       (invoice.customerCash || 0) < orderSummary.total);
 
@@ -636,6 +901,30 @@ const InvoiceWorkingArea = ({
     if (!orderId) return;
 
     try {
+      // ✅ FIX: dừng debounce ship để tránh update ship sau khi bấm thanh toán
+      if (shipTimerRef.current) {
+        clearTimeout(shipTimerRef.current);
+        shipTimerRef.current = null;
+      }
+
+      // ✅ FIX: LẤY ORDER MỚI NHẤT từ BE để dùng "tongTienThuHo" chính xác
+      const latest = await getLatestOrderFromServer();
+      if (latest) {
+        syncFromOrder(latest);
+      }
+
+      const mustPay = Number(latest?.tongTienThuHo ?? orderSummary.total ?? 0);
+      if (mustPay <= 0) {
+        message.error('Tổng tiền không hợp lệ. Vui lòng kiểm tra lại đơn hàng.');
+        return;
+      }
+
+      // Nếu tiền mặt mà khách đưa < tổng mới nhất thì chặn
+      if (invoice.paymentMethod === 'Tiền mặt' && (invoice.customerCash || 0) < mustPay) {
+        message.error('Số tiền khách đưa chưa đủ theo tổng mới nhất (có thể do phí vận chuyển vừa cập nhật).');
+        return;
+      }
+
       // 👉 Nếu chọn VNPay
       // VNPAY – MỞ TRONG CÙNG TAB (khách quét QR ngon lành)
       if (invoice.paymentMethod === 'VNPay') {
@@ -658,9 +947,6 @@ const InvoiceWorkingArea = ({
 
         // MỞ TRONG CÙNG TAB → KHÁCH DỄ QUÉT QR TRÊN ĐIỆN THOẠI
         window.location.href = payUrl;
-
-        // Không đóng modal ngay, chờ khách thanh toán xong quay lại
-        // (Backend sẽ tự redirect về trang hoàn tất)
         return;
       }
 
@@ -697,16 +983,18 @@ const InvoiceWorkingArea = ({
         return;
       }
 
-      const total = orderSummary.total;
       const khachDua =
         invoice.paymentMethod === 'Tiền mặt'
-          ? invoice.customerCash || total
-          : total;
+          ? (invoice.customerCash || mustPay)
+          : mustPay;
 
       await addPaymentToOrder(orderId, {
         idHinhThucThanhToan: methodEntity.id,
         khachDua,
       });
+
+      // ✅ FIX: refresh lại trước khi complete để chắc chắn paid >= mustPay mới nhất
+      await refreshOrderFromServer();
 
       await completeOrder(orderId);
       await refreshOrderFromServer();
@@ -722,7 +1010,6 @@ const InvoiceWorkingArea = ({
       );
     }
   };
-
 
   // ===== STYLE =====
   const primaryColor = '#0b7285';
@@ -872,6 +1159,24 @@ const InvoiceWorkingArea = ({
                 }}
               >
                 {/* Thông tin sản phẩm */}
+                {/* Ảnh thumbnail */}
+                <div style={{ width: 64, marginRight: 10 }}>
+                  <img
+                    src={item.imageUrl || '/placeholder.png'}
+                    alt={item.name}
+                    style={{
+                      width: 64,
+                      height: 64,
+                      objectFit: 'cover',
+                      borderRadius: 8,
+                      border: '1px solid #e9ecef',
+                      background: '#fff',
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.src = '/placeholder.png';
+                    }}
+                  />
+                </div>
                 <div style={{ flex: 1, paddingRight: 10 }}>
                   <div
                     style={{
@@ -1052,7 +1357,7 @@ const InvoiceWorkingArea = ({
             <h5
               style={{
                 margin: 0,
-                color: primaryColor,
+                color: '#0b7285',
                 fontSize: '0.95rem',
                 fontWeight: 600,
               }}
@@ -1125,6 +1430,7 @@ const InvoiceWorkingArea = ({
                         color: '#adb5bd',
                         fontSize: '1rem',
                         lineHeight: 1,
+                        padding: 0,
                       }}
                       title="Bỏ khách hàng"
                     >
@@ -1216,7 +1522,7 @@ const InvoiceWorkingArea = ({
                       backgroundColor: '#e7f5ff',
                       padding: '8px',
                       borderRadius: '6px',
-                      border: `1px solid ${primaryColor}`,
+                      border: `1px solid #0b7285`,
                       fontSize: '0.85rem',
                     }}
                   >
@@ -1246,6 +1552,265 @@ const InvoiceWorkingArea = ({
           })()}
         </div>
 
+        {/* GIAO HÀNG NHANH (GHN) */}
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h5 style={{ margin: 0, color: '#0b7285', fontSize: '0.95rem', fontWeight: 600 }}>
+              Giao hàng
+            </h5>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#495057' }}>
+                {giaoHang ? 'Giao hàng tận nơi' : 'Tại quầy'}
+              </span>
+              <input
+                type="checkbox"
+                checked={giaoHang}
+                onChange={async (e) => {
+                  const val = e.target.checked;
+                  setGiaoHang(val);
+
+                  if (!orderId) return;
+
+                  // ✅ reset checkbox lưu địa chỉ khi đổi trạng thái giao hàng
+                  setSaveAddress(false);
+                  setSetAsDefault(false);
+
+                  // tắt giao hàng => gọi BE reset phí
+                  if (!val) {
+                    try {
+                      setShippingLoading(true);
+                      const res = await updateShippingForOrder(orderId, { giaoHang: false });
+                      const data = unwrapApi(res);
+                      syncFromOrder(data);
+                      notify('success', 'Đã tắt giao hàng và reset phí vận chuyển.');
+                    } catch (err) {
+                      notify('error', err?.response?.data?.message || 'Không thể tắt giao hàng.');
+                    } finally {
+                      setShippingLoading(false);
+                    }
+                    return;
+                  }
+
+                  // ✅ bật giao hàng => gọi BE để lấy địa chỉ mặc định (KHÔNG LƯU)
+                  try {
+                    setShippingLoading(true);
+
+                    const hasAccount = !!(invoice?.customer?.idTaiKhoan || invoice?.customer?.id);
+
+                    // 1) Khách có tài khoản -> gọi BE để lấy địa chỉ mặc định (và tính phí nếu đủ ward/district)
+                    if (hasAccount) {
+                      const res = await updateShippingForOrder(orderId, {
+                        giaoHang: true,
+                        saveAddress: false,
+                        setAsDefault: false,
+                      });
+                      const data = unwrapApi(res);
+                      syncFromOrder(data);
+                    } else {
+                      // 2) Khách vãng lai -> KHÔNG gọi BE ngay (vì chưa có district/ward sẽ lỗi)
+                      // Fee sẽ được tính tự động bởi useEffect khi user chọn Quận/Huyện + Phường/Xã
+                      notify('info', 'Vui lòng chọn Tỉnh/Thành, Quận/Huyện và Phường/Xã để tính phí vận chuyển.');
+                    }
+                  } catch (err) {
+                    const msg = err?.response?.data?.message || 'Không thể bật giao hàng.';
+                    // ✅ FIX: nếu BE báo thiếu district/ward thì chỉ nhắc user chọn, không báo lỗi đỏ
+                    if (msg.includes('Thiếu districtId') || msg.includes('wardCode')) {
+                      notify('info', 'Khách chưa có địa chỉ đủ thông tin. Vui lòng chọn Quận/Huyện và Phường/Xã để tính phí.');
+                    } else {
+                      notify('error', msg);
+                    }
+                  } finally {
+                    setShippingLoading(false);
+                  }
+                }}
+              />
+            </label>
+          </div>
+
+          {giaoHang && (
+            <>
+              <div style={{ marginTop: 10 }}>
+                <input
+                  value={shipForm.hoTen}
+                  onChange={(e) => setShipForm(p => ({ ...p, hoTen: e.target.value }))}
+                  placeholder="Họ tên người nhận"
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6, marginBottom: 8 }}
+                />
+                <input
+                  value={shipForm.soDienThoai}
+                  onChange={(e) => setShipForm(p => ({ ...p, soDienThoai: e.target.value }))}
+                  placeholder="Số điện thoại người nhận"
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6, marginBottom: 8 }}
+                />
+                <input
+                  value={shipForm.diaChiChiTiet}
+                  onChange={(e) => setShipForm(p => ({ ...p, diaChiChiTiet: e.target.value }))}
+                  placeholder="Địa chỉ chi tiết (số nhà, đường...)"
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6, marginBottom: 8 }}
+                />
+
+                {/* Province */}
+                <select
+                  value={shipForm.provinceId || ''}
+                  onChange={(e) => {
+                    const provinceId = e.target.value ? Number(e.target.value) : null;
+                    const provinceObj = provinces.find(x => Number(x.ProvinceID || x.province_id) === provinceId);
+                    setShipForm(p => ({
+                      ...p,
+                      provinceId,
+                      tinhThanh: provinceObj?.ProvinceName || provinceObj?.province_name || '',
+                    }));
+                  }}
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6, marginBottom: 8 }}
+                >
+                  <option value="">Tỉnh/Thành phố *</option>
+                  {provinces.map((p) => {
+                    const id = p.ProvinceID ?? p.province_id;
+                    const name = p.ProvinceName ?? p.province_name;
+                    return <option key={id} value={id}>{name}</option>;
+                  })}
+                </select>
+
+                {/* District */}
+                <select
+                  value={shipForm.districtId || ''}
+                  onChange={(e) => {
+                    const districtId = e.target.value ? Number(e.target.value) : null;
+                    const dObj = districts.find(x => Number(x.DistrictID || x.district_id) === districtId);
+                    setShipForm(p => ({
+                      ...p,
+                      districtId,
+                      quanHuyen: dObj?.DistrictName || dObj?.district_name || '',
+                    }));
+                  }}
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6, marginBottom: 8 }}
+                  disabled={!shipForm.provinceId}
+                >
+                  <option value="">Quận/Huyện *</option>
+                  {districts.map((d) => {
+                    const id = d.DistrictID ?? d.district_id;
+                    const name = d.DistrictName ?? d.district_name;
+                    return <option key={id} value={id}>{name}</option>;
+                  })}
+                </select>
+
+                {/* Ward */}
+                <select
+                  value={shipForm.wardCode || ''}
+                  onChange={(e) => {
+                    const wardCode = e.target.value || '';
+                    const wObj = wards.find(x => String(x.WardCode || x.ward_code) === wardCode);
+                    setShipForm(p => ({
+                      ...p,
+                      wardCode,
+                      phuongXa: wObj?.WardName || wObj?.ward_name || '',
+                    }));
+                  }}
+                  style={{ width: '100%', padding: 8, border: '1px solid #ced4da', borderRadius: 6 }}
+                  disabled={!shipForm.districtId}
+                >
+                  <option value="">Phường/Xã *</option>
+                  {wards.map((w) => {
+                    const code = w.WardCode ?? w.ward_code;
+                    const name = w.WardName ?? w.ward_name;
+                    return <option key={code} value={code}>{name}</option>;
+                  })}
+                </select>
+              </div>
+
+              {/* ✅ UI Lưu địa chỉ (chỉ cho khách có tài khoản) */}
+              {!!(invoice?.customer?.idTaiKhoan || invoice?.customer?.id) && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                    <input
+                      type="checkbox"
+                      checked={saveAddress}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setSaveAddress(v);
+                        if (!v) setSetAsDefault(false);
+                      }}
+                    />
+                    Lưu địa chỉ này vào sổ địa chỉ khách hàng
+                  </label>
+
+                  {saveAddress && (
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={setAsDefault}
+                        onChange={(e) => setSetAsDefault(e.target.checked)}
+                      />
+                      Đặt làm địa chỉ mặc định
+                    </label>
+                  )}
+
+                  {saveAddress && (
+                    <button
+                      type="button"
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#0b7285',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                      }}
+                      onClick={async () => {
+                        if (!orderId) return;
+                        try {
+                          setShippingLoading(true);
+
+                          const res = await updateShippingForOrder(orderId, {
+                            giaoHang: true,
+                            hoTen: shipForm.hoTen,
+                            soDienThoai: shipForm.soDienThoai,
+                            diaChiChiTiet: shipForm.diaChiChiTiet,
+                            quocGia: shipForm.quocGia || "Việt Nam",
+                            tinhThanh: shipForm.tinhThanh,
+                            quanHuyen: shipForm.quanHuyen,
+                            phuongXa: shipForm.phuongXa,
+                            provinceId: shipForm.provinceId,
+                            districtId: shipForm.districtId,
+                            wardCode: shipForm.wardCode,
+
+                            // ✅ chỉ lúc bấm nút mới lưu DB
+                            saveAddress: true,
+                            setAsDefault: !!setAsDefault,
+                          });
+
+                          const data = unwrapApi(res);
+                          syncFromOrder(data);
+
+                          setSaveAddress(false);
+                          setSetAsDefault(false);
+
+                          notify('success', 'Đã lưu địa chỉ mới cho khách hàng.');
+                        } catch (err) {
+                          notify('error', err?.response?.data?.message || 'Lưu địa chỉ thất bại.');
+                        } finally {
+                          setShippingLoading(false);
+                        }
+                      }}
+                    >
+                      Lưu địa chỉ mới
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e9ecef' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span>Phí vận chuyển:</span>
+                  <strong>{shippingLoading ? 'Đang tính...' : formatCurrency(Number(orderDetail?.phiVanChuyen || 0))}</strong>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         {/* VOUCHER */}
         <div style={cardStyle}>
           <div
@@ -1259,7 +1824,7 @@ const InvoiceWorkingArea = ({
             <h5
               style={{
                 margin: 0,
-                color: secondaryColor,
+                color: '#12b886',
                 fontSize: '0.95rem',
                 fontWeight: 600,
               }}
@@ -1271,7 +1836,7 @@ const InvoiceWorkingArea = ({
               style={{
                 background: 'none',
                 border: 'none',
-                color: secondaryColor,
+                color: '#12b886',
                 padding: '3px 8px',
                 cursor: 'pointer',
                 fontWeight: 600,
@@ -1292,7 +1857,7 @@ const InvoiceWorkingArea = ({
                   padding: '7px 9px',
                   backgroundColor: '#e6f7ea',
                   borderRadius: '6px',
-                  border: `1px solid ${secondaryColor}`,
+                  border: `1px solid #12b886`,
                   marginBottom: '6px',
                   fontSize: '0.85rem',
                 }}
@@ -1339,7 +1904,7 @@ const InvoiceWorkingArea = ({
                   padding: '8px 10px',
                   borderRadius: '8px',
                   border: active
-                    ? `1px solid ${secondaryColor}`
+                    ? `1px solid #12b886`
                     : '1px solid #e9ecef',
                   backgroundColor: active ? '#e6fcf5' : '#fff',
                   marginBottom: 6,
@@ -1372,7 +1937,7 @@ const InvoiceWorkingArea = ({
                     border: active
                       ? 'none'
                       : '1px solid rgba(0,0,0,0.15)',
-                    backgroundColor: active ? secondaryColor : '#fff',
+                    backgroundColor: active ? '#12b886' : '#fff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1399,7 +1964,7 @@ const InvoiceWorkingArea = ({
           <h5
             style={{
               margin: '0 0 8px 0',
-              color: primaryColor,
+              color: '#0b7285',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -1439,6 +2004,18 @@ const InvoiceWorkingArea = ({
                 - {formatCurrency(orderSummary.totalDiscount)}
               </strong>
             </div>
+
+            {/* ✅ HIỂN THỊ PHÍ VẬN CHUYỂN */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: '2px 0',
+              }}
+            >
+              <span>Phí vận chuyển:</span>
+              <strong>{formatCurrency(Number(orderDetail?.phiVanChuyen || 0))}</strong>
+            </div>
           </div>
 
           <div
@@ -1454,7 +2031,7 @@ const InvoiceWorkingArea = ({
             </span>
             <strong
               style={{
-                color: primaryColor,
+                color: '#0b7285',
                 fontSize: '1.25rem',
               }}
             >
@@ -1507,7 +2084,7 @@ const InvoiceWorkingArea = ({
                 }}
               >
                 <span>Tiền trả lại:</span>
-                <strong style={{ color: secondaryColor }}>
+                <strong style={{ color: '#12b886' }}>
                   {formatCurrency(orderSummary.change)}
                 </strong>
               </div>
@@ -1523,7 +2100,7 @@ const InvoiceWorkingArea = ({
               padding: '10px',
               fontSize: '0.95rem',
               marginTop: 8,
-              backgroundColor: isPayDisabled ? '#a5d8a5' : secondaryColor,
+              backgroundColor: isPayDisabled ? '#a5d8a5' : '#12b886',
               cursor: isPayDisabled ? 'not-allowed' : 'pointer',
             }}
           >
@@ -1533,7 +2110,6 @@ const InvoiceWorkingArea = ({
       </div>
 
       {/* MODALS */}
-
       {showQrScanner && (
         <QrScannerModal
           onScan={handleScanQr}
@@ -1548,8 +2124,6 @@ const InvoiceWorkingArea = ({
           formatCurrency={formatCurrency}
         />
       )}
-
-
 
       {showVoucherSelector && (
         <VoucherSelector
@@ -1605,6 +2179,13 @@ const InvoiceWorkingArea = ({
           paymentMethod={invoice.paymentMethod}
           customerCash={invoice.customerCash}
           formatCurrency={formatCurrency}
+
+          // ✅ truyền phí vận chuyển để modal hiển thị
+          shippingFee={Number(orderDetail?.phiVanChuyen || 0)}
+
+          // ✅ FIX: truyền flag giao hàng để modal hiển thị đúng
+          isDelivery={giaoHang}
+
           onClose={() => setShowConfirmation(false)}
           onConfirm={handleConfirmPayment}
         />

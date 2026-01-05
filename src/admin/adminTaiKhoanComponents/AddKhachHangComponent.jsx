@@ -3,13 +3,13 @@ import { Form, Input, DatePicker, Radio, Button, Select, Row, Col, message, Uplo
 import { PlusOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import userService from '../../service/userService';
+import { getGHNProvinces, getGHNDistricts, getGHNWards } from '../../service/ghnApi';
 
 const { Option } = Select;
 
 const removeAccents = (str) => {
-  return str
+  return String(str || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
@@ -19,12 +19,15 @@ const removeAccents = (str) => {
 const AddKhachHangComponent = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
+
   const [provinces, setProvinces] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [wards, setWards] = useState([]);
+
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
+
   const [fileList, setFileList] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -32,10 +35,10 @@ const AddKhachHangComponent = () => {
     const fetchProvinces = async () => {
       setLoadingProvinces(true);
       try {
-        const response = await axios.get('https://provinces.open-api.vn/api/p/');
-        setProvinces(response.data);
+        const list = await getGHNProvinces();
+        setProvinces(list);
       } catch (error) {
-        message.error('Không thể tải danh sách tỉnh/thành phố!');
+        message.error('Không thể tải danh sách tỉnh/thành phố (GHN)!');
       } finally {
         setLoadingProvinces(false);
       }
@@ -47,48 +50,48 @@ const AddKhachHangComponent = () => {
     form.setFieldsValue({ quocGia: 'Việt Nam' });
   }, [form]);
 
-  const handleProvinceChange = async (provinceCode) => {
+  const filterOption = (input, option) => {
+    const inputValue = removeAccents(input.toLowerCase());
+    const optionValue = removeAccents((option?.children || '').toLowerCase());
+    return optionValue.includes(inputValue);
+  };
+
+  const handleProvinceChange = async (provinceId) => {
     setLoadingDistricts(true);
     try {
-      const response = await axios.get(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-      setDistricts(response.data.districts || []);
+      const list = await getGHNDistricts(provinceId);
+      setDistricts(list);
       setWards([]);
       form.setFieldsValue({ quanHuyen: undefined, phuongXa: undefined });
     } catch (error) {
-      message.error('Không thể tải danh sách quận/huyện!');
+      message.error('Không thể tải danh sách quận/huyện (GHN)!');
     } finally {
       setLoadingDistricts(false);
     }
   };
 
-  const handleDistrictChange = async (districtCode) => {
+  const handleDistrictChange = async (districtId) => {
     setLoadingWards(true);
     try {
-      const response = await axios.get(`https://provinces.open-api.vn/api/d/${districtCode}?depth=2`);
-      setWards(response.data.wards || []);
+      const list = await getGHNWards(districtId);
+      setWards(list);
       form.setFieldsValue({ phuongXa: undefined });
     } catch (error) {
-      message.error('Không thể tải danh sách phường/xã!');
+      message.error('Không thể tải danh sách phường/xã (GHN)!');
     } finally {
       setLoadingWards(false);
     }
   };
 
-  const filterOption = (input, option) => {
-    const inputValue = removeAccents(input.toLowerCase());
-    const optionValue = removeAccents(option.children.toLowerCase());
-    return optionValue.includes(inputValue);
-  };
-
   const handleSubmit = async (values) => {
     setLoading(true);
     try {
-      const province = provinces.find((p) => p.code === values.tinhThanh);
-      const district = districts.find((d) => d.code === values.quanHuyen);
-      const ward = wards.find((w) => w.code === values.phuongXa);
+      const province = provinces.find((p) => Number(p.ProvinceID) === Number(values.tinhThanh));
+      const district = districts.find((d) => Number(d.DistrictID) === Number(values.quanHuyen));
+      const ward = wards.find((w) => String(w.WardCode) === String(values.phuongXa));
 
       if (!province || !district || !ward) {
-        message.error('Vui lòng chọn đầy đủ thông tin địa chỉ!');
+        message.error('Vui lòng chọn đầy đủ Tỉnh/Huyện/Xã!');
         return;
       }
 
@@ -99,10 +102,17 @@ const AddKhachHangComponent = () => {
         ngaySinh: values.ngaySinh ? values.ngaySinh.format('YYYY-MM-DD') : null,
         gioiTinh: values.gioiTinh,
         quocGia: values.quocGia || 'Việt Nam',
-        tinhThanh: province.name,
-        quanHuyen: district.name,
-        phuongXa: ward.name,
+
+        // ✅ Lưu text để hiển thị
+        tinhThanh: province.ProvinceName,
+        quanHuyen: district.DistrictName,
+        phuongXa: ward.WardName,
         diaChiChiTiet: values.diaChiChiTiet,
+
+        // ✅ Lưu GHN IDs để tính ship / tạo vận đơn
+        provinceId: province.ProvinceID,      // number
+        districtId: district.DistrictID,      // number
+        wardCode: ward.WardCode,              // string
       };
 
       const avatarFile = fileList.length > 0 ? fileList[0].originFileObj : null;
@@ -112,16 +122,14 @@ const AddKhachHangComponent = () => {
       navigate('/admin/khach-hang');
     } catch (error) {
       console.error('Lỗi khi tạo khách hàng:', error);
-      message.error(error.message || 'Không thể tạo khách hàng!');
+      message.error(error?.message || 'Không thể tạo khách hàng!');
     } finally {
       setLoading(false);
     }
   };
 
   const uploadProps = {
-    onRemove: () => {
-      setFileList([]);
-    },
+    onRemove: () => setFileList([]),
     beforeUpload: (file) => {
       const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
       if (!isImage) {
@@ -138,7 +146,7 @@ const AddKhachHangComponent = () => {
         name: file.name,
         status: 'done',
         url: URL.createObjectURL(file),
-        originFileObj: file
+        originFileObj: file,
       }]);
       return false;
     },
@@ -151,6 +159,7 @@ const AddKhachHangComponent = () => {
   return (
     <div style={{ padding: 24 }}>
       <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Thêm khách hàng mới</h2>
+
       <Form
         form={form}
         onFinish={handleSubmit}
@@ -179,6 +188,7 @@ const AddKhachHangComponent = () => {
               </Upload>
             </Form.Item>
           </Col>
+
           <Col span={20}>
             <Form.Item
               name="ten"
@@ -200,40 +210,23 @@ const AddKhachHangComponent = () => {
                     { required: true, message: 'Vui lòng chọn Ngày sinh!' },
                     {
                       validator: (_, value) => {
-                        if (!value || !value.isValid?.()) {
-                          return Promise.reject('Vui lòng chọn ngày hợp lệ!');
-                        }
-
+                        if (!value || !value.isValid?.()) return Promise.reject('Vui lòng chọn ngày hợp lệ!');
                         const today = moment().startOf('day');
                         const birthday = value.clone().startOf('day');
-
-                        if (birthday.isAfter(today)) {
-                          return Promise.reject('Ngày sinh không được lớn hơn ngày hiện tại!');
-                        }
-
+                        if (birthday.isAfter(today)) return Promise.reject('Ngày sinh không được lớn hơn ngày hiện tại!');
                         const eighteenYearsAgo = today.clone().subtract(18, 'years');
-                        if (birthday.isAfter(eighteenYearsAgo)) {
-                          return Promise.reject('Khách hàng phải từ 18 tuổi trở lên!');
-                        }
-
+                        if (birthday.isAfter(eighteenYearsAgo)) return Promise.reject('Khách hàng phải từ 18 tuổi trở lên!');
                         const oneHundredYearsAgo = today.clone().subtract(100, 'years');
-                        if (birthday.isBefore(oneHundredYearsAgo)) {
-                          return Promise.reject('Tuổi không được quá 100!');
-                        }
-
+                        if (birthday.isBefore(oneHundredYearsAgo)) return Promise.reject('Tuổi không được quá 100!');
                         return Promise.resolve();
                       },
                     },
                   ]}
                 >
-                  <DatePicker
-                    format="DD/MM/YYYY"
-                    style={{ width: '100%' }}
-                    placeholder="Ngày sinh"
-                    disabled={loading}
-                  />
+                  <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} placeholder="Ngày sinh" disabled={loading} />
                 </Form.Item>
               </Col>
+
               <Col span={12}>
                 <Form.Item
                   name="gioiTinh"
@@ -255,15 +248,13 @@ const AddKhachHangComponent = () => {
                   label="Số điện thoại"
                   rules={[
                     { required: true, message: 'Vui lòng nhập SĐT!' },
-                    {
-                      pattern: /^0\d{9}$/,
-                      message: 'SĐT phải bắt đầu bằng 0 và gồm 10 chữ số!',
-                    },
+                    { pattern: /^0\d{9}$/, message: 'SĐT phải bắt đầu bằng 0 và gồm 10 chữ số!' },
                   ]}
                 >
                   <Input placeholder="Số điện thoại" disabled={loading} />
                 </Form.Item>
               </Col>
+
               <Col span={12}>
                 <Form.Item
                   name="email"
@@ -278,11 +269,7 @@ const AddKhachHangComponent = () => {
               </Col>
             </Row>
 
-            <Form.Item
-              name="quocGia"
-              label="Quốc gia"
-              initialValue="Việt Nam"
-            >
+            <Form.Item name="quocGia" label="Quốc gia" initialValue="Việt Nam">
               <Input value="Việt Nam" disabled />
             </Form.Item>
 
@@ -309,14 +296,15 @@ const AddKhachHangComponent = () => {
                     loading={loadingProvinces}
                     disabled={loading}
                   >
-                    {provinces.map((province) => (
-                      <Option key={province.code} value={province.code}>
-                        {province.name}
+                    {provinces.map((p) => (
+                      <Option key={p.ProvinceID} value={p.ProvinceID}>
+                        {p.ProvinceName}
                       </Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
+
               <Col span={8}>
                 <Form.Item
                   name="quanHuyen"
@@ -331,14 +319,15 @@ const AddKhachHangComponent = () => {
                     filterOption={filterOption}
                     loading={loadingDistricts}
                   >
-                    {districts.map((district) => (
-                      <Option key={district.code} value={district.code}>
-                        {district.name}
+                    {districts.map((d) => (
+                      <Option key={d.DistrictID} value={d.DistrictID}>
+                        {d.DistrictName}
                       </Option>
                     ))}
                   </Select>
                 </Form.Item>
               </Col>
+
               <Col span={8}>
                 <Form.Item
                   name="phuongXa"
@@ -352,9 +341,9 @@ const AddKhachHangComponent = () => {
                     filterOption={filterOption}
                     loading={loadingWards}
                   >
-                    {wards.map((ward) => (
-                      <Option key={ward.code} value={ward.code}>
-                        {ward.name}
+                    {wards.map((w) => (
+                      <Option key={w.WardCode} value={w.WardCode}>
+                        {w.WardName}
                       </Option>
                     ))}
                   </Select>
@@ -363,20 +352,10 @@ const AddKhachHangComponent = () => {
             </Row>
 
             <Form.Item style={{ textAlign: 'center' }}>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{ minWidth: 120 }}
-                loading={loading}
-                disabled={loading}
-              >
+              <Button type="primary" htmlType="submit" style={{ minWidth: 120 }} loading={loading} disabled={loading}>
                 Xác nhận
               </Button>
-              <Button
-                onClick={() => navigate('/admin/khach-hang')}
-                style={{ marginLeft: 8 }}
-                disabled={loading}
-              >
+              <Button onClick={() => navigate('/admin/khach-hang')} style={{ marginLeft: 8 }} disabled={loading}>
                 Hủy
               </Button>
             </Form.Item>

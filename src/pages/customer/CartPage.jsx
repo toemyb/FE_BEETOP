@@ -131,8 +131,8 @@ const CartPage = () => {
         try {
             const response = await axios.get(urlShippingFee, {
                 params: {
-                    insurance_value: "",
-                    coupon: "",
+                    insurance_value: "",        // ← Thêm lại dòng này
+                    coupon: "",                 // ← Thêm lại dòng này
                     service_type_id: SHOP_CONFIG.service_type_id,
                     from_district_id: SHOP_CONFIG.from_district_id,
                     from_ward_code: SHOP_CONFIG.from_ward_code,
@@ -140,7 +140,7 @@ const CartPage = () => {
                     to_ward_code: String(toWardCode),
                     height: 50,
                     length: 20,
-                    weight: 200,
+                    weight: 200,                // ← Đảm bảo là 200 (không phải 1000 hay khác)
                     width: 20,
                 },
                 headers: {
@@ -970,7 +970,7 @@ const CartPage = () => {
                 if (selectedDiscount.giaTriMin && totalAmount < selectedDiscount.giaTriMin) {
                     // Không đủ điều kiện, không áp dụng giảm giá
                     setAppliedDiscount(0);
-                    const actualShippingFee = totalAmount >= 5000000 ? 0 : shippingFee;
+                    const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
                     setFinalTotal(totalAmount + actualShippingFee);
                     return;
                 }
@@ -991,12 +991,12 @@ const CartPage = () => {
             setAppliedDiscount(discountValue);
             const totalAfterDiscount = totalAmount - discountValue;
             // Kiểm tra free ship: nếu tổng tiền sau giảm giá >= 5 triệu thì free ship
-            const actualShippingFee = totalAfterDiscount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(Math.max(totalAfterDiscount + actualShippingFee, 0));
         } else {
             setAppliedDiscount(0);
             // Kiểm tra free ship: nếu tổng tiền >= 5 triệu thì free ship
-            const actualShippingFee = totalAmount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(totalAmount + actualShippingFee);
         }
     }, [totalAmount, selectedDiscount, shippingFee]);
@@ -1167,21 +1167,33 @@ const CartPage = () => {
         try {
             setAddressLoading(true);
 
+            const p = provinces.find(x => Number(x.ProvinceID) === Number(editAddressForm.provinceId));
+            const d = districts.find(x => Number(x.DistrictID) === Number(editAddressForm.districtId));
+            const w = wards.find(x => String(x.WardCode) === String(editAddressForm.wardCode));
+
             const addressData = {
+                quocGia: "Việt Nam",
+
                 hoTen: editAddressForm.name.trim(),
                 soDienThoai: editAddressForm.phone.trim(),
                 diaChiChiTiet: editAddressForm.address.trim(),
-                tinhThanh: editAddressForm.provinceId,
-                quanHuyen: editAddressForm.districtId,
-                phuongXa: editAddressForm.wardCode,
+
+                tinhThanh: p?.ProvinceName || "",
+                quanHuyen: d?.DistrictName || "",
+                phuongXa: w?.WardName || "",
+
+                provinceId: Number(editAddressForm.provinceId),
+                districtId: Number(editAddressForm.districtId),
+                wardCode: String(editAddressForm.wardCode),
             };
+
 
 
             await updateAddress(editingAddressId, addressData);
             message.success("Cập nhật địa chỉ thành công!");
 
-          const customerId =
-  localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+            const customerId =
+                localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
             const updated = await getAllAddress(customerId);
             const raw = Array.isArray(updated) ? updated : updated?.data || [];
 
@@ -1428,16 +1440,27 @@ const CartPage = () => {
                 try {
                     setAddressLoading(true);
 
+                    const p = provinces.find(x => Number(x.ProvinceID) === Number(newAddressForm.provinceId));
+                    const d = districts.find(x => Number(x.DistrictID) === Number(newAddressForm.districtId));
+                    const w = wards.find(x => String(x.WardCode) === String(newAddressForm.wardCode));
+
                     const addressData = {
+                        idTaiKhoan: localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan"),
+                        quocGia: "Việt Nam",
+
                         hoTen: newAddressForm.name.trim(),
                         soDienThoai: newAddressForm.phone.trim(),
                         diaChiChiTiet: newAddressForm.address.trim(),
-                        tinhThanh: newAddressForm.provinceId,
-                        quanHuyen: newAddressForm.districtId,
-                        phuongXa: newAddressForm.wardCode,
-                        idTaiKhoan:
-                            localStorage.getItem("customerId") ||
-                            sessionStorage.getItem("idTaiKhoan")
+
+                        // ✅ tên (để DB không null)
+                        tinhThanh: p?.ProvinceName || "",
+                        quanHuyen: d?.DistrictName || "",
+                        phuongXa: w?.WardName || "",
+
+                        // ✅ ID GHN
+                        provinceId: Number(newAddressForm.provinceId),
+                        districtId: Number(newAddressForm.districtId),
+                        wardCode: String(newAddressForm.wardCode),
                     };
 
                     console.log("💾 Dữ liệu địa chỉ sẽ gửi lên:", addressData);
@@ -1873,7 +1896,7 @@ const CartPage = () => {
 
             // Tính phí ship thực tế (có thể free ship nếu >= 5tr)
             const totalAfterDiscount = totalAmount - appliedDiscount;
-            const actualShippingFee = totalAfterDiscount >= 5000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAfterDiscount >= 15000000 ? 0 : shippingFee;
 
             // Lấy voucher ID từ selectedDiscount
             let voucherId = null;
@@ -2797,7 +2820,7 @@ const CartPage = () => {
                                         ) : (
                                             (() => {
                                                 const totalAfterDiscount = totalAmount - appliedDiscount;
-                                                const isFreeShip = totalAfterDiscount >= 5000000;
+                                                const isFreeShip = totalAfterDiscount >= 15000000;
                                                 return isFreeShip ? (
                                                     <span style={{ color: '#52c41a', fontWeight: '600' }}>Miễn phí</span>
                                                 ) : (

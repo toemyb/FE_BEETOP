@@ -117,7 +117,7 @@ const HomePage = () => {
             </section>
 
             {/* ======= CATEGORY SECTION ======= */}
-            <section className="category-section">
+            {/* <section className="category-section">
                 <div className="section-container">
                     <h2 className="section-title">
                         <span className="title-icon">📱</span>
@@ -134,7 +134,7 @@ const HomePage = () => {
                         ))}
                     </div>
                 </div>
-            </section>
+            </section> */}
 
             {/* ======= THƯƠNG HIỆU ======= */}
             <section className="brand-section">

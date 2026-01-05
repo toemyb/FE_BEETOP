@@ -15,7 +15,7 @@ import {
   filterAvailableProducts,
 } from "../../service/LapTopService";
 import { getCartItems } from "../../service/CartCustomerService";
-
+import logo from "../../img/BeeTop.png"
 const BRAND_LOGOS = {
   HP: "https://upload.wikimedia.org/wikipedia/commons/a/ad/HP_logo_2012.svg",
   Dell: "https://upload.wikimedia.org/wikipedia/commons/4/48/Dell_Logo.svg",
@@ -217,15 +217,14 @@ const Header = () => {
   return (
     <header className="header-wrapper">
       <div className="header-top">
-        <img src="https://ttcenter.com.vn/images/header/1.svg" alt="" />
         <img src="https://ttcenter.com.vn/images/header/2.svg" alt="" />
         <img src="https://ttcenter.com.vn/images/header/3.svg" alt="" />
       </div>
 
       <div className="header-main">
-        <Link to="/" className="header-logo">
-          <img src="https://ttcenter.com.vn/images/logo.svg" alt="Logo" />
-        </Link>
+  <Link to="/" className="header-logo">
+    <img src={logo} alt="Logo" />
+  </Link>
 
         <div
           className="category-container"

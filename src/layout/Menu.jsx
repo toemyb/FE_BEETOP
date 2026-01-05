@@ -99,7 +99,7 @@ const AppSider = ({ collapsed, user }) => {
     {
       key: 'trahang',
       icon: <RollbackOutlined />,
-      label: <Link to="/admin/tra-hang">Trả Hàng</Link>,
+      label: <Link to="/admin/tra-hang">Bảo hành</Link>,
       disabled: !['ADMIN', 'NHAN_VIEN'].includes(user?.role),
     },
     {

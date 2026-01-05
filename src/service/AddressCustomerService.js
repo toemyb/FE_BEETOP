@@ -1,67 +1,32 @@
-import axios from "axios";
+import api from "./api";
 
-const BASEURL = 'http://localhost:8080';
-const REST_API_URL = '/api/v1/laptops/address';
-
-// Lấy tất cả địa chỉ của khách hàng
+// Lấy tất cả địa chỉ của khách hàng (customer endpoint)
 export const getAllAddress = async (customerId) => {
-    try {
-        const response = await axios.get(`${BASEURL}/api/v1/laptops/get-all-address/${customerId}`);
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi lấy danh sách địa chỉ:", error);
-        throw error;
-    }
+  const res = await api.get(`/api/v1/laptops/get-all-address/${customerId}`);
+  // tuỳ BE trả thẳng list hay bọc data
+  return res.data?.data ?? res.data ?? [];
 };
 
 // Thêm địa chỉ mới
 export const addAddress = async (address) => {
-    try {
-        const response = await axios.post(`${BASEURL}${REST_API_URL}/add`, address, {
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi thêm địa chỉ:", error);
-        throw error;
-    }
+  const res = await api.post(`/api/v1/laptops/address/add`, address);
+  return res.data?.data ?? res.data;
 };
 
 // Cập nhật địa chỉ
 export const updateAddress = async (id, address) => {
-    try {
-        const response = await axios.put(`${BASEURL}${REST_API_URL}/update/${id}`, address, {
-            headers: {
-                "Content-Type": "application/json"
-            }
-        });
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi cập nhật địa chỉ:", error);
-        throw error;
-    }
+  const res = await api.put(`/api/v1/laptops/address/update/${id}`, address);
+  return res.data?.data ?? res.data;
 };
 
 // Đặt địa chỉ mặc định
 export const setDefaultAddress = async (id) => {
-    try {
-        const response = await axios.put(`${BASEURL}${REST_API_URL}/set-default/${id}`, {});
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi đặt địa chỉ mặc định:", error);
-        throw error;
-    }
+  const res = await api.put(`/api/v1/laptops/address/set-default/${id}`, {});
+  return res.data?.data ?? res.data;
 };
 
 // Xóa địa chỉ
 export const deleteAddress = async (id) => {
-    try {
-        const response = await axios.delete(`${BASEURL}${REST_API_URL}/delete/${id}`);
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi xóa địa chỉ:", error);
-        throw error;
-    }
+  const res = await api.delete(`/api/v1/laptops/address/delete/${id}`);
+  return res.data?.data ?? res.data;
 };

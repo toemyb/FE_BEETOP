@@ -49,14 +49,14 @@ const formatDateTime = (value) => {
   return `${time} ${date}`;
 };
 
-// POS (tại quầy) - ví dụ của bạn
+// POS (tại quầy) - ✅ FIX: đúng yêu cầu "Tạo đơn / Hoàn tất / Hủy"
 const ORDER_STATUS_MAP = {
-  1: { text: "Đang chuẩn bị hàng", color: "blue" },
+  1: { text: "Tạo đơn", color: "gold" },
   2: { text: "Hoàn thành", color: "green" },
   3: { text: "Đã hủy", color: "red" },
 };
 
-// ONLINE (khớp 1..7)
+// ONLINE/GIAO_HANG (khớp 1..7)
 const ORDER_STATUS_ONLINE_MAP = {
   1: { text: "Chờ xác nhận", color: "gold" },
   2: { text: "Đã xác nhận", color: "cyan" },
@@ -70,11 +70,13 @@ const ORDER_STATUS_ONLINE_MAP = {
 const ORDER_TYPE_MAP = {
   TAI_QUAY: "Bán tại quầy",
   ONLINE: "Đơn hàng online",
+  GIAO_HANG: "Đơn giao hàng",
 };
 
 // === normalize loaiDon từ DB (VD: "Đơn hàng Online") ===
 const normalizeLoaiDon = (loaiDon) => {
   const raw = (loaiDon || "").toString().toLowerCase();
+  if (raw.includes("giao_hang") || raw.includes("giao hàng") || raw.includes("delivery")) return "GIAO_HANG"; // ✅ ADD
   if (raw.includes("online")) return "ONLINE";
   if (raw.includes("quầy") || raw.includes("tai_quay") || raw.includes("pos")) return "TAI_QUAY";
   return loaiDon || "";
@@ -83,13 +85,14 @@ const normalizeLoaiDon = (loaiDon) => {
 const getLoaiDonText = (loaiDon) => {
   const t = normalizeLoaiDon(loaiDon);
   if (t === "ONLINE") return "Đơn hàng online";
+  if (t === "GIAO_HANG") return "Đơn giao hàng";
   if (t === "TAI_QUAY") return "Bán tại quầy";
   return loaiDon || "-";
 };
 
 const getOrderStatusInfo = (order) => {
   const t = normalizeLoaiDon(order?.loaiDon);
-  if (t === "ONLINE") {
+  if (t === "ONLINE" || t === "GIAO_HANG") {
     return ORDER_STATUS_ONLINE_MAP[order?.trangThai] || { text: "Không xác định", color: "default" };
   }
   return ORDER_STATUS_MAP[order?.trangThai] || { text: "Không xác định", color: "default" };
@@ -106,7 +109,7 @@ const STEP_DESC_BY_STATUS = {
   7: "Đơn hàng đã bị hủy.",
 };
 
-// ✅ title log theo BE (đã đổi: status 1 = "Chờ xác nhận")
+// ✅ title log theo BE
 const LOG_TITLE_BY_CODE = {
   1: "Chờ xác nhận",
   2: "Đã xác nhận",
@@ -117,6 +120,12 @@ const LOG_TITLE_BY_CODE = {
   7: "Hủy đơn",
 };
 
+const STEP_DESC_POS = {
+  1: "Đơn hàng tại quầy đã được tạo.",
+  2: "Đơn hàng tại quầy đã hoàn tất.",
+  3: "Đơn hàng tại quầy đã bị hủy.",
+};
+
 const getStepVisual = (state) => {
   // state: DONE | CURRENT | UPCOMING | CANCELLED
   if (state === "DONE") return { color: "green", dot: <CheckCircleFilled /> };
@@ -125,9 +134,13 @@ const getStepVisual = (state) => {
   return { color: "gray", dot: <MinusCircleOutlined /> };
 };
 
-const getProcessingTag = (status) => {
-  if (status === 6) return <Tag color="green">Đã hoàn thành</Tag>;
-  if (status === 7) return <Tag color="red">Đã hủy</Tag>;
+// ✅ FIX: trạng thái final khác nhau theo loại đơn
+const getProcessingTag = (typeNorm, status) => {
+  const doneCode = typeNorm === "TAI_QUAY" ? 2 : 6;
+  const cancelCode = typeNorm === "TAI_QUAY" ? 3 : 7;
+
+  if (status === doneCode) return <Tag color="green">Đã hoàn thành</Tag>;
+  if (status === cancelCode) return <Tag color="red">Đã hủy</Tag>;
   return <Tag color="blue">Đang xử lý</Tag>;
 };
 
@@ -178,7 +191,9 @@ const OrderDetailComponent = () => {
   }, [id]);
 
   // ===== derived hooks =====
-  const isOnline = normalizeLoaiDon(order?.loaiDon) === "ONLINE";
+  const typeNorm = useMemo(() => normalizeLoaiDon(order?.loaiDon), [order?.loaiDon]);
+  const isOnlineLike = typeNorm === "ONLINE" || typeNorm === "GIAO_HANG"; // ✅ ADD
+  const isPos = typeNorm === "TAI_QUAY";
 
   const mustPay = useMemo(() => Number(order?.tongTienThuHo || 0), [order?.tongTienThuHo]);
 
@@ -206,39 +221,34 @@ const OrderDetailComponent = () => {
     return Number(st);
   }, [timeline?.trangThai, order?.trangThai]);
 
-  // ✅ label “Xác nhận hoàn thành đơn hàng”
+  // ✅ FIX: final code theo loại đơn
+  const doneCode = useMemo(() => (isPos ? 2 : 6), [isPos]);
+  const cancelCode = useMemo(() => (isPos ? 3 : 7), [isPos]);
+  const isFinal = useMemo(() => currentStatus === doneCode || currentStatus === cancelCode, [currentStatus, doneCode, cancelCode]);
+
+  // ✅ FIX: nextStatus dựa theo steps trả về từ BE (không hardcode)
   const nextStatus = useMemo(() => {
-    switch (currentStatus) {
-      case 1:
-        return { code: 2, label: "Xác nhận đơn hàng" };
-      case 2:
-        return { code: 3, label: "Chuyển sang chuẩn bị hàng" };
-      case 3:
-        return { code: 4, label: "Chuyển sang chuẩn bị giao hàng" };
-      case 4:
-        return { code: 5, label: "Chuyển sang đang giao hàng" };
-      case 5:
-        return { code: 6, label: "Xác nhận hoàn thành đơn hàng" };
-      default:
-        return null;
+    const steps = timeline?.steps || [];
+    if (!steps.length) return null;
+
+    const idx = steps.findIndex((s) => s.state === "CURRENT");
+    if (idx === -1) return null;
+
+    for (let i = idx + 1; i < steps.length; i++) {
+      if (steps[i]?.state === "UPCOMING") {
+        const code = Number(steps[i].code);
+        if (Number.isNaN(code)) return null;
+
+        // giữ label như bạn đang dùng (tối thiểu)
+        if (isPos && code === 2) return { code, label: "Xác nhận hoàn thành đơn hàng" };
+        return { code, label: "Chuyển bước tiếp theo" };
+      }
     }
-  }, [currentStatus]);
+    return null;
+  }, [timeline?.steps, isPos]);
 
-  const canCancel = useMemo(() => isOnline && currentStatus !== 6 && currentStatus !== 7, [isOnline, currentStatus]);
-
-  // ✅ bỏ “Tạo đơn” -> chỉ còn 6 bước (1..6)
-  const timelineTotalSteps = 6;
-
-  const completedSteps = useMemo(() => {
-    if (!isOnline) return 0;
-    if (currentStatus === 7) return 1; // hủy: coi như đạt bước 1 tối thiểu
-    return Math.min(timelineTotalSteps, Math.max(1, currentStatus));
-  }, [isOnline, currentStatus]);
-
-  const timelinePercent = useMemo(() => {
-    if (!isOnline) return 0;
-    return Math.round((completedSteps * 100) / timelineTotalSteps);
-  }, [isOnline, completedSteps]);
+  // ✅ FIX: canCancel cho cả POS & ONLINE/GIAO_HANG
+  const canCancel = useMemo(() => !isFinal, [isFinal]);
 
   // ===== Actions =====
   const handleUpdateStatus = async (newStatus, note) => {
@@ -256,11 +266,14 @@ const OrderDetailComponent = () => {
 
   const confirmNext = () => {
     if (!nextStatus) return;
+
+    const statusMap = isPos ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
+
     Modal.confirm({
       title: "Xác nhận cập nhật trạng thái?",
       content: (
         <div>
-          Bạn muốn chuyển trạng thái sang: <b>{ORDER_STATUS_ONLINE_MAP[nextStatus.code]?.text || nextStatus.code}</b>
+          Bạn muốn chuyển trạng thái sang: <b>{statusMap[nextStatus.code]?.text || nextStatus.code}</b>
           <div style={{ marginTop: 6, color: "#64748b" }}>Hành động này sẽ được ghi log lịch sử đơn hàng.</div>
         </div>
       ),
@@ -273,11 +286,11 @@ const OrderDetailComponent = () => {
   const confirmCancel = () => {
     Modal.confirm({
       title: "Xác nhận hủy đơn hàng?",
-      content: "Sau khi hủy, đơn online sẽ không thể tiếp tục luồng xử lý.",
+      content: isPos ? "Sau khi hủy, đơn tại quầy sẽ không thể hoàn tất." : "Sau khi hủy, đơn sẽ không thể tiếp tục luồng xử lý.",
       okText: "Hủy đơn",
       okButtonProps: { danger: true },
       cancelText: "Không",
-      onOk: () => handleUpdateStatus(7, "Hủy bởi nhân viên"),
+      onOk: () => handleUpdateStatus(cancelCode, "Hủy bởi nhân viên"),
     });
   };
 
@@ -304,11 +317,12 @@ const OrderDetailComponent = () => {
 
   // ===== Render timeline =====
   const renderTimeline = () => {
-    if (!isOnline) {
+    // ✅ FIX: áp dụng cho ONLINE + GIAO_HANG + TAI_QUAY
+    if (!isOnlineLike && !isPos) {
       return (
         <Card size="small" style={{ borderRadius: 12, borderColor: "#edf2ff" }}>
           <Text type="secondary">
-            Timeline hiện chỉ áp dụng cho <b>đơn ONLINE</b>.
+            Timeline hiện chỉ áp dụng cho <b>đơn ONLINE / GIAO_HÀNG / TẠI QUẦY</b>.
           </Text>
         </Card>
       );
@@ -316,6 +330,13 @@ const OrderDetailComponent = () => {
 
     const steps = timeline?.steps || [];
     const logs = timeline?.logs || [];
+
+    // ✅ GIAO_HANG: bước 1-2 chỉ hiển thị (coi như DONE) khi đơn đã từ bước 3 trở đi
+const getEffectiveState = (step) => {
+  const codeNum = Number(step?.code);
+  if (typeNorm === "GIAO_HANG" && currentStatus >= 3 && codeNum <= 2) return "DONE";
+  return step?.state;
+};
 
     if (loadingTimeline && !timeline) {
       return (
@@ -325,23 +346,28 @@ const OrderDetailComponent = () => {
       );
     }
 
-    // ✅ Với yêu cầu “1 đơn chỉ có 1 actionlog”:
-    // - chỉ step hiện tại mới có time/by
-    // - các step khác để "-"
-    const findLogByCode = (code) => {
-      if (!Array.isArray(logs) || logs.length === 0) return null;
+  const findLogByStepTitle = (stepTitle) => {
+  if (!Array.isArray(logs) || logs.length === 0) return null;
 
-      // Nếu chỉ có 1 log -> gán cho step currentStatus
-      if (logs.length === 1) {
-        return code === currentStatus ? logs[0] : null;
-      }
+  const expected = (stepTitle || "").trim();
+  if (!expected) return null;
 
-      // fallback (nếu sau này bạn cho nhiều log)
-      const expectedTitle = LOG_TITLE_BY_CODE[code];
-      if (!expectedTitle) return null;
-      const hit = logs.find((l) => (l?.title || "").trim() === expectedTitle);
-      return hit || null;
-    };
+  for (let i = logs.length - 1; i >= 0; i--) {
+    const t = (logs[i]?.title || "").trim();
+    if (t === expected) return logs[i];
+  }
+  return null;
+};
+
+    // ✅ FIX: progress tính động theo steps (loại bỏ cancel step)
+    const nonCancelSteps = steps.filter((s) => Number(s.code) !== cancelCode);
+    const timelineTotalSteps = nonCancelSteps.length || 1;
+    const doneCount = nonCancelSteps.filter((s) => getEffectiveState(s) === "DONE").length;
+const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT") ? 1 : 0;
+    const completedSteps = Math.min(timelineTotalSteps, doneCount + hasCurrent);
+    const timelinePercent = Math.round((completedSteps * 100) / timelineTotalSteps);
+
+    const statusColorMap = isPos ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
 
     return (
       <div>
@@ -357,7 +383,7 @@ const OrderDetailComponent = () => {
               <Text type="secondary">
                 {completedSteps}/{timelineTotalSteps} bước hoàn thành
               </Text>
-              <div style={{ marginTop: 6 }}>{getProcessingTag(currentStatus)}</div>
+              <div style={{ marginTop: 6 }}>{getProcessingTag(typeNorm, currentStatus)}</div>
             </div>
           </div>
 
@@ -368,47 +394,62 @@ const OrderDetailComponent = () => {
           <Divider style={{ margin: "12px 0" }} />
 
           <Timeline mode="left" style={{ marginTop: 6 }}>
-            {/* ✅ bỏ “Tạo đơn hàng” - step đầu là “Chờ xác nhận” */}
             {steps.map((s) => {
-              const visual = getStepVisual(s.state);
-              const isCurrent = s.state === "CURRENT";
-              const isDone = s.state === "DONE";
-              const isUpcoming = s.state === "UPCOMING";
-              const isCancelled = s.state === "CANCELLED";
+  const codeNum = Number(s.code);
 
-              const titlePrefix = isCurrent ? "Hiện tại:" : isDone ? "Đã xong:" : isUpcoming ? "Sắp tới:" : "Trạng thái:";
+  const effectiveState = getEffectiveState(s);
 
-              const matchedLog = findLogByCode(s.code);
-              const timeLabel = matchedLog?.at ? formatDateTime(matchedLog.at) : "-";
+  const visual = getStepVisual(effectiveState);
+  const isCurrent = effectiveState === "CURRENT";
+  const isDone = effectiveState === "DONE";
+  const isUpcoming = effectiveState === "UPCOMING";
+  const isCancelled = effectiveState === "CANCELLED";
 
-              return (
-                <Timeline.Item key={s.code} color={visual.color} dot={visual.dot} label={timeLabel}>
-                  <Card
-                    size="small"
-                    style={{
-                      borderRadius: 12,
-                      borderColor: isCurrent ? "#93c5fd" : isCancelled ? "#fecaca" : "#e5e7eb",
-                      boxShadow: isCurrent ? "0 10px 22px rgba(59,130,246,0.12)" : "0 6px 14px rgba(15,23,42,0.03)",
-                      opacity: isUpcoming ? 0.55 : 1,
-                    }}
-                  >
+  const titlePrefix = isCurrent
+    ? "Hiện tại:"
+    : isDone
+    ? "Đã xong:"
+    : isUpcoming
+    ? "Sắp tới:"
+    : "Trạng thái:";
+
+  const matchedLog = findLogByStepTitle(s.title);
+  const timeLabel = matchedLog?.time ? formatDateTime(matchedLog.time) : "-";
+
+  return (
+    <Timeline.Item key={s.code} color={visual.color} dot={visual.dot} label={timeLabel}>
+      <Card
+        size="small"
+        style={{
+          borderRadius: 12,
+          borderColor: isCurrent ? "#93c5fd" : isCancelled ? "#fecaca" : "#e5e7eb",
+          boxShadow: isCurrent ? "0 10px 22px rgba(59,130,246,0.12)" : "0 6px 14px rgba(15,23,42,0.03)",
+          opacity: isUpcoming ? 0.55 : 1,
+        }}
+      >
                     <Space direction="vertical" size={6} style={{ width: "100%" }}>
                       <Space size={8} wrap>
-                        <Tag color={ORDER_STATUS_ONLINE_MAP[s.code]?.color || "default"}>{s.name}</Tag>
+                        {/* ✅ FIX: DTO steps dùng title, không dùng name */}
+                        <Tag color={statusColorMap[codeNum]?.color || "default"}>{s.title}</Tag>
                         <Text strong>
-                          {titlePrefix} {s.name}
+                          {titlePrefix} {s.title}
                         </Text>
 
-                        {/* ✅ current step: nếu là 6 thì hiện Hoàn tất */}
-                        {isCurrent && s.code === 6 && <Tag color="green">Hoàn tất</Tag>}
-                        {isCurrent && s.code === 7 && <Tag color="red">Đã hủy</Tag>}
-                        {isCurrent && s.code !== 6 && s.code !== 7 && <Tag color="blue">Đang xử lý</Tag>}
+                        {!isPos && (
+                          <>
+                            {isCurrent && codeNum === doneCode && <Tag color="green">Hoàn tất</Tag>}
+                            {isCurrent && codeNum === cancelCode && <Tag color="red">Đã hủy</Tag>}
+                            {isCurrent && codeNum !== doneCode && codeNum !== cancelCode && <Tag color="blue">Đang xử lý</Tag>}
 
-                        {isDone && <Tag color="green">Hoàn tất</Tag>}
-                        {isCancelled && <Tag color="red">Đã hủy</Tag>}
+                            {isDone && <Tag color="green">Hoàn tất</Tag>}
+                            {isCancelled && <Tag color="red">Đã hủy</Tag>}
+                          </>
+                        )}
                       </Space>
 
-                      <Text type="secondary">{STEP_DESC_BY_STATUS[s.code] || "Cập nhật trạng thái đơn hàng."}</Text>
+                      <Text type="secondary">
+                        {(isPos ? STEP_DESC_POS[codeNum] : STEP_DESC_BY_STATUS[codeNum]) || "Cập nhật trạng thái đơn hàng."}
+                      </Text>
 
                       <Text type="secondary">
                         Bởi: <b>{matchedLog?.by || "Hệ thống"}</b>
@@ -423,19 +464,21 @@ const OrderDetailComponent = () => {
           <Divider style={{ margin: "12px 0" }} />
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <Button type="primary" disabled={!nextStatus || currentStatus === 6 || currentStatus === 7} onClick={confirmNext}>
-              {nextStatus?.label || "Xác nhận"}
-            </Button>
+          {!isPos && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <Button type="primary" disabled={!nextStatus || isFinal} onClick={confirmNext}>
+                {nextStatus?.label || "Xác nhận"}
+              </Button>
 
-            <Button danger disabled={!canCancel} onClick={confirmCancel}>
-              Hủy đơn hàng
-            </Button>
-          </div>
+              <Button danger disabled={!canCancel} onClick={confirmCancel}>
+                Hủy đơn hàng
+              </Button>
+            </div>
+          )}
         </Card>
 
         {/* Logs detail */}
-        <Card size="small" title="Lịch sử thay đổi (OrderActionLog)" style={{ marginTop: 16, borderRadius: 12, borderColor: "#edf2ff" }}>
+        <Card size="small" title="Lịch sử thay đổi" style={{ marginTop: 16, borderRadius: 12, borderColor: "#edf2ff" }}>
           {Array.isArray(logs) && logs.length > 0 ? (
             <Timeline>
               {logs.map((l, idx) => (
@@ -452,7 +495,8 @@ const OrderDetailComponent = () => {
                         </Text>
                       </div>
                     </div>
-                    <Text type="secondary">{formatDateTime(l.at)}</Text>
+                    {/* ✅ FIX: time (không phải at) */}
+                    <Text type="secondary">{formatDateTime(l.time)}</Text>
                   </div>
                 </Timeline.Item>
               ))}
@@ -654,13 +698,7 @@ const OrderDetailComponent = () => {
               {renderTimeline()}
             </Tabs.TabPane>
 
-            <Tabs.TabPane tab="Lịch sử thay đổi" key="history">
-              <Card size="small" style={{ borderRadius: 12, borderColor: "#edf2ff" }}>
-                <Text type="secondary">
-                  Bạn có thể xem lịch sử chi tiết ngay trong tab <b>Trạng thái</b> (OrderActionLog).
-                </Text>
-              </Card>
-            </Tabs.TabPane>
+
           </Tabs>
         </Card>
       </div>
