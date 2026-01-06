@@ -47,3 +47,13 @@ export const getThongKeTrangThai = () => {
 export const getThongKeTruyCap = () => {
   return api.get(`${BASE_URL}/truy-cap`);
 };
+
+// Lấy top 10 laptop theo tháng
+export const getTopLaptopTheoThang = (year, month) => {
+  return api.get(`${BASE_URL}/top-laptop/thang`, {
+    params: {
+      year: year,
+      month: month
+    }
+  });
+};
