@@ -1,28 +1,41 @@
+// src/admin/adminDonHangComponents/ListDonHangComponent.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, Input, Button, Tag, Select, DatePicker, Space } from "antd";
+import {
+  Table,
+  Input,
+  Button,
+  Tag,
+  Select,
+  DatePicker,
+  Space,
+  Row,
+  Col,
+  Card,
+  Badge,
+} from "antd";
 import {
   SearchOutlined,
   ReloadOutlined,
   EyeOutlined,
   EditOutlined,
+  FilterOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import dayjs from "dayjs";
 import { searchOrders } from "../../service/OrderManagementService";
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 // ===== helpers =====
 const formatCurrency = (amount) => {
-  if (!amount && amount !== 0) return "0 ₫";
-  const num = Number(amount) || 0;
-  return num.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
+  const n = Number(amount || 0);
+  return n.toLocaleString("vi-VN", { style: "currency", currency: "VND" });
 };
 
 const formatDateTime = (value) => {
-  if (!value) return "";
+  if (!value) return "-";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
+  if (Number.isNaN(d.getTime())) return String(value);
   const time = d.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -36,23 +49,30 @@ const formatDateTime = (value) => {
   return `${time} ${date}`;
 };
 
-// normalize loaiDon (tránh DB lưu kiểu "Đơn hàng Online" / "bán tại quầy" ...)
+// normalize loaiDon từ DB (VD: "Đơn hàng Online", "GIAO_HANG", "Bán tại quầy"...)
 const normalizeLoaiDon = (loaiDon) => {
   const raw = (loaiDon || "").toString().toLowerCase();
+  if (
+    raw.includes("giao_hang") ||
+    raw.includes("giao hàng") ||
+    raw.includes("delivery")
+  )
+    return "GIAO_HANG";
   if (raw.includes("online")) return "ONLINE";
   if (raw.includes("quầy") || raw.includes("tai_quay") || raw.includes("pos"))
     return "TAI_QUAY";
   return loaiDon || "";
 };
 
-// ===== Map loại đơn =====
+// ===== Loại đơn map =====
 const LOAI_DON_MAP = {
   ONLINE: { text: "Đơn hàng online", color: "#228be6", bg: "#e7f5ff" },
   TAI_QUAY: { text: "Bán tại quầy", color: "#12b886", bg: "#e6fcf5" },
+  GIAO_HANG: { text: "Bán giao hàng", color: "#364fc7", bg: "#edf2ff" },
 };
 
-// ===== Map trạng thái theo loại đơn =====
-// ONLINE (1..7) theo convertTrangThaiToTen trong OrderCustomerServiceImpl
+// ===== Status map =====
+// ONLINE / GIAO_HANG (1..7)
 const STATUS_ONLINE_MAP = {
   1: { text: "Chờ xác nhận", color: "#f08c00", bg: "#fff4e6" },
   2: { text: "Đã xác nhận", color: "#15aabf", bg: "#e3fafc" },
@@ -60,115 +80,168 @@ const STATUS_ONLINE_MAP = {
   4: { text: "Chuẩn bị giao hàng", color: "#364fc7", bg: "#edf2ff" },
   5: { text: "Đang giao hàng", color: "#ae3ec9", bg: "#f3f0ff" },
   6: { text: "Hoàn thành", color: "#2f9e44", bg: "#ebfbee" },
-  7: { text: "Hủy đơn", color: "#e03131", bg: "#fff5f5" },
+  7: { text: "Đã hủy", color: "#e03131", bg: "#fff5f5" },
 };
 
-// TẠI QUẦY (1..3) theo OrderDetailComponent map POS của bạn
+// TẠI QUẦY (1..3)
 const STATUS_POS_MAP = {
-  1: { text: "Đang chuẩn bị hàng", color: "#1c7ed6", bg: "#e7f5ff" },
+  1: { text: "Đang xử lý", color: "#1c7ed6", bg: "#e7f5ff" },
   2: { text: "Hoàn thành", color: "#2f9e44", bg: "#ebfbee" },
   3: { text: "Đã hủy", color: "#e03131", bg: "#fff5f5" },
 };
 
-// ===== trạng thái thanh toán (giữ nguyên logic bạn đang dùng) =====
-const TRANG_THAI_TT_MAP = {
+// ===== thanh toán =====
+const PAYMENT_MAP = {
   0: { text: "Chưa thanh toán", color: "#f76707", bg: "#fff4e6" },
   1: { text: "Đã thanh toán", color: "#2f9e44", bg: "#ebfbee" },
 };
 
-// ===== Tabs trạng thái (key chung) =====
+// ===== Tabs trạng thái (giống ảnh) =====
 const ORDER_TABS = [
   { key: "ALL", label: "Tất cả" },
-  { key: "CHO_XAC_NHAN", label: "Chờ xác nhận" }, // online chủ yếu
-  { key: "DANG_XU_LY", label: "Đang xử lý" },     // online(3/4) + pos(1)
-  { key: "DANG_GIAO", label: "Đang giao" },       // online(5)
-  { key: "HOAN_THANH", label: "Hoàn thành" },     // online(6) + pos(2)
-  { key: "DA_HUY", label: "Đã hủy" },             // online(7) + pos(3)
+  { key: "CHO_XAC_NHAN", label: "Chờ xác nhận" },
+  { key: "DANG_XU_LY", label: "Đang xử lý" },
+  { key: "DANG_GIAO", label: "Đang giao" },
+  { key: "HOAN_THANH", label: "Hoàn thành" },
+  { key: "DA_HUY", label: "Đã hủy" },
 ];
 
 const ListDonHangComponent = () => {
+  const navigate = useNavigate();
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const [page, setPage] = useState(1); // antd 1-based
+  const [page, setPage] = useState(1); // antd: 1-based
   const [size, setSize] = useState(10);
   const [totalElements, setTotalElements] = useState(0);
 
+  // ===== Bộ lọc giống ảnh =====
+  const [maDonHang, setMaDonHang] = useState("");
+  const [khachHang, setKhachHang] = useState("");
+  const [activeTabKey, setActiveTabKey] = useState("ALL"); // trạng thái đơn hàng
+  const [orderType, setOrderType] = useState("ALL"); // ALL | ONLINE | TAI_QUAY | GIAO_HANG
+  const [dateRange, setDateRange] = useState([null, null]); // [from, to]
+
+  // toolbar dưới bảng
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState("desc"); // desc = mới nhất trước
-  const [dateRange, setDateRange] = useState(null);
 
-  const [activeTabKey, setActiveTabKey] = useState("ALL");
+  // trigger manual refresh (để tránh setState xong gọi fetch bị sai page)
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // ✅ thêm filter loại đơn
-  const [orderType, setOrderType] = useState("ALL"); // ALL | ONLINE | TAI_QUAY
+  // ===== đếm số filter đang dùng =====
+  const filterCount = useMemo(() => {
+    let c = 0;
+    if (maDonHang?.trim()) c++;
+    if (khachHang?.trim()) c++;
+    if (activeTabKey !== "ALL") c++;
+    if (orderType !== "ALL") c++;
+    if (dateRange?.[0] || dateRange?.[1]) c++;
+    if (searchText?.trim()) c++;
+    return c;
+  }, [maDonHang, khachHang, activeTabKey, orderType, dateRange, searchText]);
 
-  const navigate = useNavigate();
-
-  // ===== map tab -> trangThaiDon theo từng loại đơn =====
+  // ===== Map tab -> status theo loại đơn =====
   const mapTabToStatus = (tabKey, loaiDonNorm) => {
-    // ALL tab => không filter trạng thái
     if (tabKey === "ALL") return null;
 
-    // nếu đang chọn TAI_QUAY
     if (loaiDonNorm === "TAI_QUAY") {
       if (tabKey === "DANG_XU_LY") return 1;
       if (tabKey === "HOAN_THANH") return 2;
       if (tabKey === "DA_HUY") return 3;
-      // các tab không áp dụng cho POS -> null
       return null;
     }
 
-    // ONLINE
-    if (loaiDonNorm === "ONLINE") {
+    if (loaiDonNorm === "ONLINE" || loaiDonNorm === "GIAO_HANG") {
       if (tabKey === "CHO_XAC_NHAN") return 1;
-      if (tabKey === "DANG_XU_LY") return 3; // bạn có thể chọn 3 (chuẩn bị) là “đang xử lý”
+      if (tabKey === "DANG_XU_LY") return 3;
       if (tabKey === "DANG_GIAO") return 5;
       if (tabKey === "HOAN_THANH") return 6;
       if (tabKey === "DA_HUY") return 7;
       return null;
     }
 
-    // nếu orderType = ALL => không gửi trangThaiDon lên BE (vì ONLINE/POS khác thang số)
     return null;
   };
 
+  // ===== build keyword (BE của bạn đang nhận keyword) =====
+  const buildKeyword = () => {
+    const parts = [maDonHang, khachHang, searchText]
+      .map((x) => (x || "").trim())
+      .filter(Boolean);
+    return parts.length ? parts.join(" ") : undefined;
+  };
+
+  // ✅ FIX LỖI BỘ LỌC: gửi đúng trangThaiDon & trangThaiDonForTaiQuay
   const fetchOrders = async () => {
     try {
       setLoading(true);
 
-      const loaiDonNorm = orderType === "ALL" ? null : orderType;
-      const trangThaiDon =
-        loaiDonNorm ? mapTabToStatus(activeTabKey, loaiDonNorm) : null;
+      const loaiDonNorm = orderType === "ALL" ? undefined : orderType;
+
+      let trangThaiDon = undefined; // ONLINE/GIAO_HANG
+      let trangThaiDonForTaiQuay = undefined; // POS (array)
+
+      if (orderType === "TAI_QUAY") {
+        const stPos = mapTabToStatus(activeTabKey, "TAI_QUAY");
+        trangThaiDonForTaiQuay = stPos ? [stPos] : undefined;
+        trangThaiDon = undefined;
+      } else if (orderType === "ONLINE" || orderType === "GIAO_HANG") {
+        trangThaiDon = mapTabToStatus(activeTabKey, orderType) ?? undefined;
+        trangThaiDonForTaiQuay = undefined;
+      } else {
+        // orderType === "ALL" -> lọc mix cả online-like & tại quầy theo tab
+        switch (activeTabKey) {
+          case "CHO_XAC_NHAN":
+            trangThaiDon = 1;
+            trangThaiDonForTaiQuay = undefined; // POS không có
+            break;
+          case "DANG_XU_LY":
+            trangThaiDon = 3;
+            trangThaiDonForTaiQuay = [1];
+            break;
+          case "DANG_GIAO":
+            trangThaiDon = 5;
+            trangThaiDonForTaiQuay = undefined; // POS không có
+            break;
+          case "HOAN_THANH":
+            trangThaiDon = 6;
+            trangThaiDonForTaiQuay = [2];
+            break;
+          case "DA_HUY":
+            trangThaiDon = 7;
+            trangThaiDonForTaiQuay = [3];
+            break;
+          default:
+            trangThaiDon = undefined;
+            trangThaiDonForTaiQuay = undefined;
+        }
+      }
+
+      const from = dateRange?.[0]
+        ? dateRange[0].format("YYYY-MM-DD")
+        : undefined;
+      const to = dateRange?.[1]
+        ? dateRange[1].format("YYYY-MM-DD")
+        : undefined;
 
       const params = {
-        keyword: searchText || undefined,
-        loaiDon: loaiDonNorm || undefined, // ✅ filter loại đơn ở BE
-        trangThaiDon: trangThaiDon ?? undefined, // ✅ chỉ gửi khi đã xác định đúng theo loại
-        trangThaiThanhToan: undefined,
-        fromDate:
-          dateRange && dateRange[0]
-            ? dateRange[0].format("YYYY-MM-DD")
-            : undefined,
-        toDate:
-          dateRange && dateRange[1]
-            ? dateRange[1].format("YYYY-MM-DD")
-            : undefined,
-        page: page - 1, // BE 0-based
+        keyword: buildKeyword(),
+        loaiDon: loaiDonNorm,
+        trangThaiDon,
+        trangThaiDonForTaiQuay,
+        fromDate: from,
+        toDate: to,
+        page: page - 1,
         size,
         sort: `ngayTao,${sortOrder}`,
       };
 
       const pageResult = await searchOrders(params);
 
-      if (!pageResult) {
-        setOrders([]);
-        setTotalElements(0);
-        return;
-      }
-
-      setOrders(pageResult.content || []);
-      setTotalElements(pageResult.totalElements || 0);
+      setOrders(pageResult?.content || []);
+      setTotalElements(pageResult?.totalElements || 0);
     } catch (err) {
       console.error("Lỗi tải danh sách đơn hàng:", err);
     } finally {
@@ -176,72 +249,88 @@ const ListDonHangComponent = () => {
     }
   };
 
+  // auto fetch khi đổi paging/sort/tab/type/date hoặc refreshKey
   useEffect(() => {
     fetchOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, size, sortOrder, activeTabKey, dateRange, orderType]);
+  }, [page, size, sortOrder, activeTabKey, orderType, dateRange, refreshKey]);
+
+  // debounce cho input text (mã đơn, khách, search dưới bảng) để giống ảnh
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setPage(1);
+      setRefreshKey((k) => k + 1);
+    }, 450);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maDonHang, khachHang, searchText]);
 
   const resetFilter = () => {
-    setSearchText("");
-    setDateRange(null);
-    setSortOrder("desc");
+    setMaDonHang("");
+    setKhachHang("");
     setActiveTabKey("ALL");
     setOrderType("ALL");
+    setDateRange([null, null]);
+    setSearchText("");
+    setSortOrder("desc");
+    setPage(1);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const setQuickRange = (mode) => {
+    const now = dayjs();
+    if (mode === "today") {
+      setDateRange([now.startOf("day"), now.endOf("day")]);
+    } else if (mode === "7days") {
+      setDateRange([now.subtract(6, "day").startOf("day"), now.endOf("day")]);
+    } else if (mode === "30days") {
+      setDateRange([now.subtract(29, "day").startOf("day"), now.endOf("day")]);
+    } else if (mode === "month") {
+      setDateRange([now.startOf("month"), now.endOf("month")]);
+    }
     setPage(1);
   };
 
-  const handleSearch = () => {
-    setPage(1);
-    fetchOrders();
+  const renderLoaiDonTag = (value) => {
+    const type = normalizeLoaiDon(value);
+    const conf =
+      LOAI_DON_MAP[type] || { text: value || "Không xác định", color: "#495057", bg: "#f1f3f5" };
+    return (
+      <Tag style={{ borderRadius: 16, padding: "2px 10px", border: "none" }} color={conf.bg}>
+        <span style={{ color: conf.color, fontWeight: 600 }}>{conf.text}</span>
+      </Tag>
+    );
   };
 
-  // ===== hiển thị trạng thái theo loại đơn =====
   const renderOrderStatusTag = (record) => {
     const type = normalizeLoaiDon(record?.loaiDon);
-    const status = Number(record?.trangThaiDon ?? record?.trangThai ?? 0);
+    const status = Number(
+      record?.trangThaiDon ??
+        record?.trangThai ??
+        record?.trangThaiDonHang ??
+        0
+    );
 
     const conf =
       type === "TAI_QUAY"
         ? STATUS_POS_MAP[status]
         : STATUS_ONLINE_MAP[status];
 
-    const view = conf || {
-      text: "Không xác định",
-      color: "#495057",
-      bg: "#f1f3f5",
-    };
+    const view = conf || { text: "Không xác định", color: "#495057", bg: "#f1f3f5" };
 
     return (
-      <Tag
-        style={{
-          borderRadius: 16,
-          padding: "2px 10px",
-          border: "none",
-        }}
-        color={view.bg}
-      >
-        <span style={{ color: view.color, fontWeight: 500 }}>{view.text}</span>
+      <Tag style={{ borderRadius: 16, padding: "2px 10px", border: "none" }} color={view.bg}>
+        <span style={{ color: view.color, fontWeight: 600 }}>{view.text}</span>
       </Tag>
     );
   };
 
-  const renderLoaiDonTag = (value) => {
-    const type = normalizeLoaiDon(value);
-    const conf = LOAI_DON_MAP[type] || {
-      text: value || "Không xác định",
-      color: "#495057",
-      bg: "#f1f3f5",
-    };
+  const renderPaymentTag = (value) => {
+    const conf = PAYMENT_MAP[value] || { text: "Không xác định", color: "#495057", bg: "#f1f3f5" };
     return (
-      <Tag
-        style={{
-          borderRadius: 16,
-          padding: "2px 10px",
-          border: "none",
-        }}
-        color={conf.bg}
-      >
-        <span style={{ color: conf.color, fontWeight: 500 }}>{conf.text}</span>
+      <Tag style={{ borderRadius: 16, padding: "2px 10px", border: "none" }} color={conf.bg}>
+        <span style={{ color: conf.color, fontWeight: 600 }}>{conf.text}</span>
       </Tag>
     );
   };
@@ -259,7 +348,7 @@ const ListDonHangComponent = () => {
       dataIndex: "maDonHang",
       render: (value, record) => (
         <span
-          style={{ color: "#1c7ed6", cursor: "pointer", fontWeight: 500 }}
+          style={{ color: "#1c7ed6", cursor: "pointer", fontWeight: 700 }}
           onClick={() => navigate(`/admin/orders/${record.id}`)}
         >
           {value}
@@ -274,50 +363,38 @@ const ListDonHangComponent = () => {
     {
       title: "Tên khách hàng",
       dataIndex: "tenKhachHang",
-      render: (value) => {
-        const name = value || "Khách vãng lai";
-        const firstChar = name?.charAt(0)?.toUpperCase() || "K";
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                backgroundColor: "#e9ecef",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#495057",
-              }}
-            >
-              {firstChar}
-            </div>
-            <span>{name}</span>
-          </div>
-        );
-      },
+      render: (value) => value || "Khách vãng lai",
     },
-    { title: "Số điện thoại", dataIndex: "sdtKhachHang" },
+    {
+      title: "Số điện thoại",
+      dataIndex: "sdtKhachHang",
+      render: (v, r) => v || r?.soDienThoai || "-",
+    },
     {
       title: "Tổng tiền",
       dataIndex: "tongTien",
       align: "right",
-      render: (value) => (
-        <Tag
-          color="#ebfbee"
-          style={{
-            borderRadius: 16,
-            border: "none",
-            padding: "2px 10px",
-            fontWeight: 600,
-          }}
-        >
-          <span style={{ color: "#2f9e44" }}>{formatCurrency(value)}</span>
-        </Tag>
-      ),
+      render: (v, r) => {
+        const total =
+          v ??
+          r?.tongTienThuHo ??
+          r?.tongThanhToan ??
+          r?.tongTienThanhToan ??
+          0;
+        return (
+          <Tag
+            color="#ebfbee"
+            style={{
+              borderRadius: 16,
+              border: "none",
+              padding: "2px 10px",
+              fontWeight: 700,
+            }}
+          >
+            <span style={{ color: "#2f9e44" }}>{formatCurrency(total)}</span>
+          </Tag>
+        );
+      },
     },
     {
       title: "Loại đơn hàng",
@@ -327,75 +404,31 @@ const ListDonHangComponent = () => {
     {
       title: "Trạng thái đơn hàng",
       dataIndex: "trangThaiDon",
-      render: (_value, record) => renderOrderStatusTag(record),
+      render: (_v, record) => renderOrderStatusTag(record),
     },
     {
       title: "Trạng thái thanh toán",
       dataIndex: "trangThaiThanhToan",
-      render: (value) => {
-        const conf = TRANG_THAI_TT_MAP[value] || {
-          text: "Không xác định",
-          color: "#495057",
-          bg: "#f1f3f5",
-        };
-        return (
-          <Tag
-            style={{
-              borderRadius: 16,
-              padding: "2px 10px",
-              border: "none",
-            }}
-            color={conf.bg}
-          >
-            <span style={{ color: conf.color, fontWeight: 500 }}>
-              {conf.text}
-            </span>
-          </Tag>
-        );
-      },
+      render: (value) => renderPaymentTag(value),
     },
     {
       title: "Ngày tạo",
       dataIndex: "ngayTao",
-      render: (value) => (
-        <div
-          style={{
-            backgroundColor: "#e6fcf5",
-            borderRadius: 6,
-            padding: "2px 6px",
-            display: "inline-block",
-          }}
-        >
-          <span style={{ whiteSpace: "nowrap", color: "#0ca678" }}>
-            {formatDateTime(value)}
-          </span>
-        </div>
-      ),
+      render: (value) => <span style={{ whiteSpace: "nowrap" }}>{formatDateTime(value)}</span>,
     },
     {
       title: "Ngày cập nhật",
       dataIndex: "ngayCapNhat",
-      render: (value) => (
-        <span style={{ whiteSpace: "nowrap" }}>{formatDateTime(value)}</span>
-      ),
+      render: (value) => <span style={{ whiteSpace: "nowrap" }}>{formatDateTime(value)}</span>,
     },
     {
       title: "Hành động",
-      dataIndex: "action",
       fixed: "right",
-      width: 90,
+      width: 100,
       render: (_text, record) => (
         <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => navigate(`/admin/orders/${record.id}`)}
-          />
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => console.log("Sửa đơn", record.id)}
-          />
+          <Button type="text" icon={<EyeOutlined />} onClick={() => navigate(`/admin/orders/${record.id}`)} />
+          <Button type="text" icon={<EditOutlined />} onClick={() => console.log("Edit:", record.id)} />
         </Space>
       ),
     },
@@ -411,80 +444,130 @@ const ListDonHangComponent = () => {
           setPage(1);
         }}
         style={{
-          borderRadius: "999px",
+          borderRadius: 999,
           border: isActive ? "none" : "1px solid #dee2e6",
           padding: "6px 14px",
           marginRight: 8,
+          marginBottom: 8,
           display: "flex",
           alignItems: "center",
           gap: 8,
           backgroundColor: isActive ? "#12b886" : "#ffffff",
           color: isActive ? "#ffffff" : "#495057",
-          fontWeight: 500,
+          fontWeight: 600,
           cursor: "pointer",
           boxShadow: isActive ? "0 2px 6px rgba(0,0,0,0.12)" : "none",
           whiteSpace: "nowrap",
         }}
       >
-        <span>{tab.label}</span>
+        {tab.label}
       </button>
     );
   };
 
   return (
-    <div
-      style={{
-        padding: 16,
-        backgroundColor: "#f5f7fa",
-        minHeight: "100vh",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h3 style={{ marginBottom: 16 }}>
-        <span style={{ color: "#28a745" }}>Quản lý đơn hàng</span>{" "}
-        <small style={{ color: "#6c757d", fontWeight: "normal" }}>
-          Danh sách &amp; trạng thái
-        </small>
-      </h3>
-
-      {/* Tabs trạng thái */}
-      <div style={{ marginBottom: 16, display: "flex", flexWrap: "wrap" }}>
-        {ORDER_TABS.map(renderTab)}
-      </div>
-
+    <div style={{ padding: 16, backgroundColor: "#f5f7fa", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}>
+      {/* ✅ Header đẹp hơn giống ảnh */}
       <div
         style={{
-          backgroundColor: "#ffffff",
-          borderRadius: 8,
-          padding: 16,
+          marginBottom: 12,
+          background: "#ffffff",
+          borderRadius: 12,
+          padding: "12px 14px",
+          border: "1px solid #edf2ff",
           boxShadow: "0 2px 6px rgba(15, 23, 42, 0.04)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        {/* Search + filter */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 12,
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <Input
-            allowClear
-            placeholder="Tìm kiếm..."
-            prefix={<SearchOutlined />}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            onPressEnter={handleSearch}
-            style={{ maxWidth: 280 }}
-          />
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 999, background: "#12b886" }} />
+            <span style={{ fontSize: 18, fontWeight: 900, color: "#0ca678" }}>
+              Quản lý đơn hàng
+            </span>
+          </div>
+          <div style={{ marginTop: 4, color: "#64748b", fontSize: 13 }}>
+            Danh sách &amp; trạng thái
+          </div>
+        </div>
 
-          <Space>
-            {/* ✅ Filter loại đơn */}
+        <Button icon={<ReloadOutlined />} onClick={() => setRefreshKey((k) => k + 1)}>
+          Làm mới
+        </Button>
+      </div>
+
+      {/* ===== Bộ lọc giống ảnh ===== */}
+      <Card
+        style={{
+          borderRadius: 12,
+          marginBottom: 12,
+          boxShadow: "0 2px 6px rgba(15, 23, 42, 0.04)",
+          border: "1px solid #edf2ff",
+        }}
+        bodyStyle={{ padding: 14 }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <FilterOutlined style={{ color: "#0ca678" }} />
+            <span style={{ fontWeight: 800 }}>Bộ lọc</span>
+            <Badge count={filterCount} size="small" style={{ backgroundColor: "#228be6" }} />
+          </div>
+
+          <Button type="link" onClick={resetFilter} style={{ padding: 0 }}>
+            Xóa toàn bộ bộ lọc
+          </Button>
+        </div>
+
+        <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>
+          Sử dụng các bộ lọc dưới đây để tìm kiếm đơn hàng
+        </div>
+
+        <Row gutter={[12, 12]}>
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Mã đơn hàng</div>
+            <Input
+              value={maDonHang}
+              onChange={(e) => setMaDonHang(e.target.value)}
+              placeholder="Lọc mã đơn hàng"
+              allowClear
+            />
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Khách hàng</div>
+            <Input
+              value={khachHang}
+              onChange={(e) => setKhachHang(e.target.value)}
+              placeholder="Lọc tên khách hàng"
+              allowClear
+            />
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Trạng thái đơn hàng</div>
+            <Select
+              value={activeTabKey}
+              style={{ width: "100%" }}
+              onChange={(val) => {
+                setActiveTabKey(val);
+                setPage(1);
+              }}
+            >
+              {ORDER_TABS.map((t) => (
+                <Option key={t.key} value={t.key}>
+                  {t.label}
+                </Option>
+              ))}
+            </Select>
+          </Col>
+
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Loại đơn hàng</div>
             <Select
               value={orderType}
-              style={{ width: 160 }}
+              style={{ width: "100%" }}
               onChange={(val) => {
                 setOrderType(val);
                 setPage(1);
@@ -492,32 +575,91 @@ const ListDonHangComponent = () => {
             >
               <Option value="ALL">Tất cả loại đơn</Option>
               <Option value="ONLINE">Đơn hàng online</Option>
+              <Option value="GIAO_HANG">Bán giao hàng</Option>
               <Option value="TAI_QUAY">Bán tại quầy</Option>
             </Select>
+          </Col>
 
-            <RangePicker
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Ngày tạo từ</div>
+            <DatePicker
+              style={{ width: "100%" }}
               format="DD/MM/YYYY"
-              value={dateRange}
-              onChange={(values) => {
-                setDateRange(values);
+              value={dateRange?.[0]}
+              onChange={(v) => {
+                setDateRange([v, dateRange?.[1] || null]);
                 setPage(1);
               }}
+              allowClear
             />
+          </Col>
 
+          <Col xs={24} sm={12} md={6}>
+            <div style={{ fontSize: 12, marginBottom: 6, color: "#334155" }}>Ngày tạo đến</div>
+            <DatePicker
+              style={{ width: "100%" }}
+              format="DD/MM/YYYY"
+              value={dateRange?.[1]}
+              onChange={(v) => {
+                setDateRange([dateRange?.[0] || null, v]);
+                setPage(1);
+              }}
+              allowClear
+            />
+          </Col>
+
+          <Col xs={24} md={12} style={{ display: "flex", alignItems: "end", justifyContent: "flex-end" }}>
+            <Space wrap>
+              <Button onClick={() => setQuickRange("today")}>Hôm nay</Button>
+              <Button onClick={() => setQuickRange("7days")}>7 ngày qua</Button>
+              <Button onClick={() => setQuickRange("30days")}>30 ngày qua</Button>
+              <Button onClick={() => setQuickRange("month")}>Tháng này</Button>
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+
+      {/* Tabs dạng pill giống ảnh */}
+      <div style={{ marginBottom: 12, display: "flex", flexWrap: "wrap" }}>
+        {ORDER_TABS.map(renderTab)}
+      </div>
+
+      {/* ===== Table ===== */}
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          borderRadius: 12,
+          padding: 16,
+          border: "1px solid #edf2ff",
+          boxShadow: "0 2px 6px rgba(15, 23, 42, 0.04)",
+        }}
+      >
+        {/* Toolbar: search + sort */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
+          <Input
+            allowClear
+            placeholder="Tìm kiếm..."
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            style={{ maxWidth: 320 }}
+          />
+
+          <Space>
             <Select
               value={sortOrder}
-              style={{ width: 140 }}
+              style={{ width: 160 }}
               onChange={(val) => {
                 setSortOrder(val);
                 setPage(1);
               }}
             >
-              <Option value="asc">Cũ nhất trước</Option>
               <Option value="desc">Mới nhất trước</Option>
+              <Option value="asc">Cũ nhất trước</Option>
             </Select>
 
             <Button icon={<ReloadOutlined />} onClick={resetFilter}>
-              Làm mới
+              Reset
             </Button>
           </Space>
         </div>

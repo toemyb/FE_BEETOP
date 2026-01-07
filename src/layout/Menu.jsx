@@ -11,7 +11,7 @@ import {
   StarOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-
+import beeTopLogo from "../img/BeeTop.png";
 const { Sider } = Layout;
 const { SubMenu } = Menu;
 
@@ -140,7 +140,6 @@ const AppSider = ({ collapsed, user }) => {
       disabled: user?.role !== 'ADMIN',
       children: [
         { key: 'giamgia-phieu', label: <Link to="/admin/phieu-giam-gia">Phiếu Giảm Giá</Link> },
-        { key: 'giamgia-dot', label: <Link to="/dot-giam-gia">Đợt Giảm Giá</Link> },
       ],
     },
   ];
@@ -148,16 +147,26 @@ const AppSider = ({ collapsed, user }) => {
   return (
     <Sider trigger={null} collapsible collapsed={collapsed} style={{ background: '#001529' }}>
       <div
-        style={{
-          padding: 16,
-          fontWeight: 'bold',
-          fontSize: 16,
-          color: 'white',
-          textAlign: 'center',
-        }}
-      >
-        {!collapsed && 'BeeLapTop'}
-      </div>
+  style={{
+    height: 64,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  }}
+>
+  <img
+    src={beeTopLogo}
+    alt="BeeTop"
+    style={{
+      height: collapsed ? 32 : 44, // thu nhỏ khi collapsed
+      width: "auto",
+      objectFit: "contain",
+      display: "block",
+      transition: "all 0.2s ease",
+    }}
+  />
+</div>
 
       <Menu
         theme="dark"

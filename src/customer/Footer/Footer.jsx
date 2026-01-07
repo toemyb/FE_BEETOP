@@ -17,7 +17,7 @@ const Footer = () => {
                 <Row gutter={[32, 32]} justify="center" align="top">
                     {/* Cột 1: Logo & giới thiệu */}
                     <Col xs={24} sm={12} md={6} className="footer-column">
-                        <h3>🛍️ BeeLaptop</h3>
+                        <h3>🛍️ BeeTop</h3>
                         <p>
                             Cung cấp laptop chính hãng, giá tốt, bảo hành tận tâm.
                             Uy tín hàng đầu Việt Nam.
@@ -63,7 +63,7 @@ const Footer = () => {
 
             {/* Dòng bản quyền cuối cùng */}
             <div className="footer-bottom">
-                <p>© {new Date().getFullYear()} BeeLaptop. All rights reserved.</p>
+                <p>© {new Date().getFullYear()} BeeTop. All rights reserved.</p>
             </div>
         </footer>
     );

@@ -242,7 +242,7 @@ const HomePage = () => {
                 <div className="section-container">
                     <h2 className="section-title">
                         <StarOutlined className="title-icon" />
-                        Vì sao bạn nên chọn BeeLaptop
+                        Vì sao bạn nên chọn BeeTop
                     </h2>
                     <div className="info-grid">
                         <div className="info-item">

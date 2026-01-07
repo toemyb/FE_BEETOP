@@ -1,49 +1,24 @@
 import axios from "axios";
+
 const BASEURL = "http://localhost:8080/api/v1/laptops";
 
-const assertId = (id, name) => {
-  if (!id || id === "null" || id === "undefined") {
-    throw new Error(`${name} is missing`);
-  }
+// ✅ CartPage đang dùng tên checkInvoitory (giữ nguyên để khỏi lỗi import)
+export const checkInvoitory = (id) => {
+  return axios.get(`${BASEURL}/check-inventory/${id}`);
 };
 
 export const addToCart = async (cartItem) => {
   try {
-    // ✅ Validate bắt buộc đúng field BE
-    assertId(cartItem?.idTaiKhoan, "idTaiKhoan");
-    assertId(cartItem?.idSpct, "idSpct");
-
-    // ✅ Default soLuong để tránh null (BE thường yêu cầu >0)
-    const payload = {
-      ...cartItem,
-      soLuong: cartItem?.soLuong && cartItem.soLuong > 0 ? cartItem.soLuong : 1,
-    };
-
-    console.log("[addToCart] payload:", payload);
-
-    const response = await axios.post(`${BASEURL}/cart/add`, payload);
+    const response = await axios.post(`${BASEURL}/cart/add`, cartItem);
     return response.data;
   } catch (error) {
-    const beMsg =
-      error?.response?.data?.message ||
-      (typeof error?.response?.data === "string" ? error.response.data : "") ||
-      "";
-
-    console.error("Lỗi khi thêm sản phẩm vào giỏ hàng:", {
-      status: error?.response?.status,
-      data: error?.response?.data,
-      beMsg,
-      payload: cartItem,
-    });
+    console.error("Lỗi khi thêm sản phẩm vào giỏ hàng:", error);
     throw error;
   }
 };
 
 export const getCartItems = async (customerId) => {
   try {
-    if (!customerId || customerId === "null" || customerId === "undefined") {
-      throw new Error("customerId is missing");
-    }
     const response = await axios.get(`${BASEURL}/cart/${customerId}`);
     return response.data;
   } catch (error) {
@@ -54,9 +29,15 @@ export const getCartItems = async (customerId) => {
 
 export const updateCartItem = async (cartItem) => {
   try {
-    // (tuỳ chọn) validate nhẹ
-    // assertId(cartItem?.idGioHangCT, "idGioHangCT");
-    const response = await axios.put(`${BASEURL}/cart/update-cart-quantity`, cartItem);
+    const payload = {
+      idGioHangCT: cartItem.idGioHangCT,
+      quantity: cartItem.quantity ?? cartItem.soLuong, // ✅ map soLuong -> quantity
+    };
+
+    const response = await axios.put(
+      `${BASEURL}/cart/update-cart-quantity`,
+      payload
+    );
     return response.data;
   } catch (error) {
     console.error("Lỗi khi cập nhật sản phẩm trong giỏ hàng:", error);
@@ -66,7 +47,6 @@ export const updateCartItem = async (cartItem) => {
 
 export const removeCartItem = async (cartItemId) => {
   try {
-    assertId(cartItemId, "cartItemId");
     const response = await axios.delete(`${BASEURL}/cart/remove/${cartItemId}`);
     return response.data;
   } catch (error) {
@@ -77,26 +57,10 @@ export const removeCartItem = async (cartItemId) => {
 
 export const createOrder = async (orderData) => {
   try {
-    // ✅ validate cơ bản (tránh gửi rỗng)
-    if (!orderData || !orderData.idTaiKhoan) {
-      throw new Error("orderData or idTaiKhoan is missing");
-    }
-
-    console.log("[createOrder] payload:", orderData);
-
     const response = await axios.post(`${BASEURL}/order/create`, orderData);
-    return response.data;
+    return response.data; // CartPage đã handle cả response.data.id và response.id
   } catch (error) {
-    const beMsg =
-      error?.response?.data?.message ||
-      (typeof error?.response?.data === "string" ? error.response.data : "") ||
-      "";
-
-    console.error("Lỗi khi tạo đơn hàng:", {
-      status: error?.response?.status,
-      data: error?.response?.data,
-      beMsg,
-    });
+    console.error("Lỗi khi tạo đơn hàng:", error);
     throw error;
   }
 };

@@ -49,11 +49,11 @@
 }
 
 .header-logo img {
-    height: var(--item-h); /* ✅ SỬA */
-    width: auto;
-    max-width: 240px;
-    object-fit: contain;
-    display: block;
+  height: 62px;       /* ✅ tăng riêng logo */
+  width: auto;
+  max-width: 260px;
+  object-fit: contain;
+  display: block;
 }
 
 /* ======= CATEGORY CONTAINER ======= */

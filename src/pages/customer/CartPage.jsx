@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCartOutlined, CreditCardOutlined, CheckCircleOutlined, DeleteOutlined, ArrowLeftOutlined, ShopOutlined, TruckOutlined, PlusOutlined, EditOutlined, EnvironmentOutlined, WalletOutlined, UserOutlined, PhoneOutlined, MailOutlined } from '@ant-design/icons';
+import { ShoppingCartOutlined, CreditCardOutlined, CheckCircleOutlined, DeleteOutlined, ArrowLeftOutlined, ShopOutlined, TruckOutlined, PlusOutlined, EditOutlined, EnvironmentOutlined, WalletOutlined, UserOutlined, PhoneOutlined, MailOutlined, MinusOutlined } from '@ant-design/icons';
 import { message, Modal, Empty, Radio, Button, Checkbox } from "antd";
 import { Select, Input, Spin } from 'antd';
 import axios from 'axios';
 import { getVoucherForBill } from '../../service/PhieuGiamGiaService';
-import { getCartItems } from '../../service/CartCustomerService';
-import { removeCartItem, createOrder } from '../../service/CartCustomerService';
+import { getCartItems, removeCartItem, createOrder, checkInvoitory, updateCartItem } from '../../service/CartCustomerService';
 import { getAllAddress, addAddress, deleteAddress, setDefaultAddress, updateAddress } from '../../service/AddressCustomerService';
 import { createVNPayPayment } from '../../service/VNPayService';
 import './CartPage.css';
@@ -41,7 +40,7 @@ const CartPage = () => {
     const [provinces, setProvinces] = useState([]);
     const [districts, setDistricts] = useState([]);
     const [wards, setWards] = useState([]);
-    const [isCustomer, setIsCustomer] = useState(false);
+    const [isCustomer, setIsCustomer] = useState(() => localStorage.getItem("isCustomer") === "true");
     const [deliverToOther, setDeliverToOther] = useState(false);
     const [showAddressModal, setShowAddressModal] = useState(false);
     const [showAddAddressForm, setShowAddAddressForm] = useState(false);
@@ -124,15 +123,18 @@ const CartPage = () => {
             return;
         }
 
-        // Tính số lượng sản phẩm (mỗi sản phẩm = 1)
-        let quantityProducts = orderProduct.length || 1;
+        // ✅ Tính tổng số lượng CHỈ các sản phẩm đang được chọn
+        const selectedQty =
+            orderProduct
+                .filter(it => selectedProducts.has(String(it.idSpct || it.id)))
+                .reduce((s, it) => s + (it.quantity || 1), 0) || 1;
 
         setShippingFeeLoading(true);
         try {
             const response = await axios.get(urlShippingFee, {
                 params: {
-                    insurance_value: "",        // ← Thêm lại dòng này
-                    coupon: "",                 // ← Thêm lại dòng này
+                    insurance_value: "",
+                    coupon: "",
                     service_type_id: SHOP_CONFIG.service_type_id,
                     from_district_id: SHOP_CONFIG.from_district_id,
                     from_ward_code: SHOP_CONFIG.from_ward_code,
@@ -140,7 +142,7 @@ const CartPage = () => {
                     to_ward_code: String(toWardCode),
                     height: 50,
                     length: 20,
-                    weight: 200,                // ← Đảm bảo là 200 (không phải 1000 hay khác)
+                    weight: 200 * selectedQty, // ✅ sửa ở đây
                     width: 20,
                 },
                 headers: {
@@ -155,7 +157,6 @@ const CartPage = () => {
                 const totalShip = response.data.data;
                 if (totalShip && totalShip.total !== undefined) {
                     console.log("Tiền ship:", totalShip.total);
-                    // Lưu phí ship gốc từ API (sẽ được áp dụng logic free ship trong useEffect tính finalTotal)
                     setShippingFee(totalShip.total);
                 } else {
                     console.log("Không có giá trị total.");
@@ -513,11 +514,7 @@ const CartPage = () => {
         fetchAddresses();
     }, [isCustomer]);
 
-    // set isCustomer từ localStorage
-    useEffect(() => {
-        const customerStatus = localStorage.getItem("isCustomer") === "true";
-        setIsCustomer(customerStatus);
-    }, []);
+
 
     // khi chọn địa chỉ: điền cả id tỉnh/huyện/xã và load select tương ứng
     const handleSelectAddress = async (address) => {
@@ -908,32 +905,35 @@ const CartPage = () => {
     };
 
     useEffect(() => {
+        if (isCustomer) return;
         const saved = localStorage.getItem("orderProduct");
         console.log("localStorage data:", saved);
         if (saved) {
             try {
                 const parsed = JSON.parse(saved);
                 const items = Array.isArray(parsed) ? parsed : [parsed];
-                setOrderProduct(items);
+                const itemsWithQuantity = items.map(it => ({ ...it, quantity: it.quantity || 1 }));
+                setOrderProduct(itemsWithQuantity);
+
 
                 const buyNowFlag = sessionStorage.getItem("buyNow");
                 if (buyNowFlag) {
                     try {
                         const buyNowData = JSON.parse(buyNowFlag);
-                        if (buyNowData.enabled && items.length > 0) {
+                        if (buyNowData.enabled && itemsWithQuantity.length > 0) {
                             let productToSelect = null;
                             if (buyNowData.productId) {
-                                productToSelect = items.find(item =>
-                                    String(item.id || item.idSpct) === String(buyNowData.productId)
+                                productToSelect = itemsWithQuantity.find(item =>
+                                    String(item.idSpct || item.id) === String(buyNowData.productId)
                                 );
                             }
                             // Nếu không tìm thấy theo ID, lấy sản phẩm cuối cùng
                             if (!productToSelect) {
-                                productToSelect = items[items.length - 1];
+                                productToSelect = itemsWithQuantity[itemsWithQuantity.length - 1];
                             }
 
                             if (productToSelect) {
-                                const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${items.length - 1}`);
+                                const itemId = String(productToSelect.idSpct || productToSelect.id || `temp-${itemsWithQuantity.length - 1}`);
                                 setSelectedProducts(new Set([itemId]));
                                 setIsBuyNow(true);
                                 setTimeout(() => {
@@ -958,57 +958,62 @@ const CartPage = () => {
                 console.error("Lỗi parse localStorage:", err);
             }
         }
-    }, []);
+    }, [isCustomer]);
 
     useEffect(() => {
+        const selectedCount = selectedProducts?.size ?? 0;
+
+        // ✅ Chưa chọn sản phẩm => không ship, không discount
+        if (totalAmount <= 0 || selectedCount === 0) {
+            setAppliedDiscount(0);
+            setFinalTotal(0);
+            return;
+        }
+
+        // ✅ Chỉ cộng ship ở step "Thông tin đặt hàng"
+        const stepShippingFee = currentStep === 1 ? Number(shippingFee || 0) : 0;
+
         if (selectedDiscount) {
             let discountValue = 0;
 
-            if (selectedDiscount.giaTriGiam < 100.00) {
-                // Giảm theo phần trăm
-                // Kiểm tra điều kiện đơn tối thiểu (giaTriMin)
+            if (selectedDiscount.giaTriGiam < 100.0) {
+                // % giảm
                 if (selectedDiscount.giaTriMin && totalAmount < selectedDiscount.giaTriMin) {
-                    // Không đủ điều kiện, không áp dụng giảm giá
+                    // Không đủ điều kiện => không giảm, vẫn tính total nhưng ship chỉ ở step 1
                     setAppliedDiscount(0);
-                    const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
+                    const actualShippingFee = totalAmount >= 15000000 ? 0 : stepShippingFee;
                     setFinalTotal(totalAmount + actualShippingFee);
                     return;
                 }
 
-                // Tính giảm giá theo phần trăm
                 discountValue = totalAmount * (selectedDiscount.giaTriGiam / 100);
 
-                // Giới hạn mức giảm tối đa (giaTriMax) - chỉ áp dụng cho loại phần trăm
                 if (selectedDiscount.giaTriMax && discountValue > selectedDiscount.giaTriMax) {
                     discountValue = selectedDiscount.giaTriMax;
                 }
             } else {
-                // Giảm theo số tiền cố định (giaTriGiam >= 100.00)
-                // Không kiểm tra giaTriMin và giaTriMax, giảm trực tiếp theo giaTriGiam
+                // giảm số tiền cố định
                 discountValue = selectedDiscount.giaTriGiam;
             }
 
             setAppliedDiscount(discountValue);
             const totalAfterDiscount = totalAmount - discountValue;
-            // Kiểm tra free ship: nếu tổng tiền sau giảm giá >= 5 triệu thì free ship
-            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
+            const actualShippingFee = totalAfterDiscount >= 15000000 ? 0 : stepShippingFee;
+
             setFinalTotal(Math.max(totalAfterDiscount + actualShippingFee, 0));
         } else {
+            const actualShippingFee = totalAmount >= 15000000 ? 0 : stepShippingFee;
             setAppliedDiscount(0);
-            // Kiểm tra free ship: nếu tổng tiền >= 5 triệu thì free ship
-            const actualShippingFee = totalAmount >= 15000000 ? 0 : shippingFee;
             setFinalTotal(totalAmount + actualShippingFee);
         }
-    }, [totalAmount, selectedDiscount, shippingFee]);
+    }, [totalAmount, selectedDiscount, shippingFee, currentStep, selectedProducts]);
 
     // Tính tổng tiền chỉ cho sản phẩm được chọn
     useEffect(() => {
         const total = orderProduct
-            .filter((item, index) => {
-                const itemId = String(item.idSpct || item.id || `temp-${index}`);
-                return selectedProducts.has(itemId);
-            })
-            .reduce((sum, item) => sum + item.price, 0);
+            .filter(item => selectedProducts.has(String(item.idSpct || item.id)))
+            .reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
+
         setTotalAmount(total);
         console.log("Check totalamount", total);
     }, [orderProduct, selectedProducts]);
@@ -1076,7 +1081,7 @@ const CartPage = () => {
                     // Xóa khỏi selectedProducts nếu có
                     setSelectedProducts(prev => {
                         const newSet = new Set(prev);
-                        const itemId = item.idSpct || item.id;
+                        const itemId = String(item.idSpct || item.id);
                         newSet.delete(itemId);
                         return newSet;
                     });
@@ -1575,11 +1580,41 @@ const CartPage = () => {
         });
     };
 
-    const handleCheckout = () => {
+    const handleCheckout = async () => {
         if (selectedProducts.size === 0) {
             message.warning('Vui lòng chọn ít nhất một sản phẩm để thanh toán');
             return;
         }
+
+        // ✅ CHECK HẾT HÀNG (Seri / tồn kho) trước khi sang step 1
+        try {
+            const selectedItems = orderProduct.filter(it =>
+                selectedProducts.has(String(it.idSpct || it.id))
+            );
+
+            const results = await Promise.all(
+                selectedItems.map(async (it) => {
+                    const spctId = it.idSpct || it.id;
+                    const res = await checkInvoitory(spctId); // API bạn đang dùng
+                    const inventory = Number(res?.data);
+                    return { it, inventory };
+                })
+            );
+
+            const outOfStock = results.find(x =>
+                !Number.isFinite(x.inventory) || x.inventory <= 0 || (x.it.quantity || 1) > x.inventory
+            );
+
+            if (outOfStock) {
+                message.warning("Đã hết hàng");
+                return;
+            }
+        } catch (e) {
+            console.error("❌ Lỗi check tồn kho trước checkout:", e);
+            message.error("Không thể kiểm tra tồn kho. Vui lòng thử lại!");
+            return;
+        }
+
         setCurrentStep(1);
         window.scrollTo(0, 0);
     };
@@ -1627,7 +1662,7 @@ const CartPage = () => {
                         const itemId = String(item.idSpct || item.id || `temp-${index}`);
                         return newSet.has(itemId);
                     })
-                    .reduce((sum, item) => sum + item.price, 0);
+                    .reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
 
                 const productToAdd = orderProduct.find((item, index) => {
                     const itemId = String(item.idSpct || item.id || `temp-${index}`);
@@ -1635,7 +1670,7 @@ const CartPage = () => {
                 });
 
                 if (productToAdd) {
-                    const newTotal = currentTotal + productToAdd.price;
+                    const newTotal = currentTotal + productToAdd.price * (productToAdd.quantity || 1);
                     const maxAmount = 100000000; // 100 triệu
 
                     if (newTotal > maxAmount) {
@@ -1656,7 +1691,10 @@ const CartPage = () => {
 
     const handleSelectAll = (checked) => {
         if (checked) {
-            const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + item.price, 0);
+            const totalIfSelectAll = orderProduct.reduce(
+                (sum, item) => sum + item.price * (item.quantity || 1),
+                0
+            );
             const maxAmount = 100000000; // 100 triệu
 
             if (totalIfSelectAll > maxAmount) {
@@ -1685,6 +1723,110 @@ const CartPage = () => {
             setSelectedProducts(allIds);
         } else {
             setSelectedProducts(new Set());
+        }
+    };
+    const handleIncreaseQuantity = async (itemId) => {
+        try {
+            const MAX_AMOUNT = 100000000;
+
+            // tìm item trong orderProduct
+            const target = orderProduct.find(it => String(it.idSpct || it.id) === String(itemId));
+            if (!target) return;
+
+            const normalizedId = String(target.idSpct || target.id);
+
+            // ✅ nếu item đang được chọn => chặn vượt 100tr
+            if (selectedProducts.has(normalizedId)) {
+                const currentTotal = orderProduct
+                    .filter((prod, idx) => {
+                        const prodId = String(prod.idSpct || prod.id || `temp-${idx}`);
+                        return selectedProducts.has(prodId);
+                    })
+                    .reduce((sum, prod) => sum + prod.price * (prod.quantity || 1), 0);
+
+                // tăng thêm 1 sẽ + giá của chính item
+                if (currentTotal + (target.price || 0) > MAX_AMOUNT) {
+                    message.warning("Tổng tiền đơn hàng không được vượt quá 100 triệu. Không thể tăng số lượng nữa!");
+                    return;
+                }
+            }
+
+            // ✅ check tồn kho (chỉ customer)
+            let inventory = Infinity;
+            if (isCustomer) {
+                const res = await checkInvoitory(itemId);
+                inventory = Number(res?.data);
+                if (!Number.isFinite(inventory)) inventory = Infinity;
+
+                const currentQty = target.quantity || 1;
+                if (currentQty >= inventory) {
+                    message.warning("Số lượng vượt quá tồn kho!");
+                    return;
+                }
+
+                // ✅ update BE trước để reload không bị tụt
+                const newQty = currentQty + 1;
+
+                // NOTE: payload này dựa trên normalizeCartData của bạn: idGiohang = idChiTiet (cart detail id)
+                await updateCartItem({
+                    idGioHangCT: target.idGiohang,
+                    soLuong: newQty
+                });
+            }
+
+            // ✅ update UI
+            setOrderProduct(prev => {
+                const updated = prev.map(item => {
+                    const id = item.idSpct || item.id;
+                    if (String(id) === String(itemId)) {
+                        const currentQty = item.quantity || 1;
+                        return { ...item, quantity: currentQty + 1 };
+                    }
+                    return item;
+                });
+
+                if (!isCustomer) localStorage.setItem("orderProduct", JSON.stringify(updated));
+                return updated;
+            });
+
+        } catch (err) {
+            console.error("❌ Lỗi tăng số lượng:", err);
+            message.error("Không thể tăng số lượng!");
+        }
+    };
+
+    const handleDecreaseQuantity = async (itemId) => {
+        try {
+            const target = orderProduct.find(it => String(it.idSpct || it.id) === String(itemId));
+            if (!target) return;
+
+            const currentQty = target.quantity || 1;
+            if (currentQty <= 1) return;
+
+            const newQty = currentQty - 1;
+
+            if (isCustomer) {
+                await updateCartItem({
+                    idGioHangCT: target.idGiohang,
+                    soLuong: newQty
+                });
+            }
+
+            setOrderProduct(prev => {
+                const updated = prev.map(item => {
+                    const id = item.idSpct || item.id;
+                    if (String(id) === String(itemId)) {
+                        return { ...item, quantity: newQty };
+                    }
+                    return item;
+                });
+
+                if (!isCustomer) localStorage.setItem("orderProduct", JSON.stringify(updated));
+                return updated;
+            });
+        } catch (err) {
+            console.error("❌ Lỗi giảm số lượng:", err);
+            message.error("Không thể giảm số lượng!");
         }
     };
 
@@ -1925,10 +2067,13 @@ const CartPage = () => {
                         const itemId = String(item.idSpct || item.id || `temp-${index}`);
                         return selectedProducts.has(itemId);
                     })
-                    .map(item => ({
-                        idLaptopChiTiet: item.idSpct || item.id || item.idChiTiet, // ID chi tiết laptop
-                        giaBan: item.price
-                    })),
+                    .flatMap(item => {
+                        const qty = item.quantity || 1;
+                        return Array.from({ length: qty }, () => ({
+                            idLaptopChiTiet: item.idSpct || item.id || item.idChiTiet,
+                            giaBan: item.price,
+                        }));
+                    }),
                 listHinhThucThanhToan: [{
                     idHinhThucThanhToan: getPaymentMethodId(formData.paymentMethod),
                     soTien: finalTotal, // Tổng tiền cần thanh toán
@@ -2075,10 +2220,24 @@ const CartPage = () => {
             console.error("❌ Lỗi khi tạo đơn hàng:", error);
             setIsVNPayProcessing(false);
             setIsDeliveryProcessing(false);
+
+            const serverMsg = error?.response?.data?.message;
+
+            // ✅ Hết hàng là cảnh báo nghiệp vụ => warning
+            if (serverMsg && serverMsg.toLowerCase().includes("hết hàng")) {
+                message.warning({
+                    content: serverMsg,
+                    key: "creatingOrder",
+                    duration: 4,
+                });
+                return;
+            }
+
+            // ✅ Các lỗi khác vẫn là error
             message.error({
-                content: error.response?.data?.message || 'Tạo đơn hàng thất bại. Vui lòng thử lại!',
-                key: 'creatingOrder',
-                duration: 5
+                content: serverMsg || "Tạo đơn hàng thất bại. Vui lòng thử lại!",
+                key: "creatingOrder",
+                duration: 5,
             });
         }
     };
@@ -2088,7 +2247,7 @@ const CartPage = () => {
             const itemId = String(item.idSpct || item.id || `temp-${index}`);
             return selectedProducts.has(itemId);
         })
-        .reduce((sum, item) => sum + item.price, 0);
+        .reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
 
     const total = subtotal - appliedDiscount;
 
@@ -2110,6 +2269,7 @@ const CartPage = () => {
                     color: item.productInfo.color,
                     image: item.productInfo.image,
                     price: item.productInfo.price,
+                    quantity: item.soLuong || item.quantity || item.productInfo?.soLuong || 1,
                 };
                 if (index === 0) {
                     console.log("🔍 Normalize item[0] - Original:", item);
@@ -2130,6 +2290,7 @@ const CartPage = () => {
                     color: item.color,
                     image: item.image,
                     price: item.price,
+                    quantity: item.quantity || 1,
                 };
             }
         });
@@ -2165,11 +2326,22 @@ const CartPage = () => {
 
 
     useEffect(() => {
-        if (formData.districtId && formData.wardCode && orderProduct.length > 0 && currentStep === 1) {
+        const selectedCount = selectedProducts?.size ?? 0;
+
+        if (
+            currentStep === 1 &&
+            selectedCount > 0 &&
+            formData.districtId &&
+            formData.wardCode
+        ) {
             calculateShippingFee(formData.districtId, formData.wardCode);
             fetchDayShip(formData.districtId, formData.wardCode);
+        } else {
+            // ✅ nếu không đủ điều kiện thì clear để UI không hiện ship “cũ”
+            setShippingFee(0);
+            setShippingDate("");
         }
-    }, [orderProduct, formData.districtId, formData.wardCode, currentStep]);
+    }, [selectedProducts, orderProduct, formData.districtId, formData.wardCode, currentStep]);
 
     return (
         <div className="cart-page">
@@ -2230,7 +2402,10 @@ const CartPage = () => {
                                 <div className="select-all-section">
                                     {(() => {
                                         // Tính tổng tiền nếu chọn tất cả
-                                        const totalIfSelectAll = orderProduct.reduce((sum, item) => sum + item.price, 0);
+                                        const totalIfSelectAll = orderProduct.reduce(
+                                            (sum, item) => sum + item.price * (item.quantity || 1),
+                                            0
+                                        );
                                         const maxAmount = 100000000; // 100 triệu
                                         const isSelectAllDisabled = totalIfSelectAll > maxAmount;
 
@@ -2270,9 +2445,10 @@ const CartPage = () => {
                                             const prodId = String(prod.idSpct || prod.id || `temp-${idx}`);
                                             return selectedProducts.has(prodId);
                                         })
-                                        .reduce((sum, prod) => sum + prod.price, 0);
+                                        .reduce((sum, prod) => sum + prod.price * (prod.quantity || 1), 0);
 
                                     const maxAmount = 100000000; // 100 triệu
+                                    const wouldExceedIfPlus = isSelected && (currentTotal + item.price > maxAmount);
                                     // Disable checkbox nếu tổng tiền đã >= 100tr và sản phẩm này chưa được chọn
                                     const isDisabled = !isSelected && currentTotal >= maxAmount;
 
@@ -2320,10 +2496,38 @@ const CartPage = () => {
                                             </div>
 
                                             <div className="cart-item-actions">
+                                                <div className="quantity-control">
+                                                    <button
+                                                        className="qty-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDecreaseQuantity(item.idSpct || item.id);
+                                                        }}
+                                                        disabled={(item.quantity || 1) <= 1}
+                                                        title="Giảm"
+                                                    >
+                                                        <MinusOutlined />
+                                                    </button>
+
+                                                    <span className="qty-input">{item.quantity || 1}</span>
+
+                                                    <button
+                                                        className="qty-btn"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleIncreaseQuantity(item.idSpct || item.id);
+                                                        }}
+                                                        title={wouldExceedIfPlus ? "Tổng tiền vượt 100 triệu" : "Tăng"}
+                                                        disabled={wouldExceedIfPlus}
+                                                    >
+                                                        <PlusOutlined />
+                                                    </button>
+                                                </div>
+
                                                 <div className="item-total">
-                                                    <div className="item-total-label">Giá</div>
+                                                    <div className="item-total-label">Thành tiền</div>
                                                     <div className="item-total-price">
-                                                        {formatPrice(item.price)}
+                                                        {formatPrice(item.price * (item.quantity || 1))}
                                                     </div>
                                                 </div>
 

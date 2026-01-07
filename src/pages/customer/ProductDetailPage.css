@@ -214,12 +214,22 @@
     margin-bottom: 24px;
 }
 
+.price-label {
+  display: block;
+  font-size: 25px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 8px;
+  opacity: 0.85;
+}
+
 .price-main {
     display: flex;
     align-items: baseline;
     gap: 4px;
     margin-bottom: 16px;
 }
+
 
 .price-currency {
     font-size: 24px;

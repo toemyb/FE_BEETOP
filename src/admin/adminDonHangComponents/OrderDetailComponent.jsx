@@ -33,6 +33,10 @@ import {
 import { getOrderDetail, unwrapApi } from "../../service/PosOrderService";
 import { getOrderTimeline, updateOrderStatus } from "../../service/OrderTimelineService";
 
+// ✅ NEW
+import InvoiceModal from "./InvoiceModal";
+import { buildInvoiceHtml } from "./invoiceTemplate";
+
 const { Title, Text } = Typography;
 
 const formatCurrency = (amount) => {
@@ -49,7 +53,7 @@ const formatDateTime = (value) => {
   return `${time} ${date}`;
 };
 
-// POS (tại quầy) - ✅ FIX: đúng yêu cầu "Tạo đơn / Hoàn tất / Hủy"
+// POS (tại quầy) - đúng yêu cầu "Tạo đơn / Hoàn tất / Hủy"
 const ORDER_STATUS_MAP = {
   1: { text: "Tạo đơn", color: "gold" },
   2: { text: "Hoàn thành", color: "green" },
@@ -67,16 +71,10 @@ const ORDER_STATUS_ONLINE_MAP = {
   7: { text: "Hủy đơn", color: "red" },
 };
 
-const ORDER_TYPE_MAP = {
-  TAI_QUAY: "Bán tại quầy",
-  ONLINE: "Đơn hàng online",
-  GIAO_HANG: "Đơn giao hàng",
-};
-
 // === normalize loaiDon từ DB (VD: "Đơn hàng Online") ===
 const normalizeLoaiDon = (loaiDon) => {
   const raw = (loaiDon || "").toString().toLowerCase();
-  if (raw.includes("giao_hang") || raw.includes("giao hàng") || raw.includes("delivery")) return "GIAO_HANG"; // ✅ ADD
+  if (raw.includes("giao_hang") || raw.includes("giao hàng") || raw.includes("delivery")) return "GIAO_HANG";
   if (raw.includes("online")) return "ONLINE";
   if (raw.includes("quầy") || raw.includes("tai_quay") || raw.includes("pos")) return "TAI_QUAY";
   return loaiDon || "";
@@ -85,7 +83,7 @@ const normalizeLoaiDon = (loaiDon) => {
 const getLoaiDonText = (loaiDon) => {
   const t = normalizeLoaiDon(loaiDon);
   if (t === "ONLINE") return "Đơn hàng online";
-  if (t === "GIAO_HANG") return "Đơn giao hàng";
+  if (t === "GIAO_HANG") return "Bán giao hàng";
   if (t === "TAI_QUAY") return "Bán tại quầy";
   return loaiDon || "-";
 };
@@ -109,7 +107,7 @@ const STEP_DESC_BY_STATUS = {
   7: "Đơn hàng đã bị hủy.",
 };
 
-// ✅ title log theo BE
+// title log theo BE
 const LOG_TITLE_BY_CODE = {
   1: "Chờ xác nhận",
   2: "Đã xác nhận",
@@ -134,7 +132,7 @@ const getStepVisual = (state) => {
   return { color: "gray", dot: <MinusCircleOutlined /> };
 };
 
-// ✅ FIX: trạng thái final khác nhau theo loại đơn
+// trạng thái final khác nhau theo loại đơn
 const getProcessingTag = (typeNorm, status) => {
   const doneCode = typeNorm === "TAI_QUAY" ? 2 : 6;
   const cancelCode = typeNorm === "TAI_QUAY" ? 3 : 7;
@@ -144,6 +142,10 @@ const getProcessingTag = (typeNorm, status) => {
   return <Tag color="blue">Đang xử lý</Tag>;
 };
 
+// extract time/actor safely (BE hay đổi field)
+const pickLogTime = (log) => log?.time || log?.at || log?.createdAt || log?.created_time || null;
+const pickLogBy = (log) => log?.by || log?.actor || log?.createdBy || log?.nguoiThucHien || "Hệ thống";
+
 const OrderDetailComponent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -152,6 +154,9 @@ const OrderDetailComponent = () => {
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [order, setOrder] = useState(null);
   const [timeline, setTimeline] = useState(null);
+
+  // ✅ NEW: modal hóa đơn
+  const [openInvoice, setOpenInvoice] = useState(false);
 
   const fetchDetail = async () => {
     if (!id) return;
@@ -176,6 +181,7 @@ const OrderDetailComponent = () => {
       setTimeline(data);
     } catch (err) {
       console.error("Lỗi load timeline:", err);
+      // đừng toast đỏ liên tục, chỉ log
     } finally {
       setLoadingTimeline(false);
     }
@@ -192,7 +198,7 @@ const OrderDetailComponent = () => {
 
   // ===== derived hooks =====
   const typeNorm = useMemo(() => normalizeLoaiDon(order?.loaiDon), [order?.loaiDon]);
-  const isOnlineLike = typeNorm === "ONLINE" || typeNorm === "GIAO_HANG"; // ✅ ADD
+  const isOnlineLike = typeNorm === "ONLINE" || typeNorm === "GIAO_HANG";
   const isPos = typeNorm === "TAI_QUAY";
 
   const mustPay = useMemo(() => Number(order?.tongTienThuHo || 0), [order?.tongTienThuHo]);
@@ -206,11 +212,14 @@ const OrderDetailComponent = () => {
   const isPaid = useMemo(() => paidByBE || (mustPay > 0 && totalPaid >= mustPay), [paidByBE, mustPay, totalPaid]);
 
   const paymentPercent = useMemo(() => {
-    if (mustPay <= 0) return 0;
+    if (mustPay <= 0) return isPaid ? 100 : 0;
     return Math.min(100, Math.round((totalPaid * 100) / mustPay));
-  }, [mustPay, totalPaid]);
+  }, [mustPay, totalPaid, isPaid]);
 
-  const paymentStatusTag = useMemo(() => (isPaid ? <Tag color="green">Đã thanh toán</Tag> : <Tag color="orange">Chưa thanh toán</Tag>), [isPaid]);
+  const paymentStatusTag = useMemo(
+    () => (isPaid ? <Tag color="green">Đã thanh toán</Tag> : <Tag color="orange">Chưa thanh toán</Tag>),
+    [isPaid]
+  );
 
   const orderStatusInfo = useMemo(() => getOrderStatusInfo(order), [order]);
 
@@ -221,34 +230,140 @@ const OrderDetailComponent = () => {
     return Number(st);
   }, [timeline?.trangThai, order?.trangThai]);
 
-  // ✅ FIX: final code theo loại đơn
   const doneCode = useMemo(() => (isPos ? 2 : 6), [isPos]);
   const cancelCode = useMemo(() => (isPos ? 3 : 7), [isPos]);
+
   const isFinal = useMemo(() => currentStatus === doneCode || currentStatus === cancelCode, [currentStatus, doneCode, cancelCode]);
 
-  // ✅ FIX: nextStatus dựa theo steps trả về từ BE (không hardcode)
-  const nextStatus = useMemo(() => {
-    const steps = timeline?.steps || [];
-    if (!steps.length) return null;
+  const canCancel = useMemo(() => !isFinal, [isFinal]);
 
-    const idx = steps.findIndex((s) => s.state === "CURRENT");
+  // ✅ FIX: đưa shippingFee + invoiceHtml lên TRƯỚC mọi return có điều kiện (tránh lỗi "Rendered more hooks")
+  const shippingFee = useMemo(() => {
+    return Number(order?.phiVanChuyen ?? order?.phiShip ?? order?.shippingFee ?? order?.tienShip ?? 0) || 0;
+  }, [order]);
+
+  const invoiceHtml = useMemo(() => {
+    // order chưa có (render đầu), tránh buildInvoiceHtml bị lỗi null
+    if (!order) {
+      return "<!doctype html><html><head><meta charset='utf-8'/></head><body></body></html>";
+    }
+    return buildInvoiceHtml({ order, shippingFee });
+  }, [order, shippingFee]);
+
+  const fullAddress = useMemo(() => {
+    const detail = order?.diaChiChiTiet || order?.diaChi; // ưu tiên chi tiết
+
+    const parts = [detail, order?.phuongXa, order?.quanHuyen, order?.tinhThanh].filter(Boolean);
+
+    // remove duplicates
+    const seen = new Set();
+    const uniq = [];
+    for (const p of parts) {
+      const key = String(p).trim();
+      if (!key) continue;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniq.push(key);
+      }
+    }
+
+    return uniq.length ? uniq.join(", ") : "-";
+  }, [order]);
+
+  // ✅ handlers (không phải hook nên đặt đâu cũng được, nhưng để đây cho rõ)
+  const handleViewInvoice = () => setOpenInvoice(true);
+
+  const handlePrintInvoice = () => {
+    try {
+      const w = window.open("", "_blank", "width=920,height=720");
+      if (!w) {
+        message.error("Trình duyệt đang chặn popup. Hãy cho phép popup để in hóa đơn.");
+        return;
+      }
+      w.document.open();
+      w.document.write(invoiceHtml);
+      w.document.close();
+      w.onload = () => {
+        w.focus();
+        w.print();
+      };
+    } catch (e) {
+      console.error(e);
+      message.error("Không thể in hóa đơn");
+    }
+  };
+
+  // ===== build steps fallback (khi BE chưa trả steps) =====
+  const buildFallbackSteps = (typeNormArg, current, cancelC, doneC) => {
+    const map = typeNormArg === "TAI_QUAY" ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
+
+    const codes = typeNormArg === "TAI_QUAY" ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7];
+
+    return codes.map((code) => {
+      const title = map[code]?.text || `Bước ${code}`;
+
+      let state = "UPCOMING";
+      if (current === cancelC) {
+        if (code === cancelC) state = "CANCELLED";
+        else if (code < cancelC) state = "DONE";
+        else state = "UPCOMING";
+      } else {
+        if (code < current) state = "DONE";
+        else if (code === current) state = "CURRENT";
+        else state = "UPCOMING";
+      }
+
+      // nếu current là doneC thì các bước < doneC = DONE, doneC = CURRENT (hoặc DONE đều ok)
+      if (current === doneC) {
+        if (code < doneC) state = "DONE";
+        if (code === doneC) state = "CURRENT";
+        if (code > doneC) state = "UPCOMING";
+      }
+
+      return { code, title, state };
+    });
+  };
+
+  // steps/logs normalize
+  const stepsRaw = useMemo(() => (Array.isArray(timeline?.steps) ? timeline.steps : []), [timeline?.steps]);
+  const logsRaw = useMemo(() => (Array.isArray(timeline?.logs) ? timeline.logs : []), [timeline?.logs]);
+
+  const stepsForRender = useMemo(() => {
+    if (stepsRaw.length > 0) {
+      // đảm bảo step có code/title/state
+      return stepsRaw.map((s) => ({
+        code: Number(s.code),
+        title:
+          s.title ||
+          s.name ||
+          (isPos ? ORDER_STATUS_MAP[Number(s.code)]?.text : ORDER_STATUS_ONLINE_MAP[Number(s.code)]?.text) ||
+          `Bước ${s.code}`,
+        state: s.state,
+      }));
+    }
+    // fallback khi BE chưa trả steps
+    return buildFallbackSteps(typeNorm, currentStatus, cancelCode, doneCode);
+  }, [stepsRaw, typeNorm, currentStatus, cancelCode, doneCode, isPos]);
+
+  // nextStatus: ưu tiên step UPCOMING sau CURRENT trong stepsForRender
+  const nextStatus = useMemo(() => {
+    if (!stepsForRender.length) return null;
+
+    const idx = stepsForRender.findIndex((s) => (s.state || "") === "CURRENT");
+    // nếu không có CURRENT mà đang CANCELLED/DONE -> không next
     if (idx === -1) return null;
 
-    for (let i = idx + 1; i < steps.length; i++) {
-      if (steps[i]?.state === "UPCOMING") {
-        const code = Number(steps[i].code);
+    for (let i = idx + 1; i < stepsForRender.length; i++) {
+      if (stepsForRender[i]?.state === "UPCOMING") {
+        const code = Number(stepsForRender[i].code);
         if (Number.isNaN(code)) return null;
 
-        // giữ label như bạn đang dùng (tối thiểu)
         if (isPos && code === 2) return { code, label: "Xác nhận hoàn thành đơn hàng" };
         return { code, label: "Chuyển bước tiếp theo" };
       }
     }
     return null;
-  }, [timeline?.steps, isPos]);
-
-  // ✅ FIX: canCancel cho cả POS & ONLINE/GIAO_HANG
-  const canCancel = useMemo(() => !isFinal, [isFinal]);
+  }, [stepsForRender, isPos]);
 
   // ===== Actions =====
   const handleUpdateStatus = async (newStatus, note) => {
@@ -317,7 +432,6 @@ const OrderDetailComponent = () => {
 
   // ===== Render timeline =====
   const renderTimeline = () => {
-    // ✅ FIX: áp dụng cho ONLINE + GIAO_HANG + TAI_QUAY
     if (!isOnlineLike && !isPos) {
       return (
         <Card size="small" style={{ borderRadius: 12, borderColor: "#edf2ff" }}>
@@ -328,15 +442,20 @@ const OrderDetailComponent = () => {
       );
     }
 
-    const steps = timeline?.steps || [];
-    const logs = timeline?.logs || [];
+    const steps = stepsForRender;
+    const logs = logsRaw;
 
-    // ✅ GIAO_HANG: bước 1-2 chỉ hiển thị (coi như DONE) khi đơn đã từ bước 3 trở đi
-const getEffectiveState = (step) => {
-  const codeNum = Number(step?.code);
-  if (typeNorm === "GIAO_HANG" && currentStatus >= 3 && codeNum <= 2) return "DONE";
-  return step?.state;
-};
+    // GIAO_HANG: bước 1-2 chỉ hiển thị (coi như DONE) khi đơn đã từ bước 3 trở đi
+    const getEffectiveState = (step) => {
+      const codeNum = Number(step?.code);
+      let state = step?.state;
+
+      // nếu đơn đang CANCELLED theo currentStatus thì step cancel -> CANCELLED
+      if (currentStatus === cancelCode && codeNum === cancelCode) return "CANCELLED";
+
+      if (typeNorm === "GIAO_HANG" && currentStatus >= 3 && codeNum <= 2) return "DONE";
+      return state;
+    };
 
     if (loadingTimeline && !timeline) {
       return (
@@ -346,24 +465,32 @@ const getEffectiveState = (step) => {
       );
     }
 
-  const findLogByStepTitle = (stepTitle) => {
-  if (!Array.isArray(logs) || logs.length === 0) return null;
+    // match log chắc hơn: title step, hoặc title theo code, hoặc log có code/status/newStatus
+    const findLogForStep = (step) => {
+      if (!Array.isArray(logs) || logs.length === 0) return null;
 
-  const expected = (stepTitle || "").trim();
-  if (!expected) return null;
+      const codeNum = Number(step?.code);
+      const expectedTitleA = (step?.title || "").trim();
+      const expectedTitleB = (LOG_TITLE_BY_CODE[codeNum] || "").trim();
 
-  for (let i = logs.length - 1; i >= 0; i--) {
-    const t = (logs[i]?.title || "").trim();
-    if (t === expected) return logs[i];
-  }
-  return null;
-};
+      for (let i = logs.length - 1; i >= 0; i--) {
+        const l = logs[i] || {};
+        const t = (l?.title || "").trim();
+        const codeFromLog = Number(l?.code ?? l?.status ?? l?.newStatus ?? l?.trangThai);
 
-    // ✅ FIX: progress tính động theo steps (loại bỏ cancel step)
+        if (expectedTitleA && t === expectedTitleA) return l;
+        if (expectedTitleB && t === expectedTitleB) return l;
+
+        if (!Number.isNaN(codeFromLog) && codeFromLog === codeNum) return l;
+      }
+      return null;
+    };
+
+    // progress tính động theo steps (loại bỏ cancel step)
     const nonCancelSteps = steps.filter((s) => Number(s.code) !== cancelCode);
     const timelineTotalSteps = nonCancelSteps.length || 1;
     const doneCount = nonCancelSteps.filter((s) => getEffectiveState(s) === "DONE").length;
-const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT") ? 1 : 0;
+    const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT") ? 1 : 0;
     const completedSteps = Math.min(timelineTotalSteps, doneCount + hasCurrent);
     const timelinePercent = Math.round((completedSteps * 100) / timelineTotalSteps);
 
@@ -395,56 +522,46 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
 
           <Timeline mode="left" style={{ marginTop: 6 }}>
             {steps.map((s) => {
-  const codeNum = Number(s.code);
+              const codeNum = Number(s.code);
 
-  const effectiveState = getEffectiveState(s);
+              const effectiveState = getEffectiveState(s);
+              const visual = getStepVisual(effectiveState);
 
-  const visual = getStepVisual(effectiveState);
-  const isCurrent = effectiveState === "CURRENT";
-  const isDone = effectiveState === "DONE";
-  const isUpcoming = effectiveState === "UPCOMING";
-  const isCancelled = effectiveState === "CANCELLED";
+              const isCurrent = effectiveState === "CURRENT";
+              const isDone = effectiveState === "DONE";
+              const isUpcoming = effectiveState === "UPCOMING";
+              const isCancelled = effectiveState === "CANCELLED";
 
-  const titlePrefix = isCurrent
-    ? "Hiện tại:"
-    : isDone
-    ? "Đã xong:"
-    : isUpcoming
-    ? "Sắp tới:"
-    : "Trạng thái:";
+              const titlePrefix = isCurrent ? "Hiện tại:" : isDone ? "Đã xong:" : isUpcoming ? "Sắp tới:" : "Trạng thái:";
 
-  const matchedLog = findLogByStepTitle(s.title);
-  const timeLabel = matchedLog?.time ? formatDateTime(matchedLog.time) : "-";
+              const matchedLog = findLogForStep(s);
+              const timeLabel = pickLogTime(matchedLog) ? formatDateTime(pickLogTime(matchedLog)) : "-";
 
-  return (
-    <Timeline.Item key={s.code} color={visual.color} dot={visual.dot} label={timeLabel}>
-      <Card
-        size="small"
-        style={{
-          borderRadius: 12,
-          borderColor: isCurrent ? "#93c5fd" : isCancelled ? "#fecaca" : "#e5e7eb",
-          boxShadow: isCurrent ? "0 10px 22px rgba(59,130,246,0.12)" : "0 6px 14px rgba(15,23,42,0.03)",
-          opacity: isUpcoming ? 0.55 : 1,
-        }}
-      >
+              return (
+                <Timeline.Item key={String(s.code)} color={visual.color} dot={visual.dot} label={timeLabel}>
+                  <Card
+                    size="small"
+                    style={{
+                      borderRadius: 12,
+                      borderColor: isCurrent ? "#93c5fd" : isCancelled ? "#fecaca" : "#e5e7eb",
+                      boxShadow: isCurrent ? "0 10px 22px rgba(59,130,246,0.12)" : "0 6px 14px rgba(15,23,42,0.03)",
+                      opacity: isUpcoming ? 0.55 : 1,
+                    }}
+                  >
                     <Space direction="vertical" size={6} style={{ width: "100%" }}>
                       <Space size={8} wrap>
-                        {/* ✅ FIX: DTO steps dùng title, không dùng name */}
                         <Tag color={statusColorMap[codeNum]?.color || "default"}>{s.title}</Tag>
                         <Text strong>
                           {titlePrefix} {s.title}
                         </Text>
 
-                        {!isPos && (
-                          <>
-                            {isCurrent && codeNum === doneCode && <Tag color="green">Hoàn tất</Tag>}
-                            {isCurrent && codeNum === cancelCode && <Tag color="red">Đã hủy</Tag>}
-                            {isCurrent && codeNum !== doneCode && codeNum !== cancelCode && <Tag color="blue">Đang xử lý</Tag>}
+                        {/* tag trạng thái phụ (áp dụng cả POS lẫn ONLINE) */}
+                        {isCurrent && codeNum === doneCode && <Tag color="green">Hoàn tất</Tag>}
+                        {isCurrent && codeNum === cancelCode && <Tag color="red">Đã hủy</Tag>}
+                        {isCurrent && codeNum !== doneCode && codeNum !== cancelCode && <Tag color="blue">Đang xử lý</Tag>}
 
-                            {isDone && <Tag color="green">Hoàn tất</Tag>}
-                            {isCancelled && <Tag color="red">Đã hủy</Tag>}
-                          </>
-                        )}
+                        {isDone && <Tag color="green">Hoàn tất</Tag>}
+                        {isCancelled && <Tag color="red">Đã hủy</Tag>}
                       </Space>
 
                       <Text type="secondary">
@@ -452,7 +569,7 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
                       </Text>
 
                       <Text type="secondary">
-                        Bởi: <b>{matchedLog?.by || "Hệ thống"}</b>
+                        Bởi: <b>{matchedLog ? pickLogBy(matchedLog) : "Hệ thống"}</b>
                       </Text>
                     </Space>
                   </Card>
@@ -463,18 +580,16 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
 
           <Divider style={{ margin: "12px 0" }} />
 
-          {/* Actions */}
-          {!isPos && (
-            <div style={{ display: "flex", gap: 10 }}>
-              <Button type="primary" disabled={!nextStatus || isFinal} onClick={confirmNext}>
-                {nextStatus?.label || "Xác nhận"}
-              </Button>
+          {/* Actions: bật cho cả POS & ONLINE/GIAO_HANG */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <Button type="primary" disabled={!nextStatus || isFinal} onClick={confirmNext}>
+              {nextStatus?.label || "Xác nhận"}
+            </Button>
 
-              <Button danger disabled={!canCancel} onClick={confirmCancel}>
-                Hủy đơn hàng
-              </Button>
-            </div>
-          )}
+            <Button danger disabled={!canCancel} onClick={confirmCancel}>
+              Hủy đơn hàng
+            </Button>
+          </div>
         </Card>
 
         {/* Logs detail */}
@@ -487,16 +602,15 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
                     <div>
                       <Text strong>{l.title || "Cập nhật"}</Text>
                       <div style={{ marginTop: 4 }}>
-                        <Text type="secondary">{l.description || "-"}</Text>
+                        <Text type="secondary">{l.description || l.noiDung || "-"}</Text>
                       </div>
                       <div style={{ marginTop: 4 }}>
                         <Text type="secondary">
-                          Bởi: <b>{l.by || "Hệ thống"}</b>
+                          Bởi: <b>{pickLogBy(l)}</b>
                         </Text>
                       </div>
                     </div>
-                    {/* ✅ FIX: time (không phải at) */}
-                    <Text type="secondary">{formatDateTime(l.time)}</Text>
+                    <Text type="secondary">{formatDateTime(pickLogTime(l))}</Text>
                   </div>
                 </Timeline.Item>
               ))}
@@ -548,8 +662,12 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
           </Space>
 
           <Space>
-            <Button icon={<FileTextOutlined />}>Xem hóa đơn</Button>
-            <Button icon={<PrinterOutlined />}>In hóa đơn</Button>
+            <Button icon={<FileTextOutlined />} onClick={handleViewInvoice} disabled={!order}>
+              Xem hóa đơn
+            </Button>
+            <Button icon={<PrinterOutlined />} onClick={handlePrintInvoice} disabled={!order}>
+              In hóa đơn
+            </Button>
             <Button icon={<ReloadOutlined />} onClick={refreshAll} loading={loading || loadingTimeline}>
               Làm mới
             </Button>
@@ -597,6 +715,10 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
                         <Text strong>Số điện thoại: </Text>
                         <Text>{order?.sdtNguoiNhan || order?.sdtKhachHang || "-"}</Text>
                       </div>
+                      <div style={{ marginTop: 6 }}>
+                        <Text strong>Địa chỉ: </Text>
+                        <Text>{fullAddress}</Text>
+                      </div>
                     </div>
                   </Card>
                 </Col>
@@ -625,10 +747,17 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
                       <span>Tổng tiền hàng:</span>
                       <span>{formatCurrency(order?.giaTriChuaGiam)}</span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span>Giảm giá voucher:</span>
                       <span style={{ color: "#f11e1eff" }}>- {formatCurrency(order?.giaTriGiamGia)}</span>
                     </div>
+
+                    {/* ✅ thêm phí ship nếu có */}
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                      <span>Phí vận chuyển:</span>
+                      <span>{formatCurrency(shippingFee)}</span>
+                    </div>
+
                     <div style={{ borderTop: "1px solid #f0f0f0", margin: "8px 0" }} />
                     <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 600 }}>
                       <span>Tổng thanh toán:</span>
@@ -675,6 +804,7 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
                     <Descriptions size="small" column={1} colon={false} labelStyle={{ fontWeight: 500 }}>
                       <Descriptions.Item label="Tổng tiền hàng">{formatCurrency(order?.giaTriChuaGiam)}</Descriptions.Item>
                       <Descriptions.Item label="Giảm giá voucher">- {formatCurrency(order?.giaTriGiamGia)}</Descriptions.Item>
+                      <Descriptions.Item label="Phí vận chuyển">{formatCurrency(shippingFee)}</Descriptions.Item>
                       <Descriptions.Item label="Tổng thanh toán">
                         <Text strong type="success">
                           {formatCurrency(mustPay)}
@@ -697,10 +827,11 @@ const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT"
             <Tabs.TabPane tab="Trạng thái" key="status">
               {renderTimeline()}
             </Tabs.TabPane>
-
-
           </Tabs>
         </Card>
+
+        {/* ✅ NEW: Modal hóa đơn tách component */}
+        <InvoiceModal open={openInvoice} onClose={() => setOpenInvoice(false)} html={invoiceHtml} onPrint={handlePrintInvoice} />
       </div>
     </div>
   );
