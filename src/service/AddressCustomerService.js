@@ -1,9 +1,8 @@
 import api from "./api";
 
-// Lấy tất cả địa chỉ của khách hàng (customer endpoint)
-export const getAllAddress = async (customerId) => {
-  const res = await api.get(`/api/v1/laptops/get-all-address/${customerId}`);
-  // tuỳ BE trả thẳng list hay bọc data
+// Lấy tất cả địa chỉ của user đang đăng nhập (không cần truyền customerId)
+export const getAllAddress = async () => {
+  const res = await api.get(`/api/v1/laptops/get-all-address`);
   return res.data?.data ?? res.data ?? [];
 };
 

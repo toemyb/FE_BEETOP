@@ -172,7 +172,7 @@ const ListLaptopCTComponent = () => {
       render: (val) => val || <span style={{ color: '#aaa' }}>(Không có)</span>,
     },
     {
-      title: 'Thao tác',
+      title: 'Hành động',
       fixed: 'right',
       width: 260,
       render: (_, record) => (

@@ -24,6 +24,7 @@ import Login from './components/auth/Login';
 import Register from './components/auth/Register';
 import ForgotPassword from './components/auth/ForgotPassword';
 import ResetPassword from './components/auth/ResetPassword';
+import ChangePassword from "./components/auth/ChangePassword";
 import Profile from './components/Profile';
 import CustomerHome from './components/CustomerHome';
 
@@ -96,7 +97,7 @@ import CustomerPaymentSuccessPage from './pages/customer/PaymentSuccessPage';
 import AdminProfile from './components/AdminProfile';
 // ✅ Auth pages (không layout)
 const AUTH_PATHS = ['/login', '/register', '/forgot-password', '/reset-password'];
-
+import './global.css';
 // ✅ Customer public pages (không cần login)
 const CUSTOMER_PUBLIC_PATHS = [
   '/',
@@ -126,6 +127,8 @@ const AppContent = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  
+
   useEffect(() => {
     const restoreSession = async () => {
       const storedUser = sessionStorage.getItem('user');
@@ -136,6 +139,16 @@ const AppContent = () => {
       const isAuthPage = AUTH_PATHS.includes(pathname);
 
       // helper: map user from /auth/me
+      const normalizeRole = (raw) => {
+        if (!raw) return "USER";
+        // bỏ dấu tiếng Việt
+        const noAccent = raw
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+        // chuẩn hóa
+        return noAccent.trim().toUpperCase().replace(/\s+/g, "_");
+      };
+
       const mapUser = (userData) => ({
         ten: userData.ten,
         email: userData.email,
@@ -143,7 +156,7 @@ const AppContent = () => {
         gioiTinh: userData.gioiTinh,
         ngaySinh: userData.ngaySinh,
         anh: userData.anh,
-        role: userData.tenChucVu ? userData.tenChucVu.toUpperCase() : 'USER',
+        role: normalizeRole(userData.tenChucVu || userData.role),
       });
 
       // 1) Nếu đã có storedUser + token → verify lại bằng /auth/me
@@ -242,50 +255,50 @@ const AppContent = () => {
     { path: '/admin/don-hang', element: <ListDonhangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/orders/:id', element: <OrderDetailComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
 
-    { path: '/admin/phieu-giam-gia', element: <ListPhieuGiamGiaComponent />, roles: ['ADMIN'] },
+    { path: '/admin/phieu-giam-gia', element: <ListPhieuGiamGiaComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-phieu-giam-gia', element: <PhieuGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/admin/edit-phieu-giam-gia/:idPhieugiamgia', element: <PhieuGiamGiaComponent />, roles: ['ADMIN'] },
 
     { path: '/dot-giam-gia', element: <ListDotGiamGiaComponent />, roles: ['ADMIN'] },
     { path: '/tao-dot-giam-gia', element: <DotGiamGiaComponents />, roles: ['ADMIN'] },
 
-    { path: '/admin/lap-top', element: <ListSanPhamComponent />, roles: ['ADMIN'] },
-    { path: '/admin/lap-top-ct/:idLaptop', element: <ListSanPhamCTComponent />, roles: ['ADMIN'] },
+    { path: '/admin/lap-top', element: <ListSanPhamComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/lap-top-ct/:idLaptop', element: <ListSanPhamCTComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/lap-top-ct/add/:idLaptop', element: <AddLapTopCTComponent />, roles: ['ADMIN'] },
     { path: '/admin/lap-top-ct/edit/:id', element: <UpdateLapTopCTComponent />, roles: ['ADMIN'] },
     { path: '/admin/add-lap-top', element: <AddLapTopComponent />, roles: ['ADMIN'] },
     { path: '/admin/sua-lap-top/:id', element: <AddLapTopComponent />, roles: ['ADMIN'] },
 
-    { path: '/admin/cpu', element: <ListCpuComponent />, roles: ['ADMIN'] },
+    { path: '/admin/cpu', element: <ListCpuComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-cpu', element: <AddCpuComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-cpu/:id', element: <AddCpuComponent />, roles: ['ADMIN'] },
 
-    { path: '/admin/do-hoa', element: <ListDoHoaComponent />, roles: ['ADMIN'] },
+    { path: '/admin/do-hoa', element: <ListDoHoaComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-do-hoa', element: <AddDoHoaComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-do-hoa/:id', element: <AddDoHoaComponent />, roles: ['ADMIN'] },
 
 
-    { path: '/admin/hang', element: <ListHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/seri', element: <ListSeriComponent />, roles: ['ADMIN'] },
+    { path: '/admin/hang', element: <ListHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/seri', element: <ListSeriComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
 
-    { path: '/admin/kich-thuoc', element: <ListKichThuocComponent />, roles: ['ADMIN'] },
-    { path: '/admin/he-dieu-hanh', element: <ListHeDieuHanhComponent />, roles: ['ADMIN'] },
-    { path: '/admin/thuong-hieu', element: <ListThuongHieuComponent />, roles: ['ADMIN'] },
+    { path: '/admin/kich-thuoc', element: <ListKichThuocComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/he-dieu-hanh', element: <ListHeDieuHanhComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/thuong-hieu', element: <ListThuongHieuComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
 
-    { path: '/admin/mau-sac', element: <ListMauSacComponent />, roles: ['ADMIN'] },
+    { path: '/admin/mau-sac', element: <ListMauSacComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-mausac', element: <AddMauSacComponent />, roles: ['ADMIN'] },
     { path: '/admin/update-mausac/:id', element: <AddMauSacComponent />, roles: ['ADMIN'] },
 
-    { path: '/admin/pin', element: <ListPinComponent />, roles: ['ADMIN'] },
-    { path: '/admin/ram', element: <ListRamComponent />, roles: ['ADMIN'] },
+    { path: '/admin/pin', element: <ListPinComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/ram', element: <ListRamComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-ram', element: <AddRamComponent />, roles: ['ADMIN'] },
-    { path: '/admin/rom', element: <ListRomComponent />, roles: ['ADMIN'] },
+    { path: '/admin/rom', element: <ListRomComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
     { path: '/admin/add-rom', element: <AddRomComponent />, roles: ['ADMIN'] },
-    { path: '/admin/man-hinh', element: <ListManHinhComponent />, roles: ['ADMIN'] },
+    { path: '/admin/man-hinh', element: <ListManHinhComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
 
-    { path: '/admin/khach-hang', element: <ListKhachHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/khach-hang/add', element: <AddKhachHangComponent />, roles: ['ADMIN'] },
-    { path: '/admin/khach-hang/edit/:id', element: <EditKhachHangComponent />, roles: ['ADMIN'] },
+    { path: '/admin/khach-hang', element: <ListKhachHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/khach-hang/add', element: <AddKhachHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+    { path: '/admin/khach-hang/edit/:id', element: <EditKhachHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
 
     { path: '/admin/nhan-vien', element: <ListNhanVienComponent />, roles: ['ADMIN'] },
     { path: '/admin/nhan-vien/add', element: <AddNhanVienComponent />, roles: ['ADMIN'] },
@@ -321,6 +334,7 @@ const AppContent = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/change-password" element={<ChangePassword />} />
 
         {/* ================= CUSTOMER (CustomerLayout) ================= */}
         <Route
@@ -448,4 +462,4 @@ function App() {
   );
 }
 
-export default App;
+export default App; 

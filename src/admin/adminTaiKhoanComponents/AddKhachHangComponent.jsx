@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Input, DatePicker, Radio, Button, Select, Row, Col, message, Upload } from 'antd';
+import { Form, Input, DatePicker, Radio, Button, Select, Row, Col, Upload, Modal } from 'antd';
+import { toast } from 'react-toastify';
 import { PlusOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
@@ -38,7 +39,7 @@ const AddKhachHangComponent = () => {
         const list = await getGHNProvinces();
         setProvinces(list);
       } catch (error) {
-        message.error('Không thể tải danh sách tỉnh/thành phố (GHN)!');
+        toast.error('Không thể tải danh sách tỉnh/thành phố (GHN)!');
       } finally {
         setLoadingProvinces(false);
       }
@@ -64,7 +65,7 @@ const AddKhachHangComponent = () => {
       setWards([]);
       form.setFieldsValue({ quanHuyen: undefined, phuongXa: undefined });
     } catch (error) {
-      message.error('Không thể tải danh sách quận/huyện (GHN)!');
+      toast.error('Không thể tải danh sách quận/huyện (GHN)!');
     } finally {
       setLoadingDistricts(false);
     }
@@ -77,13 +78,12 @@ const AddKhachHangComponent = () => {
       setWards(list);
       form.setFieldsValue({ phuongXa: undefined });
     } catch (error) {
-      message.error('Không thể tải danh sách phường/xã (GHN)!');
+      toast.error('Không thể tải danh sách phường/xã (GHN)!');
     } finally {
       setLoadingWards(false);
     }
   };
-
-  const handleSubmit = async (values) => {
+  const doSubmit = async (values) => {
     setLoading(true);
     try {
       const province = provinces.find((p) => Number(p.ProvinceID) === Number(values.tinhThanh));
@@ -91,7 +91,7 @@ const AddKhachHangComponent = () => {
       const ward = wards.find((w) => String(w.WardCode) === String(values.phuongXa));
 
       if (!province || !district || !ward) {
-        message.error('Vui lòng chọn đầy đủ Tỉnh/Huyện/Xã!');
+        toast.error('Vui lòng chọn đầy đủ Tỉnh/Huyện/Xã!');
         return;
       }
 
@@ -103,29 +103,37 @@ const AddKhachHangComponent = () => {
         gioiTinh: values.gioiTinh,
         quocGia: values.quocGia || 'Việt Nam',
 
-        // ✅ Lưu text để hiển thị
         tinhThanh: province.ProvinceName,
         quanHuyen: district.DistrictName,
         phuongXa: ward.WardName,
         diaChiChiTiet: values.diaChiChiTiet,
 
-        // ✅ Lưu GHN IDs để tính ship / tạo vận đơn
-        provinceId: province.ProvinceID,      // number
-        districtId: district.DistrictID,      // number
-        wardCode: ward.WardCode,              // string
+        provinceId: province.ProvinceID,
+        districtId: district.DistrictID,
+        wardCode: ward.WardCode,
       };
 
       const avatarFile = fileList.length > 0 ? fileList[0].originFileObj : null;
-
       await userService.createCustomer(payload, avatarFile);
-      message.success('Tạo khách hàng thành công!');
+      toast.success('Tạo khách hàng thành công!');
       navigate('/admin/khach-hang');
     } catch (error) {
       console.error('Lỗi khi tạo khách hàng:', error);
-      message.error(error?.message || 'Không thể tạo khách hàng!');
+      toast.error(error?.message || 'Không thể tạo khách hàng!');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (values) => {
+    Modal.confirm({
+      title: "Xác nhận tạo khách hàng",
+      content: "Bạn có chắc muốn tạo khách hàng này không?",
+      okText: "Xác nhận",
+      cancelText: "Hủy",
+      centered: true,
+      onOk: () => doSubmit(values),
+    });
   };
 
   const uploadProps = {
@@ -133,12 +141,12 @@ const AddKhachHangComponent = () => {
     beforeUpload: (file) => {
       const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
       if (!isImage) {
-        message.error('Chỉ được tải lên file JPG hoặc PNG!');
+        toast.error('Chỉ được tải lên file JPG hoặc PNG!');
         return Upload.LIST_IGNORE;
       }
       const isLt5M = file.size / 1024 / 1024 < 5;
       if (!isLt5M) {
-        message.error('Kích thước ảnh phải nhỏ hơn 5MB!');
+        toast.error('Kích thước ảnh phải nhỏ hơn 5MB!');
         return Upload.LIST_IGNORE;
       }
       setFileList([{
@@ -355,7 +363,20 @@ const AddKhachHangComponent = () => {
               <Button type="primary" htmlType="submit" style={{ minWidth: 120 }} loading={loading} disabled={loading}>
                 Xác nhận
               </Button>
-              <Button onClick={() => navigate('/admin/khach-hang')} style={{ marginLeft: 8 }} disabled={loading}>
+               <Button
+                onClick={() =>
+                  Modal.confirm({
+                    title: "Xác nhận hủy",
+                    content: "Bạn có chắc muốn hủy? Dữ liệu nhập sẽ không được lưu.",
+                    okText: "Rời trang",
+                    cancelText: "Ở lại",
+                    centered: true,
+                    onOk: () => navigate('/admin/khach-hang'),
+                  })
+                }
+                style={{ marginLeft: 8 }}
+                disabled={loading}
+              >
                 Hủy
               </Button>
             </Form.Item>

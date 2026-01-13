@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Input, Select, Space, Tag } from 'antd';
 import { listPin } from '../../service/PinService';
 import AddPinModal from './AddPinComponent';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 
 const { Option } = Select;
 
@@ -132,7 +132,6 @@ const ListPinComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb items={[{ label: 'Pin' }]} />
       <h2>Danh sách Pin</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -144,9 +143,7 @@ const ListPinComponent = () => {
           style={{ width: 220 }}
         />
 
-        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
-          Làm Mới
-        </Button>
+     
 
         <span>Sắp xếp:</span>
         <Select value={sortOption} onChange={setSortOption} style={{ width: 160 }}>
@@ -156,7 +153,9 @@ const ListPinComponent = () => {
           <Option value="dl_az">Dung lượng A-Z</Option>
           <Option value="dl_za">Dung lượng Z-A</Option>
         </Select>
-
+   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          Làm Mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm Pin
         </Button>

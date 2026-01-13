@@ -371,7 +371,7 @@ const AddSeriComponent = ({ idLaptopCt: propIdLaptopCt, onClose }) => {
       ),
     },
     {
-      title: "Thao tác",
+      title: "Hành động",
       width: 90,
       render: (_, __, index) => (
         <Button

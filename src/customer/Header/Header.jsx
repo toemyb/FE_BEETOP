@@ -23,7 +23,7 @@ const BRAND_LOGOS = {
   Asus: "https://upload.wikimedia.org/wikipedia/commons/b/b0/ASUS_Corporate_Logo.svg",
   Lenovo: "https://upload.wikimedia.org/wikipedia/commons/b/b8/Lenovo_logo_2015.svg",
   Acer: "https://upload.wikimedia.org/wikipedia/commons/0/00/Acer_2011.svg",
-  Apple: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
+  MacBook: "https://upload.wikimedia.org/wikipedia/commons/f/fa/Apple_logo_black.svg",
 };
 
 // ✅ tránh crash khi JSON sai
@@ -253,7 +253,7 @@ const Header = () => {
                   >
                     <div className="brand-info">
                       <img
-                        src={BRAND_LOGOS[b.ten] || "https://via.placeholder.com/24"}
+                        src={BRAND_LOGOS[b.ten]}
                         alt={b.ten}
                         className="brand-logo"
                         style={{ height: "30px", objectFit: "contain" }}

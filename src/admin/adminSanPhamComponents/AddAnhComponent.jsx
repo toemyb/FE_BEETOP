@@ -152,7 +152,7 @@ const AddAnhComponent = ({ idLaptopCt: propIdLaptopCt, onClose }) => {
       ),
     },
     {
-      title: "Thao tác",
+      title: "Hành động",
       width: 110,
       align: "center",
       render: (_, record) => (

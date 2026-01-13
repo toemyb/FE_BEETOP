@@ -1,6 +1,6 @@
 // src/components/VoucherSelector.jsx
-import React, { useEffect, useMemo, useState } from "react";
-import { listVouchers } from "../service/PhieuGiamGiaService";
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { listAvailableVouchers } from "../service/PhieuGiamGiaService";
 
 const ModalLayout = ({ title, onClose, children, width = 420 }) => (
   <div
@@ -247,8 +247,20 @@ const VoucherSelector = ({
   const [rawVouchers, setRawVouchers] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // chỉ 1 voucher
+  // ✅ chỉ 1 voucher
   const [selectedId, setSelectedId] = useState(appliedVouchers?.[0]?.id || null);
+
+  // ✅ FIX: ngăn auto-select lại sau khi user đã thao tác (bấm ×, chọn voucher khác...)
+  const [userTouched, setUserTouched] = useState(false);
+
+  // ✅ optional: giữ selectedId sync theo appliedVouchers khi mở modal
+  const didInitFromPropsRef = useRef(false);
+  useEffect(() => {
+    if (didInitFromPropsRef.current) return;
+    didInitFromPropsRef.current = true;
+    const initial = appliedVouchers?.[0]?.id || null;
+    setSelectedId(initial);
+  }, [appliedVouchers]);
 
   const subtotal = orderSummary?.subtotal || 0;
 
@@ -256,8 +268,10 @@ const VoucherSelector = ({
     const fetch = async () => {
       try {
         setLoading(true);
-        const res = await listVouchers();
-        const raw = res?.data?.data ?? res?.data;
+        const res = await listAvailableVouchers();
+
+        // ✅ FIX: hỗ trợ cả ApiResponse{data:[...]} và direct array
+        const raw = res?.data?.data ?? res?.data ?? res;
         const data = Array.isArray(raw) ? raw : [];
         setRawVouchers(data);
       } catch (e) {
@@ -318,8 +332,10 @@ const VoucherSelector = ({
     });
   }, [rawVouchers, subtotal]);
 
+  const getQty = (v) => Number(v?.soLuong ?? v?.so_luong ?? 0);
+
   const activeByStatusAndDate = useMemo(
-    () => vouchers.filter((v) => v.trangThai === 1 && isDateActive(v)),
+    () => vouchers.filter((v) => v.trangThai === 1 && isDateActive(v) && getQty(v) > 0),
     [vouchers]
   );
 
@@ -346,12 +362,13 @@ const VoucherSelector = ({
     return (best.discount || 0) > 0 ? best : null;
   }, [applicable]);
 
-  // auto chọn best nếu chưa chọn
+  // ✅ FIX: auto chọn best chỉ khi user CHƯA thao tác
   useEffect(() => {
     if (!bestVoucher) return;
+    if (userTouched) return; // ✅ quan trọng: user đã bấm × thì không auto lại
     if (selectedId) return;
     setSelectedId(bestVoucher.id);
-  }, [bestVoucher, selectedId]);
+  }, [bestVoucher, userTouched, selectedId]);
 
   const otherApplicable = bestVoucher
     ? applicable.filter((v) => v.id !== bestVoucher.id)
@@ -364,6 +381,7 @@ const VoucherSelector = ({
   };
 
   const handlePick = (id, allowClear = false) => {
+    setUserTouched(true);
     setSelectedId((prev) => {
       if (prev === id) return allowClear ? null : id;
       return id;
@@ -403,12 +421,8 @@ const VoucherSelector = ({
           alignItems: "center",
         }}
       >
-        <span style={{ color: "#495057", fontWeight: 700 }}>
-          Tạm tính
-        </span>
-        <span style={{ fontWeight: 900, color: "#212529" }}>
-          {formatCurrency(subtotal)}
-        </span>
+        <span style={{ color: "#495057", fontWeight: 700 }}>Tạm tính</span>
+        <span style={{ fontWeight: 900, color: "#212529" }}>{formatCurrency(subtotal)}</span>
       </div>
 
       {/* Voucher tự động áp dụng */}
@@ -428,7 +442,11 @@ const VoucherSelector = ({
           badgeRight="Lựa chọn tối ưu nhất"
           subtitle={
             <>
-              {bestVoucher.giaTriMin ? <>Đơn tối thiểu: {formatCurrency(Number(bestVoucher.giaTriMin))}</> : <>Đơn tối thiểu: 0 ₫</>}
+              {bestVoucher.giaTriMin ? (
+                <>Đơn tối thiểu: {formatCurrency(Number(bestVoucher.giaTriMin))}</>
+              ) : (
+                <>Đơn tối thiểu: 0 ₫</>
+              )}
               {bestVoucher.ngayKetThuc ? <> • Hết hạn: {formatDateVi(bestVoucher.ngayKetThuc)}</> : null}
             </>
           }
@@ -462,7 +480,11 @@ const VoucherSelector = ({
               labelGiaTriGiam={labelGiaTriGiam}
               subtitle={
                 <>
-                  {v.giaTriMin ? <>Đơn tối thiểu: {formatCurrency(Number(v.giaTriMin))}</> : <>Đơn tối thiểu: 0 ₫</>}
+                  {v.giaTriMin ? (
+                    <>Đơn tối thiểu: {formatCurrency(Number(v.giaTriMin))}</>
+                  ) : (
+                    <>Đơn tối thiểu: 0 ₫</>
+                  )}
                   {v.ngayKetThuc ? <> • Hết hạn: {formatDateVi(v.ngayKetThuc)}</> : null}
                 </>
               }
@@ -492,13 +514,11 @@ const VoucherSelector = ({
                 selected={false}
                 onPick={() => {}}
                 rightActionType="plus"
-                disabled={true} // giống ảnh: gợi ý -> không pick được khi chưa đủ min
+                disabled={true} // gợi ý -> không pick được khi chưa đủ min
                 formatCurrency={formatCurrency}
                 labelGiaTriGiam={labelGiaTriGiam}
                 extraRedLine={
-                  extra > 0
-                    ? `Mua thêm ${formatCurrency(extra)} để được giảm ${labelGiaTriGiam(v)}`
-                    : null
+                  extra > 0 ? `Mua thêm ${formatCurrency(extra)} để được giảm ${labelGiaTriGiam(v)}` : null
                 }
                 subtitle={
                   <>
@@ -516,9 +536,7 @@ const VoucherSelector = ({
       <div style={{ borderTop: "1px solid #f1f3f5", marginTop: 12, paddingTop: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10, fontSize: 13 }}>
           <span style={{ fontWeight: 900, color: "#212529" }}>Tổng giảm tạm tính</span>
-          <span style={{ fontWeight: 900, color: "#e03131" }}>
-            {formatCurrency(tempTotalDiscount)}
-          </span>
+          <span style={{ fontWeight: 900, color: "#e03131" }}>{formatCurrency(tempTotalDiscount)}</span>
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -537,19 +555,44 @@ const VoucherSelector = ({
           >
             Hủy
           </button>
+
+          {/* ✅ NEW: nút bỏ voucher (clear chắc chắn, gọi luôn onApplyVouchers([])) */}
+          {selectedId && (
+            <button
+              onClick={() => {
+                setUserTouched(true);
+                setSelectedId(null);
+                onApplyVouchers([]); // parent sẽ clear BE
+              }}
+              style={{
+                padding: "9px 14px",
+                borderRadius: 10,
+                border: "1px solid #fa5252",
+                background: "#fff",
+                cursor: "pointer",
+                color: "#fa5252",
+                fontWeight: 900,
+                fontSize: 13,
+              }}
+              title="Bỏ voucher đang chọn"
+            >
+              Bỏ voucher
+            </button>
+          )}
+
           <button
             onClick={handleApply}
-            disabled={!selectedId}
+            disabled={false}
             style={{
               padding: "9px 16px",
               borderRadius: 10,
               border: "none",
               backgroundColor: primaryColor,
               color: "#fff",
-              cursor: selectedId ? "pointer" : "not-allowed",
+              cursor: "pointer",
               fontWeight: 900,
               fontSize: 13,
-              opacity: selectedId ? 1 : 0.6,
+              opacity: 1,
               minWidth: 120,
             }}
           >

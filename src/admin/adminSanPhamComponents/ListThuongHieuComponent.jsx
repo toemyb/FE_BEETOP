@@ -14,7 +14,7 @@ import {
 } from 'antd';
 import { listThuongHieu } from '../../service/ThuongHieuService';
 import AddThuongHieuModal from './AddThuongHieuComponent';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -149,30 +149,16 @@ const ListThuongHieuComponent = () => {
   ];
 
   return (
-    <div style={{ padding: '24px 32px' }}>
-      <AdminBreadcrumb items={[{ label: 'Thương hiệu' }]} />
+    <div style={{ padding: 24}}>
+  
 
-      <Card
-        style={{
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-        }}
-      >
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
           <Col>
             <Title level={3} style={{ margin: 0 }}>
               Danh sách thương hiệu
             </Title>
           </Col>
-          <Col>
-            <Button
-              type="primary"
-              onClick={() => openModal()}
-              style={{ fontWeight: 500 }}
-            >
-              + Thêm Thương Hiệu
-            </Button>
-          </Col>
+        
         </Row>
 
         <Space
@@ -210,6 +196,15 @@ const ListThuongHieuComponent = () => {
             >
               Làm Mới
             </Button>
+              <Col>
+            <Button
+              type="primary"
+              onClick={() => openModal()}
+              style={{ fontWeight: 500 }}
+            >
+              + Thêm Thương Hiệu
+            </Button>
+          </Col>
           </Space>
         </Space>
 
@@ -239,7 +234,7 @@ const ListThuongHieuComponent = () => {
             setPagination({ current: pag.current, pageSize: pag.pageSize })
           }
         />
-      </Card>
+ 
 
       {modalVisible && (
         <AddThuongHieuModal

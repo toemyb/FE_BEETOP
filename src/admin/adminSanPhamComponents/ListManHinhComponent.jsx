@@ -176,19 +176,10 @@ const ListManHinhComponent = () => {
     <div
       style={{
         padding: '24px',
-        background: '#f5f5f5',
-        minHeight: '100vh',
+       
       }}
     >
-      <Card
-        bordered={false}
-        style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-          borderRadius: 16,
-        }}
-      >
+      
         {/* Header */}
         <Row
           justify="space-between"
@@ -200,15 +191,7 @@ const ListManHinhComponent = () => {
               Danh sách màn hình
             </Title>
           </Col>
-          <Col>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-            >
-              Thêm Màn Hình
-            </Button>
-          </Col>
+          
         </Row>
 
         {/* Thanh filter */}
@@ -222,22 +205,16 @@ const ListManHinhComponent = () => {
             value={search}
             allowClear
             onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 230 }}
+            style={{ width: 160 }}
           />
 
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleRefresh}
-            style={{ background: '#FFD700', color: '#000' }}
-          >
-            Làm mới
-          </Button>
+          
 
           <span>Tần số:</span>
           <Select
             value={filterTanSo}
             onChange={setFilterTanSo}
-            style={{ width: 140 }}
+            style={{ width: 160 }}
           >
             <Option value="all">Tất cả</Option>
             <Option value="60">60Hz</Option>
@@ -267,6 +244,22 @@ const ListManHinhComponent = () => {
             <Option value="1">Hoạt động</Option>
             <Option value="0">Ngưng hoạt động</Option>
           </Select>
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={handleRefresh}
+            style={{ background: '#FFD700', color: '#000' }}
+          >
+            Làm mới
+          </Button>
+          <Col>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => openModal()}
+            >
+              Thêm Màn Hình
+            </Button>
+          </Col>
         </Space>
 
         {/* Bảng */}
@@ -286,7 +279,7 @@ const ListManHinhComponent = () => {
             setPagination({ current: pag.current, pageSize: pag.pageSize })
           }
         />
-      </Card>
+   
 
       {modalVisible && (
         <AddManHinhModal

@@ -1,6 +1,10 @@
 // src/admin/adminBanHangTaiQuayComponents/ListBanTaiQuayComponent.jsx
 import React, { useState, useEffect } from 'react';
 import InvoiceWorkingArea from './InvoiceWorkingArea.jsx';
+import { Button, Modal } from "antd";
+import { toast, ToastContainer } from "react-toastify";
+// ✅ THÊM:
+import "react-toastify/dist/ReactToastify.css";
 import {
   createDraftOrder,
   cancelOrder,
@@ -10,50 +14,19 @@ import {
 const MAX_INVOICES = 5;
 const LOCAL_KEY = 'posOpenInvoices';
 
-const NotificationToast = ({ type = 'info', message, onClose }) => {
-  const colors = {
-    success: '#12b886',
-    error: '#fa5252',
-    warning: '#f08c00',
-    info: '#228be6',
-  };
 
-  return (
-    <div style={{
-      position: 'fixed',
-      top: 20,
-      right: 20,
-      zIndex: 9999,
-      minWidth: 300,
-      backgroundColor: colors[type],
-      color: '#fff',
-      padding: '12px 16px',
-      borderRadius: 12,
-      boxShadow: '0 8px 25px rgba(0,0,0,0.2)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      fontSize: '0.95rem',
-      fontWeight: 600,
-    }}>
-      <span>{type === 'success' ? 'Thành công' : type === 'error' ? 'Lỗi' : type === 'warning' ? 'Cảnh báo' : 'Thông tin'}</span>
-      <div style={{ flex: 1 }}>{message}</div>
-      <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.4rem', cursor: 'pointer' }}>
-        ×
-      </button>
-    </div>
-  );
-};
 
 const ListBanTaiQuayComponent = () => {
   const [invoices, setInvoices] = useState([]);
   const [activeInvoiceId, setActiveInvoiceId] = useState(null);
   const [creating, setCreating] = useState(false);
-  const [notification, setNotification] = useState(null);
 
-  const showNotification = (type, message) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 4000);
+
+  const showNotification = (type, msg) => {
+    if (type === "success") return toast.success(msg);
+    if (type === "error") return toast.error(msg);
+    if (type === "warning") return toast.warn(msg);
+    return toast.info(msg);
   };
 
   // Load từ localStorage
@@ -89,7 +62,7 @@ const ListBanTaiQuayComponent = () => {
         const data = e.newValue ? JSON.parse(e.newValue) : [];
         setInvoices(data);
         if (data.length === 0) setActiveInvoiceId(null);
-      } catch (e) {}
+      } catch (e) { }
     };
     window.addEventListener('storage', handler);
     return () => window.removeEventListener('storage', handler);
@@ -156,7 +129,7 @@ const ListBanTaiQuayComponent = () => {
         orderId: order.id,
         maDonHang: order.maDonHang || 'Đơn mới',
         customer: null,
-        paymentMethod: 'Tiền mặt',
+        paymentMethod: 'CASH',
         customerCash: 0,
         itemCount: 0,
         orderStatus: order.trangThai,
@@ -172,18 +145,51 @@ const ListBanTaiQuayComponent = () => {
     }
   };
 
-  const handleCloseInvoice = async (idToClose) => {
-    const inv = invoices.find(i => i.id === idToClose);
-    if (inv?.orderId && inv.orderStatus === 1) {
-      try { await cancelOrder(inv.orderId); } catch (e) {}
-    }
+  const canCancel = (st) => {
+    const n = Number(st);
+    // Chỉ không hủy khi COMPLETED(6) hoặc CANCELED(7)
+    return !Number.isNaN(n) && n !== 6 && n !== 7;
+  };
 
+  const removeTabOnly = (idToClose) => {
     const updated = invoices.filter(i => i.id !== idToClose);
     setInvoices(updated);
     if (idToClose === activeInvoiceId) {
       setActiveInvoiceId(updated[0]?.id || null);
     }
   };
+
+  const handleCloseInvoice = (idToClose) => {
+    const inv = invoices.find(i => i.id === idToClose);
+    if (!inv) return;
+
+    Modal.confirm({
+      title: "Đóng giỏ hàng",
+      content: `Đóng giỏ sẽ hủy đơn ${inv.maDonHang}. Bạn chắc chắn?`,
+      // ✅ THÊM:
+      centered: true,
+      okText: "Hủy đơn & đóng",
+      // ✅ SỬA: okType -> dùng okButtonProps danger
+      okButtonProps: { danger: true },
+      cancelText: "Giữ lại",
+      onOk: async () => {
+        try {
+          if (inv.orderId && canCancel(inv.orderStatus)) {
+            await cancelOrder(inv.orderId); // ✅ gọi BE hủy đơn
+          }
+          showNotification("success", `Đã hủy đơn ${inv.maDonHang}.`);
+          removeTabOnly(idToClose); // ✅ chỉ xóa tab sau khi hủy OK
+        } catch (e) {
+          const msg =
+            e?.response?.data?.message ||
+            "Không thể hủy đơn (có thể đã có thanh toán).";
+          showNotification("error", msg);
+          // ❌ Không đóng tab nếu hủy thất bại (để tránh đơn treo/giữ seri)
+        }
+      },
+    });
+  };
+
 
   const handleInvoiceDone = (id) => {
     setInvoices(prev => prev.filter(i => i.id !== id));
@@ -204,11 +210,14 @@ const ListBanTaiQuayComponent = () => {
 
   return (
     <div style={{ padding: '12px', background: '#f5f7fa', minHeight: '100vh' }}>
-      {notification && (
-        <NotificationToast {...notification} onClose={() => setNotification(null)} />
-      )}
-
-      <h3 style={{ margin: '0 0 16px', color: '#212529', fontSize: '1.6rem', fontWeight: 700 }}>
+      <ToastContainer
+        position="top-right"
+        autoClose={4000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+      />
+      <h3 style={{ margin: '0 0 16px', color: '#212529', fontSize: '1.5rem', fontWeight: 700 }}>
         Bán hàng tại quầy
         <span style={{ fontSize: '1rem', color: '#6c757d', marginLeft: 12 }}>
           ({invoices.length}/{MAX_INVOICES} giỏ)
@@ -263,21 +272,20 @@ const ListBanTaiQuayComponent = () => {
           </div>
         ))}
 
-        <button
+        <Button
+          type="primary"
+          size="large"
           onClick={handleAddInvoice}
           disabled={invoices.length >= MAX_INVOICES || creating}
           style={{
-            padding: '10px 20px',
-            background: invoices.length >= MAX_INVOICES ? '#ccc' : '#12b886',
-            color: 'white',
-            border: 'none',
+            height: 46,
+            padding: "0 22px",
             borderRadius: 12,
-            cursor: invoices.length >= MAX_INVOICES ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
+            fontWeight: 700,
           }}
         >
           + Giỏ mới
-        </button>
+        </Button>
       </div>
 
       {/* Nội dung */}
@@ -297,20 +305,21 @@ const ListBanTaiQuayComponent = () => {
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
         }}>
           <p style={{ fontSize: '1.2rem', color: '#6c757d' }}>Chưa có giỏ hàng nào</p>
-          <button
+          <Button
+            type="primary"
+            size="large"
             onClick={handleAddInvoice}
             style={{
-              background: '#12b886',
-              color: 'white',
-              padding: '14px 32px',
-              border: 'none',
-              borderRadius: 12,
-              fontSize: '1.1rem',
-              cursor: 'pointer',
+              height: 52,
+              padding: "0 34px",
+              borderRadius: 14,
+              fontWeight: 700,
+              fontSize: 16,
             }}
           >
             + Tạo đơn hàng đầu tiên
-          </button>
+          </Button>
+
         </div>
       )}
     </div>

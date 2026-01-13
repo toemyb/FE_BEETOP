@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { listRam } from '../../service/RamService';
 import { Button, Table, Tag, Input, Select, Space, message } from 'antd';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 import AddRamModal from './AddRamComponent'; // đảm bảo file modal đã tồn tại
 
 const { Option } = Select;
@@ -122,7 +122,7 @@ const ListRamComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb items={[{ label: 'RAM' }]} />
+
       <h2>Danh sách RAM</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -134,9 +134,7 @@ const ListRamComponent = () => {
           style={{ width: 200 }}
         />
 
-        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
-          Làm mới
-        </Button>
+     
 
         <span>Trạng thái:</span>
         <Select
@@ -159,7 +157,9 @@ const ListRamComponent = () => {
           <Option value="az">Dung lượng A-Z</Option>
           <Option value="za">Dung lượng Z-A</Option>
         </Select>
-
+   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          Làm mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm RAM
         </Button>

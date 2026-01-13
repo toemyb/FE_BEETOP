@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Tag, Input, Select, Space, message } from 'antd';
 import { listRom } from '../../service/RomService';
 import AddRomModal from './AddRomComponent'; // modal dạng form
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 
 const { Option } = Select;
 
@@ -128,7 +128,7 @@ const ListRomComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb items={[{ label: 'ROM' }]} />
+  
       <h2>Danh sách ROM</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -139,9 +139,7 @@ const ListRomComponent = () => {
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 200 }}
         />
-        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
-          Làm mới
-        </Button>
+     
 
         <span>Trạng thái:</span>
         <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 140 }}>
@@ -156,7 +154,9 @@ const ListRomComponent = () => {
           <Option value="az">Dung lượng A-Z</Option>
           <Option value="za">Dung lượng Z-A</Option>
         </Select>
-
+   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          Làm mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm ROM
         </Button>

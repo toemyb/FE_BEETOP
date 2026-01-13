@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Tag, Input, Select, Space } from 'antd';
 import { listCpu } from '../../service/CpuService';
-import AdminBreadcrumb from '../components/Breadcrumb';
 import AddCpuModal from './AddCpuComponent'; // ✅ modal thêm/sửa
 import useToast from '../../hooks/useNotify';
 
@@ -110,7 +109,7 @@ const ListCpuComponent = () => {
         val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngừng</Tag>,
     },
     {
-      title: 'Thao tác',
+      title: 'Hành động',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -121,7 +120,6 @@ const ListCpuComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb items={[{ label: 'CPU' }]} />
       <h2>Danh sách CPU</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -133,12 +131,7 @@ const ListCpuComponent = () => {
           style={{ width: 200 }}
         />
 
-        <Button
-          onClick={handleRefresh}
-          style={{ background: '#FFD700', color: '#000' }}
-        >
-          Làm mới
-        </Button>
+       
 
         <span>Trạng Thái:</span>
         <Select
@@ -161,7 +154,12 @@ const ListCpuComponent = () => {
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
-
+ <Button
+          onClick={handleRefresh}
+          style={{ background: '#FFD700', color: '#000' }}
+        >
+          Làm mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm CPU
         </Button>

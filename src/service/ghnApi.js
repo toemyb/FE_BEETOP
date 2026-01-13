@@ -1,33 +1,44 @@
 // src/service/ghnApi.js
-import axios from "axios";
+import api from "./api";
 
-// ✅ Đặt token GHN của bạn ở đây (hoặc dùng env: import.meta.env.VITE_GHN_TOKEN)
-const GHN_TOKEN = "7d67a984-b5fe-11ef-b166-4205c1d15e61";
-
-export const ghnApi = axios.create({
-  baseURL: "https://online-gateway.ghn.vn/shiip/public-api",
-  headers: {
-    token: GHN_TOKEN,
-  },
-});
-
+// ✅ Provinces
 export const getGHNProvinces = async () => {
-  const res = await ghnApi.get("/master-data/province");
-  return res.data?.data || [];
+  // CartPage có unwrapList() nên trả thẳng res hoặc res.data đều được,
+  // nhưng trả res.data sẽ gọn hơn
+  const res = await api.get("/api/v1/ghn/province");
+  return res?.data; // KHÔNG ép [] ở đây
 };
 
+// ✅ Districts
 export const getGHNDistricts = async (provinceId) => {
   if (!provinceId) return [];
-  const res = await ghnApi.get("/master-data/district", {
+  const res = await api.get("/api/v1/ghn/district", {
     params: { province_id: provinceId },
   });
-  return res.data?.data || [];
+  return res?.data;
 };
 
+// ✅ Wards
 export const getGHNWards = async (districtId) => {
   if (!districtId) return [];
-  const res = await ghnApi.get("/master-data/ward", {
+  const res = await api.get("/api/v1/ghn/ward", {
     params: { district_id: districtId },
   });
-  return res.data?.data || [];
+  return res?.data;
+};
+
+// ✅ Fee
+export const calcGhnFee = async (payload) => {
+  const res = await api.post("/api/v1/ghn/fee", payload);
+
+  // BE có thể trả: {total}, {data:{total}}, {data:{data:{total}}}, {data:{Data:{total}}}...
+  const total =
+    res?.data?.total ??
+    res?.data?.data?.total ??
+    res?.data?.data?.data?.total ??
+    res?.data?.Data?.total ??
+    res?.data?.data?.Data?.total ??
+    0;
+
+  return Number(total || 0);
 };

@@ -11,8 +11,8 @@ import {
   ShopOutlined,
   GlobalOutlined,
 } from '@ant-design/icons'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { getThongKeTongQuan, getThongKe12Thang, getThongKeTheoThang, getThongKeSoSanhHaiNgay, getThongKeTrangThai, getThongKeTruyCap } from '../../service/ThongKeService'
+import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { getThongKeTongQuan, getThongKe12Thang, getThongKeTheoThang, getThongKeSoSanhHaiNgay, getThongKeTrangThai, getThongKeTruyCap, getTopLaptopTheoThang } from '../../service/ThongKeService'
 import dayjs from 'dayjs'
 
 const { RangePicker } = DatePicker
@@ -45,6 +45,7 @@ const ListThongKeComponent = () => {
     totalOnline: 0,
     totalOffline: 0
   });
+  const [top10MonthFilter, setTop10MonthFilter] = useState(dayjs()); // Bộ lọc tháng riêng cho Top 10
 
   useEffect(() => {
     try {
@@ -64,6 +65,9 @@ const ListThongKeComponent = () => {
 
     // Load dữ liệu truy cập online/offline
     fetchAccessData();
+
+    // Load top 10 sản phẩm theo tháng hiện tại
+    fetchTop10ByMonth(dayjs());
 
     // Auto refresh access data mỗi 30 giây
     const interval = setInterval(() => {
@@ -213,11 +217,13 @@ const ListThongKeComponent = () => {
                 const existing = allLaptops1.get(laptop.idLaptop);
                 if (existing) {
                   existing.soLuongBan += laptop.soLuongBan || 0;
+                  existing.tongTienThuHo += laptop.tongTienThuHo || 0;
                 } else {
                   allLaptops1.set(laptop.idLaptop, {
                     idLaptop: laptop.idLaptop,
                     tenSanPham: laptop.tenSanPham || 'N/A',
-                    soLuongBan: laptop.soLuongBan || 0
+                    soLuongBan: laptop.soLuongBan || 0,
+                    tongTienThuHo: laptop.tongTienThuHo || 0
                   });
                 }
               }
@@ -231,11 +237,13 @@ const ListThongKeComponent = () => {
                 const existing = allLaptops2.get(laptop.idLaptop);
                 if (existing) {
                   existing.soLuongBan += laptop.soLuongBan || 0;
+                  existing.tongTienThuHo += laptop.tongTienThuHo || 0;
                 } else {
                   allLaptops2.set(laptop.idLaptop, {
                     idLaptop: laptop.idLaptop,
                     tenSanPham: laptop.tenSanPham || 'N/A',
-                    soLuongBan: laptop.soLuongBan || 0
+                    soLuongBan: laptop.soLuongBan || 0,
+                    tongTienThuHo: laptop.tongTienThuHo || 0
                   });
                 }
               }
@@ -252,12 +260,13 @@ const ListThongKeComponent = () => {
           .sort((a, b) => b.soLuongBan - a.soLuongBan)
           .slice(0, 10);
 
-        setTop10Laptops({
-          period1: sortedLaptops1,
-          period2: sortedLaptops2,
-          label1: `Năm ${previousYear}`,
-          label2: `Năm ${currentYear}`
-        });
+        // KHÔNG set top10Laptops ở đây nữa vì đã có bộ lọc riêng
+        // setTop10Laptops({
+        //   period1: sortedLaptops1,
+        //   period2: sortedLaptops2,
+        //   label1: `Năm ${previousYear}`,
+        //   label2: `Năm ${currentYear}`
+        // });
       }
     } catch (error) {
       console.error('Lỗi khi tải dữ liệu biểu đồ mặc định:', error);
@@ -303,6 +312,36 @@ const ListThongKeComponent = () => {
       }
     } catch (error) {
       console.error('Lỗi khi lấy dữ liệu truy cập:', error);
+    }
+  };
+
+  // Fetch top 10 laptop theo tháng được chọn (độc lập với bộ lọc biểu đồ)
+  const fetchTop10ByMonth = async (selectedMonth) => {
+    try {
+      const year = selectedMonth.year();
+      const month = selectedMonth.month() + 1; // dayjs month is 0-based
+
+      const response = await getTopLaptopTheoThang(year, month);
+
+      if (response.data?.data && Array.isArray(response.data.data)) {
+        setTop10Laptops({
+          period1: [],
+          period2: response.data.data,
+          label1: '',
+          label2: `Tháng ${month}/${year}`
+        });
+      }
+    } catch (error) {
+      console.error('Lỗi khi lấy top 10 laptop theo tháng:', error);
+      message.error('Không thể tải dữ liệu top 10 sản phẩm');
+    }
+  };
+
+  // Xử lý khi thay đổi tháng filter cho Top 10
+  const handleTop10MonthChange = (date) => {
+    if (date) {
+      setTop10MonthFilter(date);
+      fetchTop10ByMonth(date);
     }
   };
 
@@ -446,12 +485,13 @@ const ListThongKeComponent = () => {
           console.log('Sorted laptops 1:', sortedLaptops1);
           console.log('Sorted laptops 2:', sortedLaptops2);
 
-          setTop10Laptops({
-            period1: sortedLaptops1,
-            period2: sortedLaptops2,
-            label1: `Tháng ${thang1.format('MM/YYYY')}`,
-            label2: `Tháng ${thang2.format('MM/YYYY')}`
-          });
+          // KHÔNG cập nhật top10Laptops nữa vì đã có bộ lọc riêng
+          // setTop10Laptops({
+          //   period1: sortedLaptops1,
+          //   period2: sortedLaptops2,
+          //   label1: `Tháng ${thang1.format('MM/YYYY')}`,
+          //   label2: `Tháng ${thang2.format('MM/YYYY')}`
+          // });
 
           message.success(`Đã tải dữ liệu so sánh tháng ${thang1.format('MM/YYYY')} và ${thang2.format('MM/YYYY')}`);
         }
@@ -527,12 +567,13 @@ const ListThongKeComponent = () => {
             .sort((a, b) => b.soLuongBan - a.soLuongBan)
             .slice(0, 10);
 
-          setTop10Laptops({
-            period1: sortedLaptops1,
-            period2: sortedLaptops2,
-            label1: `Năm ${nam1}`,
-            label2: `Năm ${nam2}`
-          });
+          // KHÔNG cập nhật top10Laptops nữa vì đã có bộ lọc riêng
+          // setTop10Laptops({
+          //   period1: sortedLaptops1,
+          //   period2: sortedLaptops2,
+          //   label1: `Năm ${nam1}`,
+          //   label2: `Năm ${nam2}`
+          // });
 
           message.success(`Đã tải dữ liệu so sánh năm ${nam1} và năm ${nam2}`);
         }
@@ -586,12 +627,13 @@ const ListThongKeComponent = () => {
           console.log('Top laptops 1:', topLaptops1);
           console.log('Top laptops 2:', topLaptops2);
 
-          setTop10Laptops({
-            period1: topLaptops1,
-            period2: topLaptops2,
-            label1: `Ngày ${ngay1.format('DD/MM/YYYY')}`,
-            label2: `Ngày ${ngay2.format('DD/MM/YYYY')}`
-          });
+          // KHÔNG cập nhật top10Laptops nữa vì đã có bộ lọc riêng
+          // setTop10Laptops({
+          //   period1: topLaptops1,
+          //   period2: topLaptops2,
+          //   label1: `Ngày ${ngay1.format('DD/MM/YYYY')}`,
+          //   label2: `Ngày ${ngay2.format('DD/MM/YYYY')}`
+          // });
 
           message.success(`Đã tải dữ liệu so sánh ngày ${ngay1.format('DD/MM/YYYY')} và ${ngay2.format('DD/MM/YYYY')}`);
         }
@@ -824,13 +866,6 @@ const ListThongKeComponent = () => {
       valueStyle: { color: '#1890ff' },
     },
     {
-      title: 'Tổng Khách Hàng',
-      value: thongKeData?.tongKhachHang || 0,
-      prefix: <UserOutlined />,
-      suffix: ' người',
-      valueStyle: { color: '#722ed1' },
-    },
-    {
       title: 'Tăng Trưởng',
       value: thongKeData?.tangTruong || 0,
       prefix: <RiseOutlined />,
@@ -1040,13 +1075,13 @@ const ListThongKeComponent = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {statisticsData.map((stat, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
-            <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
+            <Card variant="outlined" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)' }}>
               <Statistic
                 title={stat.title}
                 value={stat.value}
                 prefix={stat.prefix}
                 suffix={stat.suffix}
-                valueStyle={stat.valueStyle}
+                styles={{ content: stat.valueStyle }}
               />
             </Card>
           </Col>
@@ -1228,342 +1263,173 @@ const ListThongKeComponent = () => {
                 </>
               ),
             },
-            {
-              key: 'online',
-              label: (
-                <span>
-                  <GlobalOutlined style={{ marginRight: 8 }} />
-                  Online
-                </span>
-              ),
-              children: (
-                <>
-                  <Spin spinning={chartLoading} tip="Đang tải dữ liệu...">
-                    <div style={{ padding: '20px 0' }}>
-                      <ResponsiveContainer width="100%" height={400}>
-                        {timeFilter === 'month' ? (
-                          <LineChart
-                            data={getChartData('online')}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="period"
-                              tick={{ fontSize: 11 }}
-                              angle={-45}
-                              textAnchor="end"
-                              height={80}
-                              interval={2}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend
-                              wrapperStyle={{ paddingTop: '20px' }}
-                              iconType="line"
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="thang1"
-                              stroke="#1890ff"
-                              strokeWidth={3}
-                              name={`Tháng ${selectedMonths.thang1 || 'Trước'} (Online)`}
-                              dot={{ fill: '#1890ff', r: 4 }}
-                              activeDot={{ r: 6 }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="thang2"
-                              stroke="#40a9ff"
-                              strokeWidth={3}
-                              name={`Tháng ${selectedMonths.thang2 || 'Sau'} (Online)`}
-                              dot={{ fill: '#40a9ff', r: 4 }}
-                              activeDot={{ r: 6 }}
-                            />
-                          </LineChart>
-                        ) : (
-                          <BarChart
-                            data={getChartData('online')}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="period"
-                              tick={{ fontSize: 12 }}
-                              angle={timeFilter === 'year' ? -45 : 0}
-                              textAnchor={timeFilter === 'year' ? 'end' : 'middle'}
-                              height={timeFilter === 'year' ? 80 : 60}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                if (timeFilter === 'day') return `${(value / 1000000).toFixed(1)}M`;
-                                if (timeFilter === 'year') return `${(value / 1000000).toFixed(0)}M`;
-                                return `${(value / 1000000000).toFixed(1)}B`;
-                              }}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend
-                              wrapperStyle={{ paddingTop: '20px' }}
-                              iconType="rect"
-                            />
-                            {timeFilter === 'day' ? (
-                              <Bar
-                                dataKey="doanhThu"
-                                fill="#1890ff"
-                                name="Doanh thu (Online)"
-                                radius={[8, 8, 0, 0]}
-                                barSize={100}
-                              />
-                            ) : (
-                              <>
-                                <Bar
-                                  dataKey="namBatDau"
-                                  fill="#1890ff"
-                                  name={`Năm ${selectedYears.nam1} (Online)`}
-                                  radius={[4, 4, 0, 0]}
-                                />
-                                <Bar
-                                  dataKey="namKetThuc"
-                                  fill="#40a9ff"
-                                  name={`Năm ${selectedYears.nam2} (Online)`}
-                                  radius={[4, 4, 0, 0]}
-                                />
-                              </>
-                            )}
-                          </BarChart>
-                        )}
-                      </ResponsiveContainer>
-                    </div>
-                  </Spin>
-
-                </>
-              ),
-            },
-            {
-              key: 'offline',
-              label: (
-                <span>
-                  <ShopOutlined style={{ marginRight: 8 }} />
-                  Offline
-                </span>
-              ),
-              children: (
-                <>
-                  <Spin spinning={chartLoading} tip="Đang tải dữ liệu...">
-                    <div style={{ padding: '20px 0' }}>
-                      <ResponsiveContainer width="100%" height={400}>
-                        {timeFilter === 'month' ? (
-                          <LineChart
-                            data={getChartData('offline')}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="period"
-                              tick={{ fontSize: 11 }}
-                              angle={-45}
-                              textAnchor="end"
-                              height={80}
-                              interval={2}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => `${(value / 1000000).toFixed(1)}M`}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend
-                              wrapperStyle={{ paddingTop: '20px' }}
-                              iconType="line"
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="thang1"
-                              stroke="#faad14"
-                              strokeWidth={3}
-                              name={`Tháng ${selectedMonths.thang1 || 'Trước'} (Offline)`}
-                              dot={{ fill: '#faad14', r: 4 }}
-                              activeDot={{ r: 6 }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="thang2"
-                              stroke="#ffc53d"
-                              strokeWidth={3}
-                              name={`Tháng ${selectedMonths.thang2 || 'Sau'} (Offline)`}
-                              dot={{ fill: '#ffc53d', r: 4 }}
-                              activeDot={{ r: 6 }}
-                            />
-                          </LineChart>
-                        ) : (
-                          <BarChart
-                            data={getChartData('offline')}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="period"
-                              tick={{ fontSize: 12 }}
-                              angle={timeFilter === 'year' ? -45 : 0}
-                              textAnchor={timeFilter === 'year' ? 'end' : 'middle'}
-                              height={timeFilter === 'year' ? 80 : 60}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                if (timeFilter === 'day') return `${(value / 1000000).toFixed(1)}M`;
-                                if (timeFilter === 'year') return `${(value / 1000000).toFixed(0)}M`;
-                                return `${(value / 1000000000).toFixed(1)}B`;
-                              }}
-                            />
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend
-                              wrapperStyle={{ paddingTop: '20px' }}
-                              iconType="rect"
-                            />
-                            {timeFilter === 'day' ? (
-                              <Bar
-                                dataKey="doanhThu"
-                                fill="#faad14"
-                                name="Doanh thu (Offline)"
-                                radius={[8, 8, 0, 0]}
-                                barSize={100}
-                              />
-                            ) : (
-                              <>
-                                <Bar
-                                  dataKey="namBatDau"
-                                  fill="#faad14"
-                                  name={`Năm ${selectedYears.nam1} (Offline)`}
-                                  radius={[4, 4, 0, 0]}
-                                />
-                                <Bar
-                                  dataKey="namKetThuc"
-                                  fill="#ffc53d"
-                                  name={`Năm ${selectedYears.nam2} (Offline)`}
-                                  radius={[4, 4, 0, 0]}
-                                />
-                              </>
-                            )}
-                          </BarChart>
-                        )}
-                      </ResponsiveContainer>
-                    </div>
-                  </Spin>
-
-                </>
-              ),
-            },
           ]}
         />
       </Card>
-      <Card bodyStyle={{ padding: '24px' }} style={{ marginBottom: 24 }}>
+      <Card styles={{ padding: '24px' }} style={{ marginBottom: 24 }}>
         <Row gutter={24}>
           {/* Left Column: Customer Statistics Widget */}
           <Col xs={24} lg={14}>
-            <div >
-              <h3 style={{ marginBottom: 16, fontWeight: 600, fontSize: 18 }}>Khách Hàng Truy Cập</h3>
-              <Card bodyStyle={{ padding: '16px' }} style={{ height: '100%' }}>
-                {/* Header thống kê */}
-                <Row gutter={16} style={{ marginBottom: 16 }}>
-                  <Col span={12}>
-                    <div style={{ background: '#e6f7ff', padding: '12px', borderRadius: 8, textAlign: 'center', border: '1px solid #91d5ff' }}>
-                      <div style={{ fontSize: 12, color: '#0050b3', marginBottom: 4 }}>Đang Online</div>
-                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>
-                        {accessData?.totalOnline || 0}
-                      </div>
-                    </div>
-                  </Col>
-                  <Col span={12}>
-                    <div style={{ background: '#fff7e6', padding: '12px', borderRadius: 8, textAlign: 'center', border: '1px solid #ffd591' }}>
-                      <div style={{ fontSize: 12, color: '#ad6800', marginBottom: 4 }}>Đã Offline</div>
-                      <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>
-                        {accessData?.totalOffline || 0}
-                      </div>
-                    </div>
-                  </Col>
-                </Row>
 
-                {/* Danh sách khách hàng online */}
-                {accessData?.onlineAccounts && accessData.onlineAccounts.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#1890ff' }}>
-                      <TeamOutlined style={{ marginRight: 6 }} />
-                      Đang Online ({accessData.onlineAccounts.length})
-                    </div>
-                    <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                      {accessData.onlineAccounts.map((account, index) => (
-                        <div key={account.userId || index} style={{
-                          padding: '10px',
-                          background: '#f0f9ff',
-                          borderRadius: 6,
-                          marginBottom: 6,
-                          border: '1px solid #d6e4ff'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{account.username || 'N/A'}</div>
-                              <div style={{ fontSize: 11, color: '#8c8c8c' }}>{account.email || ''}</div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <Tag color="success" style={{ fontSize: 11 }}>Online</Tag>
-                              <div style={{ fontSize: 10, color: '#8c8c8c', marginTop: 2 }}>
-                                {account.lastActivityTime ? new Date(account.lastActivityTime).toLocaleTimeString('vi-VN') : ''}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+            <h3 style={{ marginBottom: 16, fontWeight: 600, fontSize: 18 }}>Phân Bổ Top Sản Phẩm Bán Chạy</h3>
+
+            {(() => {
+              // Prepare data for pie chart and table
+              const period2Map = new Map();
+
+              (top10Laptops.period2 || []).forEach(laptop => {
+                if (laptop && laptop.idLaptop) {
+                  period2Map.set(laptop.idLaptop, laptop);
+                }
+              });
+
+              // Get top 5 products for pie chart
+              const topProducts = Array.from(period2Map.values())
+                .sort((a, b) => b.soLuongBan - a.soLuongBan)
+                .slice(0, 5);
+
+              // Define colors for pie chart
+              const COLORS = ['#E53935', '#66BB6A', '#FFA726', '#42A5F5', '#26C6DA'];
+
+              // Calculate total for percentage
+              const total = topProducts.reduce((sum, item) => sum + (item.soLuongBan || 0), 0);
+
+              // Prepare pie chart data
+              const pieData = topProducts.map((item, index) => ({
+                name: item.tenSanPham || 'N/A',
+                value: item.soLuongBan || 0,
+                color: COLORS[index]
+              }));
+
+              // Prepare table data
+              const tableData = topProducts.map((item, index) => ({
+                key: item.idLaptop || index,
+                stt: index + 1,
+                tenSanPham: item.tenSanPham || 'N/A',
+                soLuongBan: item.soLuongBan || 0
+              }));
+
+              return (
+                <>
+                  {/* Pie Chart */}
+                  <div style={{ marginBottom: 24 }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value) => `${value} sản phẩm`}
+                        />
+                        <Legend
+                          verticalAlign="bottom"
+                          height={36}
+                          formatter={(value, entry) => {
+                            const item = pieData.find(d => d.name === value);
+                            return `${value}`;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                )}
 
-                {/* Danh sách khách hàng offline */}
-                {accessData?.offlineAccounts && accessData.offlineAccounts.length > 0 && (
+                  {/* Product Table */}
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#fa8c16' }}>
-                      <UserOutlined style={{ marginRight: 6 }} />
-                      Đã Offline ({accessData.offlineAccounts.length})
-                    </div>
-                    <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
-                      {accessData.offlineAccounts.slice(0, 5).map((account, index) => (
-                        <div key={account.userId || index} style={{
-                          padding: '10px',
-                          background: '#fffbf0',
-                          borderRadius: 6,
-                          marginBottom: 6,
-                          border: '1px solid #ffe7ba'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2 }}>{account.username || 'N/A'}</div>
-                              <div style={{ fontSize: 11, color: '#8c8c8c' }}>{account.email || ''}</div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <Tag color="warning" style={{ fontSize: 11 }}>Offline</Tag>
-                              <div style={{ fontSize: 10, color: '#fa8c16', marginTop: 2 }}>
-                                {account.offlineMinutes ? `${account.offlineMinutes} phút` : ''}
+                    <h4 style={{ marginBottom: 12, fontWeight: 600, fontSize: 16 }}>Top sản phẩm bán chạy</h4>
+                    <div style={{
+                      background: '#fff',
+                      borderRadius: 8,
+                      overflow: 'hidden'
+                    }}>
+                      <Table
+                        dataSource={tableData}
+                        pagination={false}
+                        size="small"
+                        showHeader={false}
+                        columns={[
+                          {
+                            title: 'STT',
+                            dataIndex: 'stt',
+                            key: 'stt',
+                            width: 50,
+                            render: (stt, record) => (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{
+                                  width: 24,
+                                  height: 24,
+                                  borderRadius: '50%',
+                                  background: COLORS[stt - 1],
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: '#fff',
+                                  fontSize: 12,
+                                  fontWeight: 'bold'
+                                }}>
+                                  {stt}
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                            )
+                          },
+                          {
+                            title: 'Sản phẩm',
+                            dataIndex: 'tenSanPham',
+                            key: 'tenSanPham',
+                            render: (text) => (
+                              <div>
+                                <div style={{ fontWeight: 500, fontSize: 14 }}>{text}</div>
+                              </div>
+                            )
+                          },
+                          {
+                            title: 'Số lượng',
+                            dataIndex: 'soLuongBan',
+                            key: 'soLuongBan',
+                            align: 'right',
+                            width: 80,
+                            render: (value) => (
+                              <span style={{
+                                fontWeight: 600,
+                                fontSize: 14
+                              }}>
+                                {value}
+                              </span>
+                            )
+                          }
+                        ]}
+                      />
+                    </div>
+
+                    {/* Summary footer */}
+                    <div style={{
+                      marginTop: 12,
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: 6,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>Cập nhật hôm nay</span>
+                      <span style={{ fontSize: 12, fontWeight: 600 }}>
+                        Tổng: {total} sản phẩm
+                      </span>
                     </div>
                   </div>
-                )}
-
-                {/* Hiển thị khi không có dữ liệu */}
-                {(!accessData?.onlineAccounts || accessData.onlineAccounts.length === 0) &&
-                  (!accessData?.offlineAccounts || accessData.offlineAccounts.length === 0) && (
-                    <div style={{ textAlign: 'center', padding: '30px 0', color: '#8c8c8c' }}>
-                      <TeamOutlined style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }} />
-                      <div style={{ fontSize: 13 }}>Chưa có dữ liệu truy cập</div>
-                    </div>
-                  )}
-              </Card>
-            </div>
+                </>
+              );
+            })()}
           </Col>
 
           {/* Right Column: Order Status Statistics */}
@@ -1571,47 +1437,48 @@ const ListThongKeComponent = () => {
             <h3 style={{ marginBottom: 16, fontWeight: 600, fontSize: 18 }}>Thống Kê Đơn Hàng Theo Trạng Thái</h3>
             <Row gutter={[16, 16]}>
               <Col xs={24} sm={12} lg={12}>
-                <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
+                <Card variant="borderless" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
                   <Statistic
                     title="Chờ Xác Nhận"
                     value={thongKeData?.donHangChoXacNhan || 0}
-                    valueStyle={{ color: '#faad14' }}
+                    styles={{ content: { color: '#faad14' } }}
                   />
+
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={12}>
-                <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
+                <Card variant="borderless" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
                   <Statistic
                     title="Đang Chuẩn Bị Hàng"
                     value={thongKeData?.donHangDangXuLy || 0}
-                    valueStyle={{ color: '#1890ff' }}
+                     styles={{ color: '#1890ff' }}
                   />
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={12}>
-                <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
+                <Card variant="borderless" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
                   <Statistic
                     title="Đang Giao"
                     value={thongKeData?.donHangDangGiao || 0}
-                    valueStyle={{ color: '#722ed1' }}
+                     styles={{ color: '#722ed1' }}
                   />
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={12}>
-                <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
+                <Card variant="borderless" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
                   <Statistic
                     title="Hoàn Thành"
                     value={thongKeData?.donHangHoanThanh || 0}
-                    valueStyle={{ color: '#52c41a' }}
+                     styles={{ color: '#52c41a' }}
                   />
                 </Card>
               </Col>
               <Col xs={24} sm={12} lg={12}>
-                <Card bordered={false} style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
+                <Card variant="borderless" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.03)', height: '100%' }}>
                   <Statistic
                     title="Đã Hủy"
                     value={thongKeData?.donHangDaHuy || 0}
-                    valueStyle={{ color: '#f5222d' }}
+                     styles={{ color: '#f5222d' }}
                   />
                 </Card>
               </Col>
@@ -1622,10 +1489,20 @@ const ListThongKeComponent = () => {
       {/* Top 10 Sản Phẩm Bán Chạy Nhất */}
       <Card
         title={
-          <span>
-            <TrophyOutlined style={{ marginRight: 8, color: '#faad14' }} />
-            Top 10 Sản Phẩm Bán Chạy Nhất
-          </span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>
+              <TrophyOutlined style={{ marginRight: 8, color: '#faad14' }} />
+              Top 10 Sản Phẩm Bán Chạy Nhất
+            </span>
+            <DatePicker
+              picker="month"
+              value={top10MonthFilter}
+              onChange={handleTop10MonthChange}
+              format="MM/YYYY"
+              placeholder="Chọn tháng"
+              style={{ width: 150 }}
+            />
+          </div>
         }
         style={{ marginBottom: 24 }}
       >
@@ -1734,6 +1611,27 @@ const ListThongKeComponent = () => {
                   render: (text) => (
                     <span style={{ fontWeight: 500 }}>{text || 'N/A'}</span>
                   )
+                },
+                {
+                  title: 'Doanh Thu',
+                  dataIndex: 'tongTienThuHo',
+                  key: 'tongTienThuHo',
+                  align: 'right',
+                  width: 150,
+                  render: (value, record) => {
+                    // Lấy tongTienThuHo từ period2 data
+                    const laptop2 = period2Map.get(record.idLaptop);
+                    const doanhThu = laptop2?.tongTienThuHo || 0;
+                    return (
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: '#52c41a'
+                      }}>
+                        {formatCurrency(doanhThu)} VNĐ
+                      </span>
+                    );
+                  }
                 },
                 {
                   title: 'Số lượng',

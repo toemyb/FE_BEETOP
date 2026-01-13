@@ -1,4 +1,5 @@
 // src/admin/adminDonHangComponents/invoiceTemplate.js
+import beeTopLogo from "../../img/BeeTop2.png";
 
 const formatVND = (amount) => {
   const n = Number(amount || 0);
@@ -10,6 +11,29 @@ const formatDateOnly = (value) => {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+};
+
+const extractAddressFromNote = (note) => {
+  if (!note) return null;
+  const txt = String(note).trim();
+  if (!txt) return null;
+
+  const lines = txt.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  const line =
+    lines.find((l) => /^địa\s*chỉ\s*:/i.test(l)) ||
+    lines.find((l) => /^dia\s*chi\s*:/i.test(l)) || // ✅ không dấu
+    lines.find((l) => /^đc\s*:/i.test(l)) ||
+    lines.find((l) => /^\[ship_address\]/i.test(l));
+
+  if (line) {
+    return line
+      .replace(/^(địa\s*chỉ|dia\s*chi|đc)\s*:\s*/i, "")
+      .replace(/^\[ship_address\]\s*/i, "")
+      .trim();
+  }
+
+  return txt; // ghi chú chỉ có địa chỉ
 };
 
 const escapeHtml = (s) =>
@@ -44,6 +68,7 @@ const getLoaiDonText = (loaiDon) => {
   return loaiDon || "-";
 };
 
+/** ✅ FULL ADDRESS: có field thì dùng, không có thì lấy từ ghi chú */
 const buildFullAddress = (order) => {
   const detail = pick(order, ["diaChiChiTiet", "diaChiChiTietGiaoHang", "diaChiChiTietNhanHang", "diaChi"], "");
   const parts = [
@@ -53,7 +78,6 @@ const buildFullAddress = (order) => {
     pick(order, ["tinhThanh", "thanhPho", "province"], ""),
   ].filter(Boolean);
 
-  // remove duplicates while keeping order
   const seen = new Set();
   const uniq = [];
   for (const p of parts) {
@@ -65,11 +89,13 @@ const buildFullAddress = (order) => {
     }
   }
 
-  return uniq.length ? uniq.join(", ") : "-";
+  if (uniq.length) return uniq.join(", ");
+
+  // ✅ khách vãng lai -> lấy từ ghi chú
+  return extractAddressFromNote(order?.ghiChu) || "-";
 };
 
 const buildPaymentMethodsText = (order) => {
-  // Ưu tiên payments[]
   const payments = Array.isArray(order?.payments) ? order.payments : [];
   const namesFromPayments = payments
     .map((p) => p?.tenHinhThuc || p?.hinhThuc || p?.method || p?.paymentMethod)
@@ -80,19 +106,176 @@ const buildPaymentMethodsText = (order) => {
   const uniq = [...new Set(namesFromPayments)];
   if (uniq.length) return uniq.join(", ");
 
-  // Fallback theo field tổng
   const fallback =
-    pick(order, ["tenHinhThuc", "phuongThucThanhToan", "hinhThucThanhToan", "paymentMethodName", "paymentMethod"], "") || "-";
+    pick(order, ["tenHinhThuc", "phuongThucThanhToan", "hinhThucThanhToan", "paymentMethodName", "paymentMethod"], "") ||
+    "-";
   return fallback;
 };
 
 const buildVoucherCodeText = (order) => {
+  const list =
+    (Array.isArray(order?.vouchers) && order.vouchers) ||
+    (Array.isArray(order?.giamGiaHoaDons) && order.giamGiaHoaDons) ||
+    (Array.isArray(order?.giamGiaHoaDon) && order.giamGiaHoaDon) ||
+    (Array.isArray(order?.voucherUsages) && order.voucherUsages) ||
+    [];
+
+  const pickVoucherCodeFromItem = (v) => {
+    if (!v) return "";
+
+    const code =
+      pick(
+        v,
+        [
+          "idPhieuGiamGia",
+          "maPhieuGiamGia",
+          "maVoucher",
+          "voucherCode",
+          "codeVoucher",
+          "code",
+          "maPhieu",
+          "ma",
+        ],
+        ""
+      ) || pick(v?.phieuGiamGia, ["maPhieu", "ma", "code"], "");
+
+    return code;
+  };
+
+  if (list.length) {
+    const code = pickVoucherCodeFromItem(list[0]);
+    if (code) return code;
+  }
+
   const code =
-    pick(order, ["maPhieuGiamGia", "maVoucher", "voucherCode", "codeVoucher"], "") ||
+    pick(
+      order,
+      ["idPhieuGiamGia", "maPhieuGiamGia", "maVoucher", "voucherCode", "codeVoucher"],
+      ""
+    ) ||
     pick(order?.phieuGiamGia, ["maPhieu", "ma", "code"], "") ||
-    pick(order?.voucher, ["code", "ma"], "") ||
-    "-";
-  return code;
+    pick(order?.voucher, ["code", "ma"], "");
+
+  return code || "-";
+};
+
+/** ✅ NEW: build cấu hình gọn kiểu: I5-1334U/24GB/512GB PCIE/14.0 FHD+/WIN11/ĐEN */
+const cleanOneLine = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
+
+const normalizeGB = (v) => {
+  const s = cleanOneLine(v);
+  if (!s) return "";
+  const m = s.match(/(\d+(?:\.\d+)?)\s*(GB|TB)/i);
+  if (!m) return "";
+  return `${m[1]}${m[2].toUpperCase()}`;
+};
+
+const normalizeOS = (s) => {
+  const t = cleanOneLine(s).toLowerCase();
+  if (!t) return "";
+  if (t.includes("windows 11") || t.includes("win 11") || t.includes("win11")) return "WIN11";
+  if (t.includes("windows 10") || t.includes("win 10") || t.includes("win10")) return "WIN10";
+  if (t.includes("macos")) return "MACOS";
+  return "";
+};
+
+const normalizeColor = (s) => {
+  const t = cleanOneLine(s).toLowerCase();
+  if (!t) return "";
+  if (t.includes("đen") || t.includes("black")) return "ĐEN";
+  if (t.includes("trắng") || t.includes("white")) return "TRẮNG";
+  if (t.includes("bạc") || t.includes("silver")) return "BẠC";
+  if (t.includes("xám") || t.includes("gray") || t.includes("grey")) return "XÁM";
+  if (t.includes("đỏ") || t.includes("red")) return "ĐỎ";
+  if (t.includes("xanh") || t.includes("blue")) return "XANH";
+  return cleanOneLine(s).toUpperCase();
+};
+
+const shortCPU = (cpuText) => {
+  const t = cleanOneLine(cpuText);
+  if (!t) return "";
+
+  const mIntel = t.match(/i\s*([3579])\s*[- ]?\s*(\d{4,5}[a-z0-9]*)/i);
+  if (mIntel) return `I${mIntel[1]}-${String(mIntel[2]).toUpperCase()}`;
+
+  const mRyzen = t.match(/ryzen\s*([3579])\s*[- ]?\s*(\d{4,5}[a-z0-9]*)/i);
+  if (mRyzen) return `R${mRyzen[1]}-${String(mRyzen[2]).toUpperCase()}`;
+
+  return cleanOneLine(t).toUpperCase();
+};
+
+const extractFromPrebuilt = (prebuiltRaw) => {
+  const text = cleanOneLine(prebuiltRaw);
+
+  const cpu = shortCPU(text);
+
+  const ramMatch =
+    text.match(/ram\s*[:\-]?\s*(\d{1,3})\s*gb/i) ||
+    text.match(/(\d{1,3})\s*gb\s*ram/i) ||
+    text.match(/(\d{1,3})\s*gb/i);
+  const ram = ramMatch ? `${ramMatch[1]}GB` : "";
+
+  let rom = "";
+  const romMatch =
+    text.match(/(ssd|rom|storage|pcie|nvme)\s*[:\-]?\s*(\d{1,4})\s*gb/i) ||
+    text.match(/(\d{1,4})\s*gb\s*(ssd|rom|storage|pcie|nvme)/i);
+  if (romMatch) {
+    const size = romMatch[2] || romMatch[1];
+    rom = `${size}GB`;
+  } else {
+    const allGb = [...text.matchAll(/(\d{1,4})\s*gb/gi)].map((x) => x[1]);
+    if (allGb.length >= 2) rom = `${allGb[1]}GB`;
+  }
+
+  const romType = /pcie/i.test(text) ? "PCIE" : /nvme/i.test(text) ? "NVME" : "";
+  const romFull = rom ? (romType ? `${rom} ${romType}` : rom) : "";
+
+  let screen = "";
+  const sizeM = text.match(/(\d{1,2}(?:\.\d)?)\s*(?:inch|in|")/i);
+  const resM = text.match(/\b(FHD\+?|QHD|UHD|2K|4K)\b/i);
+  if (sizeM) screen = `${sizeM[1]}${resM ? ` ${resM[1].toUpperCase()}` : ""}`;
+  else if (resM) screen = resM[1].toUpperCase();
+
+  const os = normalizeOS(text);
+  const color = normalizeColor(text);
+
+  return { cpu, ram, romFull, screen, os, color };
+};
+
+const buildConfigText = (it) => {
+  const cpuRaw = pick(it, ["cpu", "ten", "cpuName", "viXuLy"], "");
+  const ramRaw = pick(it, ["ram", "dungLuongRam", "ramDungLuong", "ramSize"], "");
+  const romRaw = pick(it, ["rom", "ssd", "dungLuongRom", "oCung", "storage", "ssdSize"], "");
+  const kichThuocRaw = pick(it, ["kichThuoc", "size", "manHinh", "kichThuocMan", "screenSize"], "");
+  const osRaw = pick(it, ["heDieuHanh", "os", "operatingSystem", "tenHeDieuHanh"], "");
+  const mauRaw = pick(it, ["mauSac", "color", "tenMau", "mau"], "");
+
+  const cpu = shortCPU(cpuRaw);
+  const ram = normalizeGB(ramRaw);
+  const rom = normalizeGB(romRaw);
+
+  const romType = /pcie/i.test(String(romRaw)) ? "PCIE" : /nvme/i.test(String(romRaw)) ? "NVME" : "";
+  const romFull = rom ? (romType ? `${rom} ${romType}` : rom) : "";
+
+  const screenSize = cleanOneLine(kichThuocRaw);
+  const resM = screenSize.match(/\b(FHD\+?|QHD|UHD|2K|4K)\b/i);
+  const sizeM = screenSize.match(/(\d{1,2}(?:\.\d)?)/);
+  const screen = sizeM && sizeM[1] ? `${sizeM[1]}${resM ? ` ${resM[1].toUpperCase()}` : ""}` : "";
+
+  const os = normalizeOS(osRaw);
+  const color = normalizeColor(mauRaw);
+
+  const partsFromFields = [cpu, ram, romFull, screen, os, color].filter(Boolean);
+  if (partsFromFields.length >= 3) return partsFromFields.join("/");
+
+  const prebuilt = pick(it, ["cauHinh", "configText", "moTaCauHinh"], "");
+  if (prebuilt) {
+    const { cpu: c, ram: r, romFull: rf, screen: sc, os: o, color: col } = extractFromPrebuilt(prebuilt);
+    const parts = [c, r, rf, sc, o, col].filter(Boolean);
+    return parts.length ? parts.join("/") : cleanOneLine(prebuilt);
+  }
+
+  return "-";
 };
 
 const INVOICE_CSS = `
@@ -110,11 +293,24 @@ body { font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff
 .inv-line { font-size: 11.5px; line-height: 1.55; }
 .inv-line b { font-weight: 800; }
 .inv-divider { margin: 10px 0; height: 2px; background: #f97316; border-radius: 2px; opacity:.85; }
-.inv-table { width: 100%; border-collapse: collapse; }
+
+/* ✅ FIX UI: table-layout fixed */
+.inv-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .inv-table th { background:#f97316; color:#fff; font-size: 11px; padding: 8px; text-align:left; }
-.inv-table td { font-size: 11px; padding: 8px; border: 1px solid #e5e7eb; vertical-align: top; }
+.inv-table td { font-size: 11px; padding: 8px; border: 1px solid #e5e7eb; vertical-align: top; word-break: break-word; }
 .inv-table th.r, .inv-table td.r { text-align:right; }
 .inv-table th.c, .inv-table td.c { text-align:center; }
+
+/* ✅ Cấu hình: 1 dòng gọn như ảnh mẫu */
+.inv-cfg{
+  font-size: 10.5px;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+}
+
 .inv-total { margin-top: 10px; width: 100%; }
 .inv-total .row { display:flex; justify-content:flex-end; gap: 14px; font-size: 12px; margin: 6px 0; }
 .inv-total .lbl { width: 180px; text-align:right; }
@@ -124,6 +320,8 @@ body { font-family: Arial, Helvetica, sans-serif; color:#111827; background:#fff
 .inv-total .big .lbl { width: 180px; text-align:right; font-weight: 900; }
 .inv-total .big .val { width: 160px; text-align:right; font-weight: 1000; font-size: 18px; color:#16a34a; }
 .inv-foot { text-align:center; margin-top: 10px; font-size: 10px; color:#6b7280; }
+.inv-brand { display:flex; justify-content:center; margin-bottom: 6px; }
+.inv-logo { height: 46px; width: auto; object-fit: contain; }
 `;
 
 export const buildInvoiceHtml = ({ order, shippingFee }) => {
@@ -134,10 +332,9 @@ export const buildInvoiceHtml = ({ order, shippingFee }) => {
   const sdtKhach = pick(order, ["sdtKhachHang"], "-");
   const email = pick(order, ["emailKhachHang"], "Không có");
 
-  // ✅ FULL: địa chỉ chi tiết + phường/xã + quận/huyện + tỉnh/thành
+  // ✅ FIX: biến này giờ luôn có
   const diaChiFull = buildFullAddress(order);
 
-  // ✅ NEW: thông tin đơn hàng bổ sung
   const loaiDonText = getLoaiDonText(pick(order, ["loaiDon"], "-"));
   const paymentMethodsText = buildPaymentMethodsText(order);
   const voucherCodeText = buildVoucherCodeText(order);
@@ -154,16 +351,16 @@ export const buildInvoiceHtml = ({ order, shippingFee }) => {
     items.length > 0
       ? items
           .map((it, idx) => {
-            const maCtsp = escapeHtml(pick(it, ["maCtsp", "maChiTietSanPham", "ctspId", "orderCtId", "id"], "-"));
             const ten = escapeHtml(pick(it, ["tenSanPham", "ten"], "-"));
-            const serial = escapeHtml(pick(it, ["maSeri", "serial", "imei"], "-"));
+            const cauHinh = escapeHtml(buildConfigText(it));
+            const serial = escapeHtml(pick(it, ["maSeri", "serial"], "-"));
             const gia = Number(pick(it, ["giaBan", "donGia", "price"], 0)) || 0;
 
             return `
               <tr>
                 <td class="c">${idx + 1}</td>
-                <td>${maCtsp}</td>
                 <td>${ten}</td>
+                <td class="inv-cfg">${cauHinh}</td>
                 <td>${serial}</td>
                 <td class="r">${escapeHtml(formatVND(gia))}</td>
                 <td class="r"><b>${escapeHtml(formatVND(gia))}</b></td>
@@ -184,8 +381,13 @@ export const buildInvoiceHtml = ({ order, shippingFee }) => {
 <body>
   <div class="inv-wrap">
     <div class="inv-title">
+      <div class="inv-brand">
+        <img class="inv-logo" src="${escapeHtml(beeTopLogo)}" alt="BeeTop" />
+      </div>
       <div class="h">HÓA ĐƠN BÁN HÀNG</div>
-      <div class="sub"><b>Mã đơn hàng:</b> ${escapeHtml(maDonHang)} &nbsp; | &nbsp; <b>Ngày tạo:</b> ${escapeHtml(ngayTao)}</div>
+      <div class="sub"><b>Mã đơn hàng:</b> ${escapeHtml(maDonHang)} &nbsp; | &nbsp; <b>Ngày tạo:</b> ${escapeHtml(
+        ngayTao
+      )}</div>
     </div>
 
     <div class="inv-top">
@@ -213,11 +415,11 @@ export const buildInvoiceHtml = ({ order, shippingFee }) => {
       <thead>
         <tr>
           <th class="c" style="width:44px;">STT</th>
-          <th style="width:140px;">Mã CTSP</th>
-          <th>Tên sản phẩm</th>
-          <th style="width:150px;">Serial/IMEI</th>
-          <th class="r" style="width:140px;">Đơn giá</th>
-          <th class="r" style="width:160px;">Thành tiền</th>
+          <th style="width:190px;">Tên sản phẩm</th>
+          <th>Cấu hình</th>
+          <th style="width:130px;">Serial</th>
+          <th class="r" style="width:120px;">Đơn giá</th>
+          <th class="r" style="width:130px;">Thành tiền</th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>

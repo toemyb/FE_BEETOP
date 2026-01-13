@@ -276,9 +276,9 @@ const ProductDetailPage = () => {
 
     const policies = [
         { icon: <SafetyOutlined />, text: "Bảo hành chính hãng 36 tháng" },
-        { icon: <ReloadOutlined />, text: "1 đổi 1 trong 14 ngày đầu" },
+   
         { icon: <TruckOutlined />, text: "Miễn phí giao hàng toàn quốc" },
-        { icon: <GiftFilled />, text: "Trả góp 0% lãi suất" },
+   
     ];
 
     const gifts = [
@@ -290,12 +290,7 @@ const ProductDetailPage = () => {
 
     return (
         <div className="product-detail-wrapper">
-            <div className="breadcrumb-section">
-                <Text type="secondary">
-                    Trang chủ / Laptop / {productDetail.productName?.substring(0, 30)}...
-                </Text>
-            </div>
-
+            
             <Row gutter={[32, 32]}>
                 {/* LEFT */}
                 <Col xs={24} lg={12}>
@@ -307,7 +302,7 @@ const ProductDetailPage = () => {
                             {productDetail.cpu} • {productDetail.ram} • {productDetail.ssd} • {productDetail.card}
                         </div>
                         <div className="product-badges-left">
-                            <Tag color="green" icon={<CheckCircleFilled />}>Còn hàng</Tag>
+                      
                             <Tag color="blue" icon={<FireOutlined />}>Sản phẩm mới</Tag>
                             <Tag color="gold" icon={<StarFilled />}>Bán chạy</Tag>
                         </div>
@@ -337,8 +332,7 @@ const ProductDetailPage = () => {
                             </Badge.Ribbon>
 
                             <div className="image-actions">
-                                <Button type="text" icon={<HeartOutlined />} className="action-btn" title="Yêu thích" />
-                                <Button type="text" icon={<ShareAltOutlined />} className="action-btn" title="Chia sẻ" />
+                          
                             </div>
                         </div>
 

@@ -1,31 +1,6 @@
-import axios from "axios";
-const BASEURL = 'http://localhost:8080/api/v1/laptops';
+import api from "./api"; // axios instance của bạn
 
-export const createVNPayPayment = async (paymentData) => {
-    try {
-        const response = await axios.post(`${BASEURL}/vnpay/create-payment`, paymentData);
-        return response.data;
-    } catch (error) {
-        console.error("Lỗi khi tạo thanh toán VNPay:", error);
-        throw error;
-    }
+export const createVNPayPayment = (payload) => {
+  // payload: { idOrder, amount, orderInfo?, orderType?, bankCode? }
+  return api.post("/api/v1/laptops/vnpay/create-payment", payload);
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Tag, Input, Select, Space } from 'antd';
 import { listDoHoa } from '../../service/DoHoaService';
 import AddDoHoaModal from './AddDoHoaComponent';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 
 const { Option } = Select;
 
@@ -135,7 +135,6 @@ const ListDoHoaComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb items={[{ label: 'Đồ họa' }]} />
       <h2>Danh sách đồ họa</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -147,9 +146,7 @@ const ListDoHoaComponent = () => {
           style={{ width: 200 }}
         />
 
-        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
-          Làm Mới
-        </Button>
+      
 
         <span>Trạng Thái:</span>
         <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 120 }}>
@@ -164,7 +161,9 @@ const ListDoHoaComponent = () => {
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
-
+  <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          Làm Mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm Đồ Họa
         </Button>

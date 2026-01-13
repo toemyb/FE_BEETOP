@@ -15,10 +15,11 @@ import {
   Typography,
   Timeline,
   Modal,
-  message,
   Divider,
   Spin,
+  Tooltip,
 } from "antd";
+import { toast } from "react-toastify";
 import {
   ArrowLeftOutlined,
   ReloadOutlined,
@@ -30,10 +31,17 @@ import {
   CloseCircleFilled,
 } from "@ant-design/icons";
 
-import { getOrderDetail, unwrapApi } from "../../service/PosOrderService";
-import { getOrderTimeline, updateOrderStatus } from "../../service/OrderTimelineService";
+import {
+  getOrderDetail,
+  unwrapApi,
+  cancelOrder as cancelPosOrder,
+} from "../../service/PosOrderService";
 
-// ✅ NEW
+import {
+  getOrderTimeline,
+  updateOrderStatus,
+} from "../../service/OrderTimelineService";
+
 import InvoiceModal from "./InvoiceModal";
 import { buildInvoiceHtml } from "./invoiceTemplate";
 
@@ -48,35 +56,50 @@ const formatDateTime = (value) => {
   if (!value) return "-";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
-  const date = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const time = d.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const date = d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
   return `${time} ${date}`;
 };
 
-// POS (tại quầy) - đúng yêu cầu "Tạo đơn / Hoàn tất / Hủy"
-const ORDER_STATUS_MAP = {
-  1: { text: "Tạo đơn", color: "gold" },
-  2: { text: "Hoàn thành", color: "green" },
-  3: { text: "Đã hủy", color: "red" },
+// ====== BE enums (backend bạn): OrderStatus 0..7 ======
+// 0 DRAFT, 1 PENDING_CONFIRM, 2 CONFIRMED, 3 PREPARING, 4 SHIPPING, 5 DELIVERED, 6 COMPLETED, 7 CANCELED
+
+const ORDER_STATUS_POS_MAP = {
+  0: { text: "Tạo đơn", color: "gold" },
+  6: { text: "Hoàn thành", color: "green" },
+  7: { text: "Đã hủy", color: "red" },
 };
 
-// ONLINE/GIAO_HANG (khớp 1..7)
 const ORDER_STATUS_ONLINE_MAP = {
+  0: { text: "Tạo đơn", color: "gold" },
   1: { text: "Chờ xác nhận", color: "gold" },
   2: { text: "Đã xác nhận", color: "cyan" },
   3: { text: "Đang chuẩn bị hàng", color: "blue" },
-  4: { text: "Chuẩn bị giao hàng", color: "geekblue" },
-  5: { text: "Đang giao hàng", color: "purple" },
+  4: { text: "Đang giao hàng", color: "geekblue" },
+  5: { text: "Đã giao hàng", color: "purple" },
   6: { text: "Hoàn thành", color: "green" },
   7: { text: "Hủy đơn", color: "red" },
 };
 
-// === normalize loaiDon từ DB (VD: "Đơn hàng Online") ===
 const normalizeLoaiDon = (loaiDon) => {
   const raw = (loaiDon || "").toString().toLowerCase();
-  if (raw.includes("giao_hang") || raw.includes("giao hàng") || raw.includes("delivery")) return "GIAO_HANG";
+  if (
+    raw.includes("giao_hang") ||
+    raw.includes("giao hàng") ||
+    raw.includes("delivery")
+  )
+    return "GIAO_HANG";
   if (raw.includes("online")) return "ONLINE";
-  if (raw.includes("quầy") || raw.includes("tai_quay") || raw.includes("pos")) return "TAI_QUAY";
+  if (raw.includes("quầy") || raw.includes("tai_quay") || raw.includes("pos"))
+    return "TAI_QUAY";
   return loaiDon || "";
 };
 
@@ -88,12 +111,25 @@ const getLoaiDonText = (loaiDon) => {
   return loaiDon || "-";
 };
 
+const pickOrderStatus = (o) => {
+  const st = o?.trangThaiDon ?? o?.trangThai ?? o?.status ?? 0;
+  return Number(st);
+};
+
+const pickPaymentStatus = (o) => {
+  const st = o?.trangThaiThanhToan ?? o?.paymentStatus ?? 0;
+  return Number(st);
+};
+
 const getOrderStatusInfo = (order) => {
   const t = normalizeLoaiDon(order?.loaiDon);
+  const st = pickOrderStatus(order);
   if (t === "ONLINE" || t === "GIAO_HANG") {
-    return ORDER_STATUS_ONLINE_MAP[order?.trangThai] || { text: "Không xác định", color: "default" };
+    return (
+      ORDER_STATUS_ONLINE_MAP[st] || { text: "Không xác định", color: "default" }
+    );
   }
-  return ORDER_STATUS_MAP[order?.trangThai] || { text: "Không xác định", color: "default" };
+  return ORDER_STATUS_POS_MAP[st] || { text: "Không xác định", color: "default" };
 };
 
 // ===== Timeline helpers =====
@@ -101,50 +137,51 @@ const STEP_DESC_BY_STATUS = {
   1: "Đơn hàng đang chờ xác nhận từ nhân viên. Vui lòng kiểm tra thông tin và xác nhận.",
   2: "Đơn hàng đã được xác nhận. Hệ thống sẽ chuyển sang chuẩn bị hàng.",
   3: "Đơn hàng đang được chuẩn bị (đóng gói, kiểm tra, chuẩn bị xuất kho).",
-  4: "Đơn hàng đã sẵn sàng bàn giao cho đơn vị vận chuyển.",
-  5: "Đơn hàng đang được vận chuyển đến khách hàng.",
+  4: "Đơn hàng đang được vận chuyển đến khách hàng.",
+  5: "Đơn hàng đã được giao đến khách hàng.",
   6: "Đơn hàng đã hoàn thành. Cảm ơn bạn đã mua hàng!",
   7: "Đơn hàng đã bị hủy.",
 };
 
-// title log theo BE
 const LOG_TITLE_BY_CODE = {
   1: "Chờ xác nhận",
   2: "Đã xác nhận",
   3: "Đang chuẩn bị hàng",
-  4: "Chuẩn bị giao hàng",
-  5: "Đang giao hàng",
+  4: "Đang giao hàng",
+  5: "Đã giao hàng",
   6: "Hoàn thành",
   7: "Hủy đơn",
 };
 
 const STEP_DESC_POS = {
-  1: "Đơn hàng tại quầy đã được tạo.",
-  2: "Đơn hàng tại quầy đã hoàn tất.",
-  3: "Đơn hàng tại quầy đã bị hủy.",
+  0: "Đơn hàng tại quầy đã được tạo.",
+  6: "Đơn hàng tại quầy đã hoàn tất.",
+  7: "Đơn hàng tại quầy đã bị hủy.",
 };
 
 const getStepVisual = (state) => {
-  // state: DONE | CURRENT | UPCOMING | CANCELLED
   if (state === "DONE") return { color: "green", dot: <CheckCircleFilled /> };
   if (state === "CURRENT") return { color: "blue", dot: <ClockCircleOutlined /> };
   if (state === "CANCELLED") return { color: "red", dot: <CloseCircleFilled /> };
   return { color: "gray", dot: <MinusCircleOutlined /> };
 };
 
-// trạng thái final khác nhau theo loại đơn
-const getProcessingTag = (typeNorm, status) => {
-  const doneCode = typeNorm === "TAI_QUAY" ? 2 : 6;
-  const cancelCode = typeNorm === "TAI_QUAY" ? 3 : 7;
-
-  if (status === doneCode) return <Tag color="green">Đã hoàn thành</Tag>;
-  if (status === cancelCode) return <Tag color="red">Đã hủy</Tag>;
+const getProcessingTag = (status) => {
+  if (status === 6) return <Tag color="green">Đã hoàn thành</Tag>;
+  if (status === 7) return <Tag color="red">Đã hủy</Tag>;
   return <Tag color="blue">Đang xử lý</Tag>;
 };
 
-// extract time/actor safely (BE hay đổi field)
-const pickLogTime = (log) => log?.time || log?.at || log?.createdAt || log?.created_time || null;
-const pickLogBy = (log) => log?.by || log?.actor || log?.createdBy || log?.nguoiThucHien || "Hệ thống";
+const pickLogTime = (log) =>
+  log?.time || log?.at || log?.createdAt || log?.created_time || log?.ngayTao || null;
+
+const pickLogBy = (log) =>
+  log?.by ||
+  log?.actor ||
+  log?.createdBy ||
+  log?.nguoiThucHien ||
+  log?.tenNguoiThucHien ||
+  "Hệ thống";
 
 const OrderDetailComponent = () => {
   const { id } = useParams();
@@ -152,10 +189,10 @@ const OrderDetailComponent = () => {
 
   const [loading, setLoading] = useState(false);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
+
+
   const [order, setOrder] = useState(null);
   const [timeline, setTimeline] = useState(null);
-
-  // ✅ NEW: modal hóa đơn
   const [openInvoice, setOpenInvoice] = useState(false);
 
   const fetchDetail = async () => {
@@ -167,11 +204,43 @@ const OrderDetailComponent = () => {
       setOrder(data);
     } catch (err) {
       console.error("Lỗi load chi tiết đơn hàng:", err);
-      message.error("Không tải được chi tiết đơn hàng");
+      toast.error("Không tải được chi tiết đơn hàng");
     } finally {
       setLoading(false);
     }
   };
+const paymentsForRender = useMemo(() => {
+  const pays = Array.isArray(order?.payments) ? order.payments : [];
+
+  const norm = (p) =>
+    String(p?.tenHinhThuc || p?.methodName || p?.method || "")
+      .trim()
+      .toUpperCase();
+
+  const map = new Map();
+
+  for (const p of pays) {
+    const key = norm(p) || "UNKNOWN";
+    const soTien = Number(p?.soTien || p?.soTienThanhToan || 0);
+
+    const prev = map.get(key);
+    if (!prev) {
+      map.set(key, { ...p, tenHinhThuc: p?.tenHinhThuc || key, soTien });
+    } else {
+      map.set(key, {
+        ...prev,
+        soTien: Number(prev.soTien || 0) + soTien,
+        khachDua: p?.khachDua ?? prev.khachDua,
+        tienTraLai: p?.tienTraLai ?? prev.tienTraLai,
+      });
+    }
+  }
+
+  // Ẩn dòng 0đ (tuỳ bạn có muốn giữ lại không)
+  return Array.from(map.values()).filter((p) => Number(p.soTien || 0) !== 0);
+}, [order?.payments]);
+
+
 
   const fetchTimeline = async () => {
     if (!id) return;
@@ -181,7 +250,6 @@ const OrderDetailComponent = () => {
       setTimeline(data);
     } catch (err) {
       console.error("Lỗi load timeline:", err);
-      // đừng toast đỏ liên tục, chỉ log
     } finally {
       setLoadingTimeline(false);
     }
@@ -196,20 +264,59 @@ const OrderDetailComponent = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // ===== derived hooks =====
+  // ===== derived =====
   const typeNorm = useMemo(() => normalizeLoaiDon(order?.loaiDon), [order?.loaiDon]);
   const isOnlineLike = typeNorm === "ONLINE" || typeNorm === "GIAO_HANG";
   const isPos = typeNorm === "TAI_QUAY";
+
+  // COD detect từ payments (order detail)
+  const isCodOrder = useMemo(() => {
+    if (timeline?.isCod === true) return true;
+
+    const pays =
+      Array.isArray(timeline?.payments) ? timeline.payments :
+        Array.isArray(order?.payments) ? order.payments : [];
+
+    return pays.some((p) =>
+      String(p?.tenHinhThuc || p?.methodName || p?.method || "")
+        .toUpperCase()
+        .includes("COD")
+    );
+  }, [timeline?.isCod, timeline?.payments, order?.payments]);
+
+  const isCashMethod = (p) => {
+    const name = String(p?.tenHinhThuc || p?.methodName || p?.method || "").toLowerCase();
+    return name.includes("cash") || name.includes("tiền mặt") || name.includes("tien mat");
+  };
+
+  const hasCashPayment = useMemo(() => {
+    const pays = Array.isArray(order?.payments) ? order.payments : [];
+    return pays.some(isCashMethod);
+  }, [order?.payments]);
+
 
   const mustPay = useMemo(() => Number(order?.tongTienThuHo || 0), [order?.tongTienThuHo]);
 
   const totalPaid = useMemo(() => {
     if (!Array.isArray(order?.payments)) return 0;
-    return order.payments.reduce((sum, p) => sum + Number(p.soTien || 0), 0);
+    return order.payments.reduce(
+      (sum, p) => sum + Number(p.soTien || p.soTienThanhToan || 0),
+      0
+    );
   }, [order?.payments]);
 
-  const paidByBE = order?.trangThaiThanhToan === 1;
-  const isPaid = useMemo(() => paidByBE || (mustPay > 0 && totalPaid >= mustPay), [paidByBE, mustPay, totalPaid]);
+  // PaymentStatus BE: 0 UNPAID, 1 PAID
+  const psTimeline =
+    timeline?.trangThaiThanhToan != null || timeline?.paymentStatus != null
+      ? pickPaymentStatus(timeline)
+      : null;
+
+  const paidByBE = (psTimeline ?? pickPaymentStatus(order)) === 1;
+
+  const isPaid = useMemo(
+    () => paidByBE || (mustPay > 0 && totalPaid >= mustPay),
+    [paidByBE, mustPay, totalPaid]
+  );
 
   const paymentPercent = useMemo(() => {
     if (mustPay <= 0) return isPaid ? 100 : 0;
@@ -222,62 +329,109 @@ const OrderDetailComponent = () => {
   );
 
   const orderStatusInfo = useMemo(() => getOrderStatusInfo(order), [order]);
-
   const tongSanPham = useMemo(() => order?.items?.length || 0, [order?.items]);
 
   const currentStatus = useMemo(() => {
-    const st = timeline?.trangThai ?? order?.trangThai ?? 1;
+    const st = timeline?.trangThai ?? pickOrderStatus(order) ?? 0;
     return Number(st);
-  }, [timeline?.trangThai, order?.trangThai]);
+  }, [timeline?.trangThai, order]);
 
-  const doneCode = useMemo(() => (isPos ? 2 : 6), [isPos]);
-  const cancelCode = useMemo(() => (isPos ? 3 : 7), [isPos]);
+  const doneCode = 6;
+  const cancelCode = 7;
 
-  const isFinal = useMemo(() => currentStatus === doneCode || currentStatus === cancelCode, [currentStatus, doneCode, cancelCode]);
+  const isFinal = useMemo(() => currentStatus === doneCode || currentStatus === cancelCode, [currentStatus]);
+  const canCancel = useMemo(() => {
+  if (isFinal) return false;
 
-  const canCancel = useMemo(() => !isFinal, [isFinal]);
+  // ✅ POS: đã có payment -> không hủy
+  if (isPos) return totalPaid <= 0;
 
-  // ✅ FIX: đưa shippingFee + invoiceHtml lên TRƯỚC mọi return có điều kiện (tránh lỗi "Rendered more hooks")
+  // ✅ ONLINE/GIAO_HANG: theo rule giống customer (BE mới)
+  if (isOnlineLike) {
+    if (isPaid || totalPaid > 0) return false;
+    if (currentStatus >= 4) return false; // từ CONFIRMED trở đi
+  }
+
+  return true;
+}, [isFinal, isPos, isOnlineLike, isPaid, totalPaid, currentStatus]);
+
+  const canCancelPos = canCancel;
+
   const shippingFee = useMemo(() => {
-    return Number(order?.phiVanChuyen ?? order?.phiShip ?? order?.shippingFee ?? order?.tienShip ?? 0) || 0;
+    return (
+      Number(
+        order?.phiVanChuyen ??
+        order?.phiShip ??
+        order?.shippingFee ??
+        order?.tienShip ??
+        0
+      ) || 0
+    );
   }, [order]);
 
   const invoiceHtml = useMemo(() => {
-    // order chưa có (render đầu), tránh buildInvoiceHtml bị lỗi null
-    if (!order) {
-      return "<!doctype html><html><head><meta charset='utf-8'/></head><body></body></html>";
-    }
+    if (!order) return "<!doctype html><html><head><meta charset='utf-8'/></head><body></body></html>";
     return buildInvoiceHtml({ order, shippingFee });
   }, [order, shippingFee]);
 
-  const fullAddress = useMemo(() => {
-    const detail = order?.diaChiChiTiet || order?.diaChi; // ưu tiên chi tiết
+  const extractAddressFromNote = (note) => {
+  if (!note) return null;
+  const txt = String(note).trim();
+  if (!txt) return null;
 
-    const parts = [detail, order?.phuongXa, order?.quanHuyen, order?.tinhThanh].filter(Boolean);
+  // Ưu tiên 1 dòng có prefix rõ ràng
+  const lines = txt.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-    // remove duplicates
-    const seen = new Set();
-    const uniq = [];
-    for (const p of parts) {
-      const key = String(p).trim();
-      if (!key) continue;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniq.push(key);
-      }
+  const line =
+    lines.find((l) => /^địa\s*chỉ\s*:/i.test(l)) ||
+    lines.find((l) => /^đc\s*:/i.test(l)) ||
+    lines.find((l) => /^\[ship_address\]/i.test(l));
+
+  if (line) {
+    return line
+      .replace(/^(địa\s*chỉ|đc)\s*:\s*/i, "")
+      .replace(/^\[ship_address\]\s*/i, "")
+      .trim();
+  }
+
+  // Nếu bạn lưu ghi chú chỉ có đúng địa chỉ -> lấy luôn
+  return txt;
+};
+
+const fullAddress = useMemo(() => {
+  const detail = order?.diaChiChiTiet || order?.diaChi;
+  const parts = [detail, order?.phuongXa, order?.quanHuyen, order?.tinhThanh].filter(Boolean);
+
+  const seen = new Set();
+  const uniq = [];
+  for (const p of parts) {
+    const key = String(p).trim();
+    if (!key) continue;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniq.push(key);
     }
+  }
 
-    return uniq.length ? uniq.join(", ") : "-";
-  }, [order]);
+  // ✅ Nếu có field địa chỉ riêng -> dùng như cũ
+  if (uniq.length) return uniq.join(", ");
 
-  // ✅ handlers (không phải hook nên đặt đâu cũng được, nhưng để đây cho rõ)
-  const handleViewInvoice = () => setOpenInvoice(true);
+  // ✅ Nếu không có (khách lẻ) -> lấy từ ghi chú
+  return extractAddressFromNote(order?.ghiChu) || "-";
+}, [
+  order?.diaChiChiTiet,
+  order?.diaChi,
+  order?.phuongXa,
+  order?.quanHuyen,
+  order?.tinhThanh,
+  order?.ghiChu,
+]);
 
   const handlePrintInvoice = () => {
     try {
       const w = window.open("", "_blank", "width=920,height=720");
       if (!w) {
-        message.error("Trình duyệt đang chặn popup. Hãy cho phép popup để in hóa đơn.");
+        toast.error("Trình duyệt đang chặn popup. Hãy cho phép popup để in hóa đơn.");
         return;
       }
       w.document.open();
@@ -289,15 +443,15 @@ const OrderDetailComponent = () => {
       };
     } catch (e) {
       console.error(e);
-      message.error("Không thể in hóa đơn");
+      toast.error("Không thể in hóa đơn");
     }
   };
 
-  // ===== build steps fallback (khi BE chưa trả steps) =====
+  // ===== build steps fallback =====
   const buildFallbackSteps = (typeNormArg, current, cancelC, doneC) => {
-    const map = typeNormArg === "TAI_QUAY" ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
-
-    const codes = typeNormArg === "TAI_QUAY" ? [1, 2, 3] : [1, 2, 3, 4, 5, 6, 7];
+    const isPosFlow = typeNormArg === "TAI_QUAY";
+    const map = isPosFlow ? ORDER_STATUS_POS_MAP : ORDER_STATUS_ONLINE_MAP;
+    const codes = isPosFlow ? [0, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
 
     return codes.map((code) => {
       const title = map[code]?.text || `Bước ${code}`;
@@ -313,7 +467,6 @@ const OrderDetailComponent = () => {
         else state = "UPCOMING";
       }
 
-      // nếu current là doneC thì các bước < doneC = DONE, doneC = CURRENT (hoặc DONE đều ok)
       if (current === doneC) {
         if (code < doneC) state = "DONE";
         if (code === doneC) state = "CURRENT";
@@ -324,88 +477,173 @@ const OrderDetailComponent = () => {
     });
   };
 
-  // steps/logs normalize
-  const stepsRaw = useMemo(() => (Array.isArray(timeline?.steps) ? timeline.steps : []), [timeline?.steps]);
-  const logsRaw = useMemo(() => (Array.isArray(timeline?.logs) ? timeline.logs : []), [timeline?.logs]);
+  const stepsRaw = useMemo(
+    () => (Array.isArray(timeline?.steps) ? timeline.steps : []),
+    [timeline?.steps]
+  );
 
+  const logsRaw = useMemo(
+    () => (Array.isArray(timeline?.logs) ? timeline.logs : []),
+    [timeline?.logs]
+  );
+
+
+
+
+  // ✅ FIX: nếu BE trả steps nhưng thiếu state -> tự suy ra state theo currentStatus
   const stepsForRender = useMemo(() => {
     if (stepsRaw.length > 0) {
-      // đảm bảo step có code/title/state
-      return stepsRaw.map((s) => ({
-        code: Number(s.code),
-        title:
-          s.title ||
-          s.name ||
-          (isPos ? ORDER_STATUS_MAP[Number(s.code)]?.text : ORDER_STATUS_ONLINE_MAP[Number(s.code)]?.text) ||
-          `Bước ${s.code}`,
-        state: s.state,
-      }));
+      const fallback = buildFallbackSteps(typeNorm, currentStatus, cancelCode, doneCode);
+      const fallbackStateByCode = new Map(fallback.map((x) => [Number(x.code), x.state]));
+
+      return stepsRaw
+        .map((s) => {
+          const code = Number(s.code ?? s.status ?? s.newStatus);
+          const safeCode = Number.isNaN(code) ? 0 : code;
+
+          const titleFromMap =
+            (isPos ? ORDER_STATUS_POS_MAP[safeCode]?.text : ORDER_STATUS_ONLINE_MAP[safeCode]?.text) ||
+            `Bước ${safeCode}`;
+
+          const stateFromBe = s.state;
+          const stateFromFallback = fallbackStateByCode.get(safeCode) || "UPCOMING";
+
+          return {
+            code: safeCode,
+            title: s.title || s.name || titleFromMap,
+            state: stateFromBe || stateFromFallback,
+          };
+        })
+        .filter(Boolean);
     }
-    // fallback khi BE chưa trả steps
+
     return buildFallbackSteps(typeNorm, currentStatus, cancelCode, doneCode);
   }, [stepsRaw, typeNorm, currentStatus, cancelCode, doneCode, isPos]);
 
-  // nextStatus: ưu tiên step UPCOMING sau CURRENT trong stepsForRender
+  // ✅ POS không có next
   const nextStatus = useMemo(() => {
-    if (!stepsForRender.length) return null;
+    if (isPos) return null;
+    if (isFinal) return null;
 
-    const idx = stepsForRender.findIndex((s) => (s.state || "") === "CURRENT");
-    // nếu không có CURRENT mà đang CANCELLED/DONE -> không next
-    if (idx === -1) return null;
+    const codes = stepsForRender
+      .map((s) => Number(s.code))
+      .filter((n) => !Number.isNaN(n) && n !== cancelCode); // bỏ 7
 
-    for (let i = idx + 1; i < stepsForRender.length; i++) {
-      if (stepsForRender[i]?.state === "UPCOMING") {
-        const code = Number(stepsForRender[i].code);
-        if (Number.isNaN(code)) return null;
+    if (!codes.length) return null;
 
-        if (isPos && code === 2) return { code, label: "Xác nhận hoàn thành đơn hàng" };
-        return { code, label: "Chuyển bước tiếp theo" };
-      }
+    // thứ tự chuẩn BE (hỗ trợ case DELIVERY tạo từ POS: có 0 rồi nhảy 3)
+    const ORDER = [0, 1, 2, 3, 4, 5, 6];
+    const forward = ORDER.filter((c) => codes.includes(c));
+
+    // nếu current chưa nằm trong forward (vd current=0 nhưng forward=[1..6] hoặc data lỗi)
+    if (!forward.includes(currentStatus)) {
+      const firstGreater = forward.find((c) => c > currentStatus);
+      return firstGreater != null ? { code: firstGreater, label: "Chuyển bước tiếp theo" } : null;
     }
-    return null;
-  }, [stepsForRender, isPos]);
+
+    const idx = forward.indexOf(currentStatus);
+    const nextCode = forward[idx + 1];
+    return nextCode != null ? { code: nextCode, label: "Chuyển bước tiếp theo" } : null;
+  }, [stepsForRender, isPos, isFinal, currentStatus, cancelCode]);
 
   // ===== Actions =====
   const handleUpdateStatus = async (newStatus, note) => {
     if (!id) return;
+
+    if (isPos) {
+      toast.warn("Đơn tại quầy không cập nhật trạng thái");
+      return;
+    }
+
+    // ✅ CHẶN: hoàn tất khi chưa thanh toán
+    if (Number(newStatus) === doneCode && !isPaid) {
+  const allowCodComplete = isCodOrder && Number(currentStatus) === 5; // DELIVERED -> COMPLETED
+  if (!allowCodComplete) {
+    toast.warn("Chưa thanh toán đủ, không thể hoàn tất đơn.");
+    return;
+  }
+}
+
     try {
       await updateOrderStatus(id, { newStatus, note: note || "" });
-      message.success("Cập nhật trạng thái thành công");
+      toast.success("Cập nhật trạng thái thành công");
+      await refreshAll();
+      window.dispatchEvent(
+  new CustomEvent("orders:changed", {
+    detail: { orderId: id, newStatus: Number(newStatus) },
+  })
+);
+    } catch (err) {
+      const beMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Cập nhật thất bại";
+      toast.error(beMsg);
+      console.error(err);
+    }
+  };
+
+  
+
+  const handleCancelPos = async () => {
+    if (!id) return;
+    try {
+      await cancelPosOrder(id);
+      toast.success("Đã hủy đơn tại quầy");
       await refreshAll();
     } catch (err) {
-      const beMsg = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Cập nhật thất bại";
-      message.error(beMsg);
+      const beMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Hủy đơn thất bại";
+      toast.error(beMsg);
       console.error(err);
     }
   };
 
   const confirmNext = () => {
     if (!nextStatus) return;
-
-    const statusMap = isPos ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
+    const statusMap = isPos ? ORDER_STATUS_POS_MAP : { ...ORDER_STATUS_ONLINE_MAP, 0: { text: "Tạo đơn" } };
 
     Modal.confirm({
       title: "Xác nhận cập nhật trạng thái?",
       content: (
         <div>
-          Bạn muốn chuyển trạng thái sang: <b>{statusMap[nextStatus.code]?.text || nextStatus.code}</b>
-          <div style={{ marginTop: 6, color: "#64748b" }}>Hành động này sẽ được ghi log lịch sử đơn hàng.</div>
+          Bạn muốn chuyển trạng thái sang:{" "}
+          <b>{statusMap[nextStatus.code]?.text || nextStatus.code}</b>
+          <div style={{ marginTop: 6, color: "#64748b" }}>
+            Hành động này sẽ được ghi log lịch sử đơn hàng.
+          </div>
         </div>
       ),
       okText: "Xác nhận",
       cancelText: "Hủy",
+      centered: true,
       onOk: () => handleUpdateStatus(nextStatus.code),
     });
   };
 
   const confirmCancel = () => {
+
+      if (!canCancel) {
+    toast.warn("Đơn này hiện không đủ điều kiện hủy.");
+    return;
+  }
     Modal.confirm({
       title: "Xác nhận hủy đơn hàng?",
-      content: isPos ? "Sau khi hủy, đơn tại quầy sẽ không thể hoàn tất." : "Sau khi hủy, đơn sẽ không thể tiếp tục luồng xử lý.",
+      content: isPos
+        ? "Sau khi hủy, đơn tại quầy sẽ không thể hoàn tất."
+        : "Sau khi hủy, đơn sẽ không thể tiếp tục luồng xử lý.",
       okText: "Hủy đơn",
       okButtonProps: { danger: true },
       cancelText: "Không",
-      onOk: () => handleUpdateStatus(cancelCode, "Hủy bởi nhân viên"),
+      centered: true,
+      onOk: () => {
+        if (isPos) return handleCancelPos();
+        return handleUpdateStatus(cancelCode, "Hủy bởi nhân viên");
+      },
     });
   };
 
@@ -423,12 +661,41 @@ const OrderDetailComponent = () => {
     { title: "Serial", dataIndex: "maSeri", key: "maSeri" },
   ];
 
-  const paymentColumns = [
-    { title: "Phương thức", dataIndex: "tenHinhThuc", key: "tenHinhThuc" },
-    { title: "Khách đưa", dataIndex: "khachDua", key: "khachDua", align: "right", render: (v) => formatCurrency(v) },
-    { title: "Số tiền thanh toán", dataIndex: "soTien", key: "soTien", align: "right", render: (v) => <Text strong>{formatCurrency(v)}</Text> },
-    { title: "Tiền trả lại", dataIndex: "tienTraLai", key: "tienTraLai", align: "right", render: (v) => formatCurrency(v) },
-  ];
+  const paymentColumns = useMemo(() => {
+    const cols = [
+      { title: "Phương thức", dataIndex: "tenHinhThuc", key: "tenHinhThuc" },
+      {
+        title: "Số tiền thanh toán",
+        dataIndex: "soTien",
+        key: "soTien",
+        align: "right",
+        render: (v) => <Text strong>{formatCurrency(v)}</Text>,
+      },
+    ];
+
+    // ✅ Chỉ khi có CASH mới hiện 2 cột này
+    if (hasCashPayment) {
+      cols.splice(1, 0,
+        {
+          title: "Khách đưa",
+          dataIndex: "khachDua",
+          key: "khachDua",
+          align: "right",
+          render: (v, row) => (isCashMethod(row) ? formatCurrency(v) : "-"),
+        },
+      );
+
+      cols.push({
+        title: "Tiền trả lại",
+        dataIndex: "tienTraLai",
+        key: "tienTraLai",
+        align: "right",
+        render: (v, row) => (isCashMethod(row) ? formatCurrency(v) : "-"),
+      });
+    }
+
+    return cols;
+  }, [hasCashPayment]);
 
   // ===== Render timeline =====
   const renderTimeline = () => {
@@ -445,18 +712,6 @@ const OrderDetailComponent = () => {
     const steps = stepsForRender;
     const logs = logsRaw;
 
-    // GIAO_HANG: bước 1-2 chỉ hiển thị (coi như DONE) khi đơn đã từ bước 3 trở đi
-    const getEffectiveState = (step) => {
-      const codeNum = Number(step?.code);
-      let state = step?.state;
-
-      // nếu đơn đang CANCELLED theo currentStatus thì step cancel -> CANCELLED
-      if (currentStatus === cancelCode && codeNum === cancelCode) return "CANCELLED";
-
-      if (typeNorm === "GIAO_HANG" && currentStatus >= 3 && codeNum <= 2) return "DONE";
-      return state;
-    };
-
     if (loadingTimeline && !timeline) {
       return (
         <div style={{ padding: 16 }}>
@@ -465,7 +720,6 @@ const OrderDetailComponent = () => {
       );
     }
 
-    // match log chắc hơn: title step, hoặc title theo code, hoặc log có code/status/newStatus
     const findLogForStep = (step) => {
       if (!Array.isArray(logs) || logs.length === 0) return null;
 
@@ -476,29 +730,31 @@ const OrderDetailComponent = () => {
       for (let i = logs.length - 1; i >= 0; i--) {
         const l = logs[i] || {};
         const t = (l?.title || "").trim();
-        const codeFromLog = Number(l?.code ?? l?.status ?? l?.newStatus ?? l?.trangThai);
+        const codeFromLog = Number(
+          l?.code ?? l?.status ?? l?.newStatus ?? l?.trangThai ?? l?.hanhDong
+        );
 
         if (expectedTitleA && t === expectedTitleA) return l;
         if (expectedTitleB && t === expectedTitleB) return l;
-
         if (!Number.isNaN(codeFromLog) && codeFromLog === codeNum) return l;
       }
       return null;
     };
 
-    // progress tính động theo steps (loại bỏ cancel step)
     const nonCancelSteps = steps.filter((s) => Number(s.code) !== cancelCode);
     const timelineTotalSteps = nonCancelSteps.length || 1;
-    const doneCount = nonCancelSteps.filter((s) => getEffectiveState(s) === "DONE").length;
-    const hasCurrent = nonCancelSteps.some((s) => getEffectiveState(s) === "CURRENT") ? 1 : 0;
+    const doneCount = nonCancelSteps.filter((s) => (s.state || "") === "DONE").length;
+    const hasCurrent = nonCancelSteps.some((s) => (s.state || "") === "CURRENT") ? 1 : 0;
     const completedSteps = Math.min(timelineTotalSteps, doneCount + hasCurrent);
     const timelinePercent = Math.round((completedSteps * 100) / timelineTotalSteps);
 
-    const statusColorMap = isPos ? ORDER_STATUS_MAP : ORDER_STATUS_ONLINE_MAP;
+    const statusColorMap = isPos ? ORDER_STATUS_POS_MAP : ORDER_STATUS_ONLINE_MAP;
+
+
 
     return (
       <div>
-        <Card size="small" style={{ borderRadius: 12, borderColor: "#edf2ff" }} bodyStyle={{ padding: 14 }}>
+        <Card size="small" style={{ borderRadius: 12, borderColor: "#edf2ff" }} styles={{ padding: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <div>
               <Text strong>Timeline trạng thái đơn hàng</Text>
@@ -510,7 +766,7 @@ const OrderDetailComponent = () => {
               <Text type="secondary">
                 {completedSteps}/{timelineTotalSteps} bước hoàn thành
               </Text>
-              <div style={{ marginTop: 6 }}>{getProcessingTag(typeNorm, currentStatus)}</div>
+              <div style={{ marginTop: 6 }}>{getProcessingTag(currentStatus)}</div>
             </div>
           </div>
 
@@ -523,19 +779,26 @@ const OrderDetailComponent = () => {
           <Timeline mode="left" style={{ marginTop: 6 }}>
             {steps.map((s) => {
               const codeNum = Number(s.code);
+          
+              const visual = getStepVisual(s.state);
 
-              const effectiveState = getEffectiveState(s);
-              const visual = getStepVisual(effectiveState);
+              const isCurrent = s.state === "CURRENT";
+              const isDone = s.state === "DONE";
+              const isUpcoming = s.state === "UPCOMING";
+              const isCancelled = s.state === "CANCELLED";
 
-              const isCurrent = effectiveState === "CURRENT";
-              const isDone = effectiveState === "DONE";
-              const isUpcoming = effectiveState === "UPCOMING";
-              const isCancelled = effectiveState === "CANCELLED";
-
-              const titlePrefix = isCurrent ? "Hiện tại:" : isDone ? "Đã xong:" : isUpcoming ? "Sắp tới:" : "Trạng thái:";
+              const titlePrefix = isCurrent
+                ? "Hiện tại:"
+                : isDone
+                  ? "Đã xong:"
+                  : isUpcoming
+                    ? "Sắp tới:"
+                    : "Trạng thái:";
 
               const matchedLog = findLogForStep(s);
-              const timeLabel = pickLogTime(matchedLog) ? formatDateTime(pickLogTime(matchedLog)) : "-";
+              const timeLabel = pickLogTime(matchedLog)
+                ? formatDateTime(pickLogTime(matchedLog))
+                : "-";
 
               return (
                 <Timeline.Item key={String(s.code)} color={visual.color} dot={visual.dot} label={timeLabel}>
@@ -555,14 +818,15 @@ const OrderDetailComponent = () => {
                           {titlePrefix} {s.title}
                         </Text>
 
-                        {/* tag trạng thái phụ (áp dụng cả POS lẫn ONLINE) */}
                         {isCurrent && codeNum === doneCode && <Tag color="green">Hoàn tất</Tag>}
                         {isCurrent && codeNum === cancelCode && <Tag color="red">Đã hủy</Tag>}
                         {isCurrent && codeNum !== doneCode && codeNum !== cancelCode && <Tag color="blue">Đang xử lý</Tag>}
 
                         {isDone && <Tag color="green">Hoàn tất</Tag>}
                         {isCancelled && <Tag color="red">Đã hủy</Tag>}
+                    
                       </Space>
+
 
                       <Text type="secondary">
                         {(isPos ? STEP_DESC_POS[codeNum] : STEP_DESC_BY_STATUS[codeNum]) || "Cập nhật trạng thái đơn hàng."}
@@ -580,19 +844,40 @@ const OrderDetailComponent = () => {
 
           <Divider style={{ margin: "12px 0" }} />
 
-          {/* Actions: bật cho cả POS & ONLINE/GIAO_HANG */}
-          <div style={{ display: "flex", gap: 10 }}>
-            <Button type="primary" disabled={!nextStatus || isFinal} onClick={confirmNext}>
-              {nextStatus?.label || "Xác nhận"}
-            </Button>
+          {/* ✅ Actions */}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {/* ✅ ONLINE/GIAO_HANG mới có chuyển bước */}
+            {!isPos && (
+              <Button type="primary" disabled={!nextStatus || isFinal} onClick={confirmNext}>
+                {nextStatus?.label || "Chuyển bước"}
+              </Button>
+            )}
 
-            <Button danger disabled={!canCancel} onClick={confirmCancel}>
-              Hủy đơn hàng
-            </Button>
+    
+
+            {/* ✅ POS: disable nếu đã có payment */}
+            {isPos ? (
+              <Tooltip
+                title={
+                  !canCancel
+                    ? "Đơn đã kết thúc"
+                    : totalPaid > 0
+                      ? "Đơn tại quầy đã có thanh toán, không thể hủy"
+                      : ""
+                }
+              >
+                <Button danger disabled={!canCancelPos} onClick={confirmCancel}>
+                  Hủy đơn hàng
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button danger disabled={!canCancel} onClick={confirmCancel}>
+                Hủy đơn hàng
+              </Button>
+            )}
           </div>
         </Card>
 
-        {/* Logs detail */}
         <Card size="small" title="Lịch sử thay đổi" style={{ marginTop: 16, borderRadius: 12, borderColor: "#edf2ff" }}>
           {Array.isArray(logs) && logs.length > 0 ? (
             <Timeline>
@@ -602,7 +887,7 @@ const OrderDetailComponent = () => {
                     <div>
                       <Text strong>{l.title || "Cập nhật"}</Text>
                       <div style={{ marginTop: 4 }}>
-                        <Text type="secondary">{l.description || l.noiDung || "-"}</Text>
+                        <Text type="secondary">{l.description || l.noiDung || l.moTa || "-"}</Text>
                       </div>
                       <div style={{ marginTop: 4 }}>
                         <Text type="secondary">
@@ -628,7 +913,12 @@ const OrderDetailComponent = () => {
     return (
       <div style={{ padding: 24, minHeight: "100vh", background: "#f5f7fb" }}>
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
-          <Button type="link" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)} style={{ paddingLeft: 0, marginBottom: 12 }}>
+          <Button
+            type="link"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(-1)}
+            style={{ paddingLeft: 0, marginBottom: 12 }}
+          >
             Quay lại
           </Button>
           <Card>Không tìm thấy đơn hàng. Vui lòng kiểm tra lại đường dẫn.</Card>
@@ -662,7 +952,7 @@ const OrderDetailComponent = () => {
           </Space>
 
           <Space>
-            <Button icon={<FileTextOutlined />} onClick={handleViewInvoice} disabled={!order}>
+            <Button icon={<FileTextOutlined />} onClick={() => setOpenInvoice(true)} disabled={!order}>
               Xem hóa đơn
             </Button>
             <Button icon={<PrinterOutlined />} onClick={handlePrintInvoice} disabled={!order}>
@@ -675,7 +965,10 @@ const OrderDetailComponent = () => {
         </div>
 
         {/* MAIN CARD + TABS */}
-        <Card style={{ borderRadius: 16, boxShadow: "0 8px 20px rgba(15,23,42,0.04)", border: "1px solid #edf2ff" }} bodyStyle={{ paddingTop: 12 }}>
+        <Card
+          style={{ borderRadius: 16, boxShadow: "0 8px 20px rgba(15,23,42,0.04)", border: "1px solid #edf2ff" }}
+          styles={{ paddingTop: 12 }}
+        >
           <Tabs defaultActiveKey="info" tabBarStyle={{ marginBottom: 16 }}>
             <Tabs.TabPane tab="Thông tin đơn hàng" key="info">
               <Row gutter={[16, 16]} align="stretch">
@@ -749,10 +1042,9 @@ const OrderDetailComponent = () => {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                       <span>Giảm giá voucher:</span>
-                      <span style={{ color: "#f11e1eff" }}>- {formatCurrency(order?.giaTriGiamGia)}</span>
+                      <span style={{ color: "#f11e1e" }}>- {formatCurrency(order?.giaTriGiamGia)}</span>
                     </div>
 
-                    {/* ✅ thêm phí ship nếu có */}
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                       <span>Phí vận chuyển:</span>
                       <span>{formatCurrency(shippingFee)}</span>
@@ -789,8 +1081,15 @@ const OrderDetailComponent = () => {
             <Tabs.TabPane tab="Thanh toán" key="payment">
               <Row gutter={[16, 16]}>
                 <Col xs={24} md={12}>
-                  <Card size="small" title="Trạng thái thanh toán" extra={paymentStatusTag} style={{ borderRadius: 12, borderColor: "#edf2ff" }}>
-                    <p style={{ marginBottom: 8 }}>{isPaid ? "Đơn hàng đã được thanh toán đầy đủ" : "Đơn hàng chưa thanh toán đủ"}</p>
+                  <Card
+                    size="small"
+                    title="Trạng thái thanh toán"
+                    extra={paymentStatusTag}
+                    style={{ borderRadius: 12, borderColor: "#edf2ff" }}
+                  >
+                    <p style={{ marginBottom: 8 }}>
+                      {isPaid ? "Đơn hàng đã được thanh toán đầy đủ" : "Đơn hàng chưa thanh toán đủ"}
+                    </p>
                     <Progress percent={paymentPercent} status={isPaid ? "success" : "active"} />
                     <Descriptions size="small" column={1} colon={false} style={{ marginTop: 12 }} labelStyle={{ fontWeight: 500 }}>
                       <Descriptions.Item label="Tổng thanh toán">{formatCurrency(mustPay)}</Descriptions.Item>
@@ -820,7 +1119,12 @@ const OrderDetailComponent = () => {
               </Row>
 
               <Card size="small" title="Phương thức thanh toán" style={{ marginTop: 16, borderRadius: 12, borderColor: "#edf2ff" }}>
-                <Table rowKey="id" columns={paymentColumns} dataSource={order?.payments || []} pagination={false} />
+                <Table
+                  rowKey={(row, idx) => row?.id || row?.paymentId || row?.ma || `${row?.tenHinhThuc || "pay"}-${idx}`}
+                  columns={paymentColumns}
+                  dataSource={paymentsForRender}
+                  pagination={false}
+                />
               </Card>
             </Tabs.TabPane>
 
@@ -830,7 +1134,6 @@ const OrderDetailComponent = () => {
           </Tabs>
         </Card>
 
-        {/* ✅ NEW: Modal hóa đơn tách component */}
         <InvoiceModal open={openInvoice} onClose={() => setOpenInvoice(false)} html={invoiceHtml} onPrint={handlePrintInvoice} />
       </div>
     </div>

@@ -1,160 +1,185 @@
-// components/ResetPassword.jsx
-import React, { useState, useEffect } from "react";
-import { message } from 'antd';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Input, Button, Form } from 'antd';
-import { MailOutlined, LockOutlined, KeyOutlined } from '@ant-design/icons';
+// components/auth/ResetPassword.jsx
+import React, { useEffect, useState } from "react";
+import { Form, Input, Button, message } from "antd";
+import { MailOutlined, LockOutlined, KeyOutlined } from "@ant-design/icons";
+import { useNavigate, useLocation } from "react-router-dom";
+import api from "../../service/api";
+import "./Auth.css";
+import beeTopLogo from "../../img/BeeTop2.png";
 
 const ResetPassword = () => {
-  const [formAntd] = Form.useForm();
+  const [form] = Form.useForm();
   const navigate = useNavigate();
-  const location = useLocation(); // Vẫn giữ để có thể điền sẵn email nếu muốn
+  const location = useLocation();
+  const [loading, setLoading] = useState(false);
 
-  const [formState, setFormState] = useState({
-    email: "",
-    resetToken: "", // Đây là nơi người dùng sẽ nhập mã xác thực từ email
-    newMatKhau: "",
-    confirmNewMatKhau: ""
-  });
-
-  // Sử dụng useEffect để điền sẵn email nếu được truyền từ trang ForgotPassword (tùy chọn)
-  // Lưu ý: Với backend hiện tại, việc này không bắt buộc vì mã xác thực là do người dùng tự nhập.
-  // Tuy nhiên, nó có thể tiện lợi cho người dùng.
+  // Prefill email từ ForgotPassword
   useEffect(() => {
-    if (location.state && location.state.email) {
-      setFormState(prevState => ({
-        ...prevState,
-        email: location.state.email
-      }));
-      formAntd.setFieldsValue({
-        email: location.state.email
-      });
-    }
-  }, [location.state, formAntd]);
-
-  const handleChange = e => setFormState({ ...formState, [e.target.name]: e.target.value });
+    const email = location?.state?.email;
+    if (email) form.setFieldsValue({ email });
+  }, [location?.state, form]);
 
   const onFinish = async (values) => {
-    try {
-      // Đảm bảo tên trường khớp với ResetPasswordRequest DTO của backend
-      // Backend của bạn mong đợi { email, resetToken, newMatKhau }
-      const res = await fetch("/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: formState.email,
-          resetToken: formState.resetToken, // Đây là mã xác thực người dùng nhập
-          newMatKhau: formState.newMatKhau
-        })
-      });
-      const data = await res.json();
+    const payload = {
+      email: values.email?.trim(),
+      resetToken: values.resetToken?.trim(),
+      newMatKhau: values.newMatKhau,
+    };
 
-      if (res.ok) {
-        message.success(data.message || "Mật khẩu đã được đổi thành công!");
-        formAntd.resetFields();
-        setTimeout(() => navigate('/login'), 1000);
-      } else {
-        // Cần xử lý các mã lỗi cụ thể từ backend của bạn
-        // Ví dụ: mã token không hợp lệ/hết hạn, email không khớp, v.v.
-        // Bạn có thể dùng data.message để hiển thị lỗi chi tiết hơn
-        message.error(data.message || "Đổi mật khẩu thất bại.");
-      }
-    } catch (networkError) {
-      message.error("Lỗi mạng: Không thể kết nối đến máy chủ.");
-      console.error("Network error:", networkError);
+    try {
+      setLoading(true);
+      const res = await api.post("/auth/reset-password", payload);
+
+      message.success(res?.data?.message || "Đổi mật khẩu thành công!");
+      form.resetFields();
+      setTimeout(() => navigate("/login"), 800);
+    } catch (error) {
+      const msg =
+        error?.response?.data?.message ||
+        "Đổi mật khẩu thất bại. Vui lòng kiểm tra mã xác thực.";
+      message.error(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ maxWidth: 400, margin: '50px auto', padding: 20, border: '1px solid #d9d9d9', borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.09)' }}>
-      <h3 style={{ textAlign: 'center', marginBottom: 24 }}>Đổi mật khẩu</h3>
-      <Form
-        form={formAntd}
-        name="reset_password"
-        onFinish={onFinish}
-        layout="vertical"
-      >
-        <Form.Item
-          name="email"
-          rules={[
-            { required: true, message: 'Vui lòng nhập Email!' },
-            { type: 'email', message: 'Email không hợp lệ!' }
-          ]}
-        >
-          <Input
-            prefix={<MailOutlined />}
-            placeholder="Email"
-            name="email" // Thêm name prop
-            value={formState.email}
-            onChange={handleChange}
-          />
-        </Form.Item>
+    <div className="authPageLite">
+      <div className="authCardWhite">
+        <div className="authHeader">
+          <img className="authLogo" src={beeTopLogo} alt="BeeTop" />
+          <h2 className="authTitle">Đặt lại mật khẩu</h2>
+          <p className="authSub">Nhập mã xác thực đã gửi về email và mật khẩu mới</p>
+        </div>
 
-        {/* Thêm trường input cho Mã xác thực */}
-        <Form.Item
-          name="resetToken"
-          rules={[{ required: true, message: 'Vui lòng nhập Mã xác thực!' }]}
-        >
-          <Input
-            prefix={<KeyOutlined />}
-            placeholder="Mã xác thực từ Email"
-            name="resetToken" // Thêm name prop
-            value={formState.resetToken}
-            onChange={handleChange}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="newMatKhau"
-          rules={[
-            { required: true, message: 'Vui lòng nhập Mật khẩu mới!' },
-            { min: 8, message: 'Mật khẩu phải có ít nhất 8 ký tự!' } // Thêm rule min length
-          ]}
-          hasFeedback
-        >
-          <Input.Password
-            prefix={<LockOutlined />}
-            placeholder="Mật khẩu mới"
-            name="newMatKhau" // Thêm name prop
-            value={formState.newMatKhau}
-            onChange={handleChange}
-          />
-        </Form.Item>
-
-        <Form.Item
-          name="confirmNewMatKhau"
-          dependencies={['newMatKhau']}
-          hasFeedback
-          rules={[
-            { required: true, message: 'Vui lòng xác nhận Mật khẩu mới!' },
-            ({ getFieldValue }) => ({
-              validator(_, value) {
-                if (!value || getFieldValue('newMatKhau') === value) {
+        <Form form={form} layout="vertical" onFinish={onFinish} autoComplete="off">
+          {/* Email */}
+          <Form.Item
+            label="Email"
+            name="email"
+            normalize={(v) => (typeof v === "string" ? v.trim() : v)}
+            rules={[
+              { required: true, message: "Vui lòng nhập Email!" },
+              { type: "email", message: "Email không hợp lệ!" },
+              { max: 254, message: "Email quá dài!" },
+              () => ({
+                validator(_, value) {
+                  if (!value) return Promise.resolve();
+                  if (/\s/.test(value)) {
+                    return Promise.reject(new Error("Email không được chứa khoảng trắng!"));
+                  }
                   return Promise.resolve();
-                }
-                return Promise.reject(new Error('Mật khẩu xác nhận không khớp!'));
-              },
-            }),
-          ]}
-        >
-          <Input.Password
-            prefix={<LockOutlined />}
-            placeholder="Xác nhận mật khẩu mới"
-            name="confirmNewMatKhau" // Thêm name prop
-            // Không cần value và onChange ở đây vì Ant Design tự handle qua dependencies
-          />
-        </Form.Item>
+                },
+              }),
+            ]}
+            hasFeedback
+          >
+            <Input
+              className="authInput"
+              prefix={<MailOutlined />}
+              placeholder="example@gmail.com"
+              inputMode="email"
+              autoComplete="email"
+            />
+          </Form.Item>
 
-        <Form.Item>
-          <Button type="primary" htmlType="submit" style={{ width: '100%' }}>
+          {/* Mã xác thực */}
+          <Form.Item
+            label="Mã xác thực"
+            name="resetToken"
+            normalize={(v) => (typeof v === "string" ? v.trim() : v)}
+            rules={[
+              { required: true, message: "Vui lòng nhập mã xác thực!" },
+              { min: 4, message: "Mã xác thực quá ngắn!" },
+              { max: 64, message: "Mã xác thực quá dài!" },
+              () => ({
+                validator(_, value) {
+                  if (!value) return Promise.resolve();
+                  if (/\s/.test(value)) {
+                    return Promise.reject(new Error("Mã xác thực không được chứa khoảng trắng!"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+            hasFeedback
+          >
+            <Input
+              className="authInput"
+              prefix={<KeyOutlined />}
+              placeholder="Nhập mã xác thực từ email"
+              autoComplete="one-time-code"
+            />
+          </Form.Item>
+
+          {/* Mật khẩu mới */}
+          <Form.Item
+            label="Mật khẩu mới"
+            name="newMatKhau"
+            rules={[
+              { required: true, message: "Vui lòng nhập mật khẩu mới!" },
+              { min: 8, message: "Mật khẩu phải có ít nhất 8 ký tự!" },
+              () => ({
+                validator(_, value) {
+                  if (!value) return Promise.resolve();
+                  if (/\s/.test(value)) {
+                    return Promise.reject(new Error("Mật khẩu không được chứa khoảng trắng!"));
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
+            hasFeedback
+          >
+            <Input.Password
+              className="authInput"
+              prefix={<LockOutlined />}
+              placeholder="Nhập mật khẩu mới"
+              autoComplete="new-password"
+            />
+          </Form.Item>
+
+          {/* Xác nhận mật khẩu */}
+          <Form.Item
+            label="Xác nhận mật khẩu mới"
+            name="confirmNewMatKhau"
+            dependencies={["newMatKhau"]}
+            rules={[
+              { required: true, message: "Vui lòng xác nhận mật khẩu mới!" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue("newMatKhau") === value) return Promise.resolve();
+                  return Promise.reject(new Error("Mật khẩu xác nhận không khớp!"));
+                },
+              }),
+            ]}
+            hasFeedback
+          >
+            <Input.Password
+              className="authInput"
+              prefix={<LockOutlined />}
+              placeholder="Nhập lại mật khẩu mới"
+              autoComplete="new-password"
+            />
+          </Form.Item>
+
+          <Button
+            type="primary"
+            htmlType="submit"
+            size="large"
+            className="authBtn"
+            loading={loading}
+          >
             Đổi mật khẩu
           </Button>
-        </Form.Item>
-      </Form>
 
-      <p style={{ marginTop: 15, textAlign: 'center' }}>
-        <a onClick={() => navigate('/login')} style={{ cursor: 'pointer', color: '#1890ff' }}>Quay lại Đăng nhập</a>
-      </p>
+          <div className="authBottom">
+            <button type="button" className="authLink" onClick={() => navigate("/login")}>
+              Quay lại đăng nhập
+            </button>
+          </div>
+        </Form>
+      </div>
     </div>
   );
 };

@@ -1,67 +1,56 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, DatePicker, Radio, Button, Select, Row, Col, message, Upload } from "antd";
+import { Form, Input, DatePicker, Radio, Button, Select, Row, Col, Upload, Modal } from "antd";
+import { toast } from "react-toastify";
 import { PlusOutlined } from "@ant-design/icons";
 import moment from "moment";
 import { useNavigate, useParams } from "react-router-dom";
 import userService from "../../service/userService";
 import api from "../../service/api";
-import { getGHNProvinces, getGHNDistricts, getGHNWards } from "../../service/ghnApi";
-
-const { Option } = Select;
-
-const removeAccents = (str) => {
-  return String(str || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D");
-};
+import AddressManager from "../../components/AddressManager";
 
 const EditNhanVienComponent = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const { id } = useParams();
 
+  const me = JSON.parse(sessionStorage.getItem("user") || "null");
+  const myEmail = (me?.email || "").toLowerCase();
+
+  // ✅ SỬA: isOwner không lấy từ sessionStorage.idTaiKhoan nữa (vì thiếu field)
+  const [isOwner, setIsOwner] = useState(false);
+
   const [user, setUser] = useState(null);
-
-  const [provinces, setProvinces] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [wards, setWards] = useState([]);
-
-  const [loadingProvinces, setLoadingProvinces] = useState(false);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
-  const [loadingWards, setLoadingWards] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [fileList, setFileList] = useState([]);
 
+  // ✅ NEW: địa chỉ mặc định lấy từ AddressManager
+  const [defaultAddress, setDefaultAddress] = useState(null);
+
+  // ✅ SỬA: xác định owner bằng cách match email trong list ADMIN (có idTaiKhoan)
   useEffect(() => {
-    const fetchProvinces = async () => {
-      setLoadingProvinces(true);
+    (async () => {
       try {
-        const list = await getGHNProvinces();
-        setProvinces(list);
-      } catch (error) {
-        message.error("Không thể tải danh sách tỉnh/thành phố (GHN)!");
-      } finally {
-        setLoadingProvinces(false);
+        const adminRes = await api.get("/api/admin/users/by-role/R001");
+        const admins = adminRes.data?.data || [];
+        const meInAdmins = admins.find((u) => (u?.email || "").toLowerCase() === myEmail);
+        setIsOwner(((meInAdmins?.idTaiKhoan || "")).toUpperCase() === "AD000");
+      } catch (e) {
+        setIsOwner(false);
       }
-    };
-    fetchProvinces();
-  }, []);
+    })();
+  }, [myEmail]);
 
   useEffect(() => {
     const loadData = async () => {
       if (!id) {
-        message.error("ID nhân viên không hợp lệ!");
+        toast.error("ID nhân viên không hợp lệ!");
         navigate("/admin/nhan-vien");
         return;
       }
 
       setLoading(true);
       try {
-        // ⚠️ Bạn đang dùng endpoint address/customer cho nhân viên.
-        // Nếu BE có endpoint riêng cho nhân viên, đổi lại ở đây.
         const [userRes, addressRes] = await Promise.all([
           userService.getUserDetail(id),
           api.get(`/api/admin/address/customer/${id}`).catch(() => ({ data: { data: [] } })),
@@ -69,55 +58,41 @@ const EditNhanVienComponent = () => {
 
         const userData = userRes;
         const addresses = addressRes.data?.data || [];
-        const defaultAddress = addresses.find((a) => a.macDinh) || addresses[0];
+        const addr = addresses.find((a) => a.macDinh) || addresses[0] || null;
+
+        // ✅ set defaultAddress (fallback names từ data cũ)
+        if (addr) {
+          setDefaultAddress({
+            ...addr,
+            provinceName: addr.provinceName || addr.tinhThanh || "",
+            districtName: addr.districtName || addr.quanHuyen || "",
+            wardName: addr.wardName || addr.phuongXa || "",
+          });
+        } else {
+          setDefaultAddress(null);
+        }
 
         setUser(userData);
+        const currentRole =
+          (userData?.tenChucVu || "").toString().toUpperCase() ||
+          (userData?.idRole?.idRole === "R001" ? "ADMIN" : "NHAN_VIEN");
 
         form.setFieldsValue({
           ten: userData.ten || "",
           email: userData.email || "",
           soDienThoai: userData.soDienThoai || "",
           ngaySinh: userData.ngaySinh ? moment(userData.ngaySinh, "YYYY-MM-DD") : null,
+          role: currentRole === "ADMIN" ? "ADMIN" : "NHAN_VIEN",
           gioiTinh: userData.gioiTinh || undefined,
           quocGia: "Việt Nam",
-          diaChiChiTiet: defaultAddress?.diaChiChiTiet || "",
         });
 
         if (userData.anh) {
           setFileList([{ uid: "-1", name: "avatar.png", status: "done", url: userData.anh }]);
         }
-
-        // ✅ Nếu có GHN IDs thì load districts/wards để set select đúng
-        const provinceId = defaultAddress?.provinceId ? Number(defaultAddress.provinceId) : null;
-        const districtId = defaultAddress?.districtId ? Number(defaultAddress.districtId) : null;
-        const wardCode = defaultAddress?.wardCode ? String(defaultAddress.wardCode) : undefined;
-
-        if (provinceId) {
-          setLoadingDistricts(true);
-          const dList = await getGHNDistricts(provinceId);
-          setDistricts(dList);
-          setLoadingDistricts(false);
-        } else {
-          setDistricts([]);
-        }
-
-        if (districtId) {
-          setLoadingWards(true);
-          const wList = await getGHNWards(districtId);
-          setWards(wList);
-          setLoadingWards(false);
-        } else {
-          setWards([]);
-        }
-
-        form.setFieldsValue({
-          tinhThanh: provinceId || undefined,
-          quanHuyen: districtId || undefined,
-          phuongXa: wardCode || undefined,
-        });
       } catch (error) {
         console.error("Lỗi khi tải dữ liệu nhân viên:", error);
-        message.error("Không thể tải dữ liệu nhân viên!");
+        toast.error("Không thể tải dữ liệu nhân viên!");
         navigate("/admin/nhan-vien");
       } finally {
         setLoading(false);
@@ -127,48 +102,26 @@ const EditNhanVienComponent = () => {
     loadData();
   }, [id, form, navigate]);
 
-  const handleProvinceChange = async (provinceId) => {
-    setLoadingDistricts(true);
-    try {
-      const list = await getGHNDistricts(provinceId);
-      setDistricts(list);
-      setWards([]);
-      form.setFieldsValue({ quanHuyen: undefined, phuongXa: undefined });
-    } catch (error) {
-      message.error("Không thể tải danh sách quận/huyện (GHN)!");
-    } finally {
-      setLoadingDistricts(false);
-    }
-  };
-
-  const handleDistrictChange = async (districtId) => {
-    setLoadingWards(true);
-    try {
-      const list = await getGHNWards(districtId);
-      setWards(list);
-      form.setFieldsValue({ phuongXa: undefined });
-    } catch (error) {
-      message.error("Không thể tải danh sách phường/xã (GHN)!");
-    } finally {
-      setLoadingWards(false);
-    }
-  };
-
-  const filterOption = (input, option) => {
-    const inputValue = removeAccents(input.toLowerCase());
-    const optionValue = removeAccents((option?.children || "").toLowerCase());
-    return optionValue.includes(inputValue);
-  };
-
-  const handleUpdate = async (values) => {
+  const doUpdate = async (values) => {
     setLoading(true);
     try {
-      const province = provinces.find((p) => Number(p.ProvinceID) === Number(values.tinhThanh));
-      const district = districts.find((d) => Number(d.DistrictID) === Number(values.quanHuyen));
-      const ward = wards.find((w) => String(w.WardCode) === String(values.phuongXa));
+      if (values.role === "ADMIN" && !isOwner) {
+        toast.error("Chỉ tài khoản chủ (AD000) được cập nhật/chuyển ADMIN.");
+        return;
+      }
 
-      if (!province || !district || !ward) {
-        message.error("Vui lòng chọn đầy đủ thông tin địa chỉ!");
+      // ✅ LẤY ĐỊA CHỈ TỪ AddressManager
+      if (!defaultAddress) {
+        toast.error("Chưa có địa chỉ mặc định. Vui lòng thêm/đặt mặc định trước!");
+        return;
+      }
+
+      const provinceId = defaultAddress.provinceId ? Number(defaultAddress.provinceId) : null;
+      const districtId = defaultAddress.districtId ? Number(defaultAddress.districtId) : null;
+      const wardCode = defaultAddress.wardCode ? String(defaultAddress.wardCode) : null;
+
+      if (!provinceId || !districtId || !wardCode) {
+        toast.error("Địa chỉ mặc định đang thiếu mã GHN. Vui lòng bấm Sửa địa chỉ và chọn lại Tỉnh/Huyện/Xã!");
         return;
       }
 
@@ -180,16 +133,16 @@ const EditNhanVienComponent = () => {
         gioiTinh: values.gioiTinh,
         quocGia: "Việt Nam",
 
-        // ✅ text
-        tinhThanh: province.ProvinceName,
-        quanHuyen: district.DistrictName,
-        phuongXa: ward.WardName,
-        diaChiChiTiet: values.diaChiChiTiet,
+        // ✅ text hiển thị
+        tinhThanh: defaultAddress.provinceName || defaultAddress.tinhThanh || "",
+        quanHuyen: defaultAddress.districtName || defaultAddress.quanHuyen || "",
+        phuongXa: defaultAddress.wardName || defaultAddress.phuongXa || "",
+        diaChiChiTiet: defaultAddress.diaChiChiTiet || defaultAddress.address || defaultAddress.diaChi || "",
 
         // ✅ GHN IDs
-        provinceId: province.ProvinceID,
-        districtId: district.DistrictID,
-        wardCode: ward.WardCode,
+        provinceId,
+        districtId,
+        wardCode,
       };
 
       const avatarFile = fileList.length > 0 && fileList[0].originFileObj ? fileList[0].originFileObj : null;
@@ -197,17 +150,41 @@ const EditNhanVienComponent = () => {
       console.log("Payload gửi đi:", payload);
       console.log("File ảnh:", avatarFile);
 
-      const updatedUser = await userService.updateEmployee(id, payload, avatarFile);
-      sessionStorage.setItem("user", JSON.stringify(updatedUser));
+      const updatedUser =
+        values.role === "ADMIN"
+          ? await userService.updateAdmin(id, payload, avatarFile)
+          : await userService.updateEmployee(id, payload, avatarFile);
 
-      message.success("Cập nhật nhân viên thành công!");
+      // ✅ SỬA: cập nhật sessionStorage đúng user + merge để không mất field
+      const oldMe = JSON.parse(sessionStorage.getItem("user") || "null");
+      const sameUser =
+        (oldMe?.email && updatedUser?.email && oldMe.email.toLowerCase() === updatedUser.email.toLowerCase()) ||
+        (oldMe?.idTaiKhoan && updatedUser?.idTaiKhoan &&
+          String(oldMe.idTaiKhoan).toUpperCase() === String(updatedUser.idTaiKhoan).toUpperCase());
+
+      if (sameUser) {
+        sessionStorage.setItem("user", JSON.stringify({ ...oldMe, ...updatedUser }));
+      }
+
+      toast.success("Cập nhật nhân viên thành công!");
       navigate("/admin/nhan-vien");
     } catch (error) {
       console.error("Lỗi khi cập nhật:", error);
-      message.error(error?.message || "Cập nhật thất bại!");
+      toast.error(error?.message || "Cập nhật thất bại!");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdate = (values) => {
+    Modal.confirm({
+      title: "Xác nhận cập nhật",
+      content: "Bạn có chắc muốn lưu thay đổi nhân viên này không?",
+      okText: "Xác nhận",
+      cancelText: "Hủy",
+      centered: true,
+      onOk: () => doUpdate(values),
+    });
   };
 
   const uploadProps = {
@@ -215,12 +192,12 @@ const EditNhanVienComponent = () => {
     beforeUpload: (file) => {
       const isImage = file.type === "image/jpeg" || file.type === "image/png";
       if (!isImage) {
-        message.error("Chỉ được tải lên file JPG hoặc PNG!");
+        toast.error("Chỉ được tải lên file JPG hoặc PNG!");
         return Upload.LIST_IGNORE;
       }
       const isLt5M = file.size / 1024 / 1024 < 5;
       if (!isLt5M) {
-        message.error("Kích thước ảnh phải nhỏ hơn 5MB!");
+        toast.error("Kích thước ảnh phải nhỏ hơn 5MB!");
         return Upload.LIST_IGNORE;
       }
       setFileList([{ uid: file.uid, name: file.name, status: "done", url: URL.createObjectURL(file), originFileObj: file }]);
@@ -276,7 +253,7 @@ const EditNhanVienComponent = () => {
               </Form.Item>
 
               <Row gutter={16}>
-                <Col span={12}>
+                <Col span={8}>
                   <Form.Item
                     name="ngaySinh"
                     label="Ngày sinh"
@@ -297,12 +274,35 @@ const EditNhanVienComponent = () => {
                       },
                     ]}
                   >
-                    <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} placeholder="Ngày sinh" disabled={loading} />
+                    <DatePicker
+                      format="DD/MM/YYYY"
+                      style={{ width: "100%" }}
+                      placeholder="Ngày sinh"
+                      disabled={loading}
+                    />
                   </Form.Item>
                 </Col>
 
-                <Col span={12}>
-                  <Form.Item name="gioiTinh" label="Giới tính" rules={[{ required: true, message: "Vui lòng chọn Giới tính!" }]}>
+                <Col span={8}>
+                  <Form.Item
+                    name="role"
+                    label="Chức vụ"
+                    initialValue="NHAN_VIEN"
+                    rules={[{ required: true, message: "Vui lòng chọn chức vụ!" }]}
+                  >
+                    <Select disabled={loading || !isOwner}>
+                      <Select.Option value="NHAN_VIEN">Nhân viên</Select.Option>
+                      <Select.Option value="ADMIN">Admin</Select.Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+
+                <Col span={8}>
+                  <Form.Item
+                    name="gioiTinh"
+                    label="Giới tính"
+                    rules={[{ required: true, message: "Vui lòng chọn Giới tính!" }]}
+                  >
                     <Radio.Group disabled={loading}>
                       <Radio value="Nam">Nam</Radio>
                       <Radio value="Nữ">Nữ</Radio>
@@ -343,77 +343,30 @@ const EditNhanVienComponent = () => {
                 <Input value="Việt Nam" disabled />
               </Form.Item>
 
-              <Form.Item
-                name="diaChiChiTiet"
-                label="Địa chỉ chi tiết"
-                rules={[{ required: true, message: "Vui lòng nhập địa chỉ chi tiết!" }]}
-              >
-                <Input placeholder="Địa chỉ chi tiết" disabled={loading} />
-              </Form.Item>
+              {/* ✅ NEW: quản lý địa chỉ như AdminProfile */}
+              <AddressManager
+                taiKhoanId={id}
+                onDefaultChange={(addr) => setDefaultAddress(addr)}
+              />
 
-              <Row gutter={16}>
-                <Col span={8}>
-                  <Form.Item name="tinhThanh" label="Tỉnh/Thành phố" rules={[{ required: true, message: "Chọn Tỉnh/Thành phố!" }]}>
-                    <Select
-                      showSearch
-                      placeholder="Gõ để tìm kiếm Tỉnh/Thành phố"
-                      onChange={handleProvinceChange}
-                      filterOption={filterOption}
-                      loading={loadingProvinces}
-                      disabled={loading || loadingProvinces}
-                    >
-                      {provinces.map((p) => (
-                        <Option key={p.ProvinceID} value={p.ProvinceID}>
-                          {p.ProvinceName}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-
-                <Col span={8}>
-                  <Form.Item name="quanHuyen" label="Quận/Huyện" rules={[{ required: true, message: "Chọn Quận/Huyện!" }]}>
-                    <Select
-                      showSearch
-                      placeholder="Gõ để tìm kiếm Quận/Huyện"
-                      onChange={handleDistrictChange}
-                      disabled={loading || loadingDistricts || !districts.length}
-                      filterOption={filterOption}
-                      loading={loadingDistricts}
-                    >
-                      {districts.map((d) => (
-                        <Option key={d.DistrictID} value={d.DistrictID}>
-                          {d.DistrictName}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-
-                <Col span={8}>
-                  <Form.Item name="phuongXa" label="Phường/Xã" rules={[{ required: true, message: "Chọn Phường/Xã!" }]}>
-                    <Select
-                      showSearch
-                      placeholder="Gõ để tìm kiếm Phường/Xã"
-                      disabled={loading || loadingWards || !wards.length}
-                      filterOption={filterOption}
-                      loading={loadingWards}
-                    >
-                      {wards.map((w) => (
-                        <Option key={w.WardCode} value={w.WardCode}>
-                          {w.WardName}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Form.Item style={{ textAlign: "center" }}>
+              <Form.Item style={{ textAlign: "center", marginTop: 16 }}>
                 <Button type="primary" htmlType="submit" style={{ minWidth: 120 }} loading={loading} disabled={loading}>
                   Cập nhật
                 </Button>
-                <Button onClick={() => navigate("/admin/nhan-vien")} style={{ marginLeft: 8 }} disabled={loading}>
+                <Button
+                  onClick={() =>
+                    Modal.confirm({
+                      title: "Xác nhận hủy",
+                      content: "Bạn có chắc muốn rời trang? Thay đổi sẽ không được lưu.",
+                      okText: "Rời trang",
+                      cancelText: "Ở lại",
+                      centered: true,
+                      onOk: () => navigate("/admin/nhan-vien"),
+                    })
+                  }
+                  style={{ marginLeft: 8 }}
+                  disabled={loading}
+                >
                   Hủy
                 </Button>
               </Form.Item>

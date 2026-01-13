@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Tag, Input, Select, Space } from 'antd';
 import { listMauSac } from '../../service/MauSacService';
 import AddMauSacModal from './AddMauSacComponent';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 import useToast from '../../hooks/useNotify';
 
 const { Option } = Select;
@@ -126,11 +126,7 @@ const ListMauSacComponent = () => {
 
   return (
     <div style={{ padding: 24 }}>
-      <AdminBreadcrumb
-        items={[
-          { label: 'Màu sắc' },
-        ]}
-      />
+     
 
       <h2>Danh sách Màu Sắc</h2>
 
@@ -146,12 +142,7 @@ const ListMauSacComponent = () => {
           style={{ width: 200 }}
         />
 
-        <Button
-          onClick={handleRefresh}
-          style={{ background: '#FFD700', color: '#000' }}
-        >
-          Làm mới
-        </Button>
+        
 
         <span>Trạng thái:</span>
         <Select
@@ -174,7 +165,12 @@ const ListMauSacComponent = () => {
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
-
+<Button
+          onClick={handleRefresh}
+          style={{ background: '#FFD700', color: '#000' }}
+        >
+          Làm mới
+        </Button>
         <Button type="primary" onClick={() => openModal()}>
           + Thêm Màu Sắc
         </Button>

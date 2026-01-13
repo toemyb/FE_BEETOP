@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Form, Input, Select, DatePicker, Button, message } from 'antd';
+import { Form, Input, Select, DatePicker, Button, Modal } from 'antd';
 import { toast } from 'react-toastify';
 import moment from 'moment';
 import { addEmployee, getVoucher, updateVoucher, checkMaTrung } from '../../service/PhieuGiamGiaService';
@@ -13,10 +13,18 @@ const PhieuGiamGiaComponent = () => {
     const { idPhieugiamgia: paramid } = useParams();
 
     useEffect(() => {
-        const user = JSON.parse(sessionStorage.getItem('user'));
-        if (!user || user.role !== 'ADMIN') {
-            message.error('Bạn không có quyền truy cập trang này!');
-            navigator('/login');
+        let user = null;
+        try {
+            const raw = sessionStorage.getItem("user");
+            user = raw ? JSON.parse(raw) : null;
+        } catch { }
+
+        const role = (user?.role || "").trim();
+        const isAdmin = role === "ADMIN" || role === "ROLE_ADMIN";
+
+        if (!isAdmin) {
+            toast.error("Bạn không có quyền truy cập trang này!");
+            navigator("/admin/phieu-giam-gia");
             return;
         }
 
@@ -32,12 +40,12 @@ const PhieuGiamGiaComponent = () => {
                     ngayBatDau: moment(data.ngayBatDau),
                     ngayKetThuc: moment(data.ngayKetThuc),
                     giaTriMin: data.giaTriMin,
-                    // giaTriMax: data.giaTriMax,
                     moTa: data.moTa,
                 });
             });
         }
     }, [paramid, navigator, form]);
+
 
     const validateUniqueId = async (_, value) => {
         if (!value) return Promise.reject('Mã không được để trống');
@@ -61,33 +69,45 @@ const PhieuGiamGiaComponent = () => {
         };
 
         if (paramid) {
-            if (!window.confirm("Bạn có muốn cập nhật phiếu giảm giá không?")) return;
-            updateVoucher(paramid, voucher)
-                .then(() => {
-                    toast.success("Cập nhật phiếu giảm giá thành công!");
-                    navigator('/admin/phieu-giam-gia');
-                })
-                .catch((err) => {
-                    console.error(err);
-                    toast.error("Lỗi khi cập nhật phiếu giảm giá");
-                });
+            Modal.confirm({
+                title: "Xác nhận cập nhật",
+                content: "Bạn có muốn cập nhật phiếu giảm giá không?",
+                okText: "Cập nhật",
+                cancelText: "Hủy",
+                onOk: async () => {
+                    try {
+                        await updateVoucher(paramid, voucher);
+                        toast.success("Cập nhật phiếu giảm giá thành công!");
+                        navigator("/admin/phieu-giam-gia");
+                    } catch (err) {
+                        console.error(err);
+                        toast.error("Lỗi khi cập nhật phiếu giảm giá");
+                    }
+                },
+            });
         } else {
-            if (!window.confirm("Bạn có chắc muốn thêm phiếu giảm giá không?")) return;
-            addEmployee(voucher)
-                .then((res) => {
-                    toast.success("Thêm phiếu giảm giá thành công!");
-                    navigator('/admin/phieu-giam-gia', { state: { newVoucher: res.data } });
-                })
-                .catch((err) => {
-                    console.error(err);
-                    toast.error("Lỗi khi thêm phiếu giảm giá!");
-                });
+            Modal.confirm({
+                title: "Xác nhận thêm mới",
+                content: "Bạn có chắc muốn thêm phiếu giảm giá không?",
+                okText: "Thêm",
+                cancelText: "Hủy",
+                onOk: async () => {
+                    try {
+                        const res = await addEmployee(voucher);
+                        toast.success("Thêm phiếu giảm giá thành công!");
+                        navigator("/admin/phieu-giam-gia", { state: { newVoucher: res.data } });
+                    } catch (err) {
+                        console.error(err);
+                        toast.error("Lỗi khi thêm phiếu giảm giá!");
+                    }
+                },
+            });
         }
     };
 
     return (
         <div className='container'>
-            <h2 className='text-center mb-4'>{paramid ? 'Update Voucher' : 'Thêm phiếu giảm giá'}</h2>
+            <h2 className='text-center mb-4'>{paramid ? 'Cập nhật Voucher' : 'Thêm phiếu giảm giá'}</h2>
             <Form
                 form={form}
                 layout="vertical"
@@ -230,10 +250,17 @@ const PhieuGiamGiaComponent = () => {
                 </Form.Item>
 
                 <Form.Item>
-                    <Button type="primary" htmlType="submit">
-                        Xác nhận
-                    </Button>
+                    <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+
+                        <Button type="primary" htmlType="submit">
+                            Xác nhận
+                        </Button>
+                        <Button onClick={() => navigator("/admin/phieu-giam-gia")}>
+                            Hủy
+                        </Button>
+                    </div>
                 </Form.Item>
+
             </Form>
         </div>
     );

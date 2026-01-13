@@ -66,7 +66,7 @@ const HomePage = () => {
         { name: "Lenovo", logo: "https://upload.wikimedia.org/wikipedia/commons/b/b8/Lenovo_logo_2015.svg" },
         { name: "Acer", logo: "https://upload.wikimedia.org/wikipedia/commons/0/00/Acer_2011.svg" },
         { name: "MSI", logo: "https://logos-world.net/wp-content/uploads/2020/11/MSI-Logo.png" },
-        { name: "Apple", logo: "https://logos-world.net/wp-content/uploads/2020/04/Apple-Logo.png" },
+        { name: "Macbook", logo: "https://logos-world.net/wp-content/uploads/2020/04/Apple-Logo.png" },
         { name: "Gigabyte", logo: "https://logos-world.net/wp-content/uploads/2020/11/Gigabyte-Logo.png" }
     ];
 
@@ -94,6 +94,7 @@ const HomePage = () => {
     // Chia sản phẩm thành các nhóm
     const featuredProducts = products.slice(0, 5);
     const saleProducts = products.slice(0, 8);
+const allProducts = products; // hiển thị tất cả
 
     return (
         <div className="home-new">
@@ -208,34 +209,35 @@ const HomePage = () => {
                     </div>
                 </div>
             </section>
+{/* ======= TẤT CẢ SẢN PHẨM ======= */}
+<section className="product-section">
+  <div className="section-container">
+    <div className="section-header">
+      <h2 className="section-title">
+        <GiftOutlined className="title-icon" />
+        Tất cả sản phẩm
+      </h2>
+      <a href="/products" className="view-all-link">Xem tất cả →</a>
+    </div>
 
-            {/* ======= SẢN PHẨM GIẢM GIÁ ======= */}
-            <section className="product-section">
-                <div className="section-container">
-                    <div className="section-header">
-                        <h2 className="section-title">
-                            <GiftOutlined className="title-icon" />
-                            Đang giảm giá
-                        </h2>
-                        <a href="#" className="view-all-link">Xem tất cả →</a>
-                    </div>
-                    <div className="product-grid">
-                        {loading ? (
-                            [...Array(8)].map((_, i) => (
-                                <div key={i} className="product-skeleton">
-                                    <div className="skeleton-img"></div>
-                                    <div className="skeleton-line"></div>
-                                    <div className="skeleton-line short"></div>
-                                </div>
-                            ))
-                        ) : (
-                            saleProducts.map((p) => (
-                                <ProductCard key={p.laptopID} product={p} />
-                            ))
-                        )}
-                    </div>
-                </div>
-            </section>
+    <div className="product-grid">
+      {loading ? (
+        [...Array(8)].map((_, i) => (
+          <div key={i} className="product-skeleton">
+            <div className="skeleton-img"></div>
+            <div className="skeleton-line"></div>
+            <div className="skeleton-line short"></div>
+          </div>
+        ))
+      ) : (
+        allProducts.map((p) => (
+          <ProductCard key={p.laptopID} product={p} />
+        ))
+      )}
+    </div>
+  </div>
+</section>
+          
 
             {/* ======= LÝ DO CHỌN ======= */}
             <section className="info-section">

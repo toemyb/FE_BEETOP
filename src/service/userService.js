@@ -105,37 +105,74 @@ const userService = {
       throw error.response?.data?.message || 'Không thể lấy thông tin tài khoản!';
     }
   },
+updateAdmin: async (id, data, avatarFile) => {
+  try {
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== null && data[key] !== undefined && data[key] !== '' && key !== 'anh') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (avatarFile) formData.append('anh', avatarFile);
 
+    const response = await api.put(`/api/admin/users/update-admin/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Không thể cập nhật tài khoản admin!';
+  }
+},
+
+updateUserByAdmin: async (id, data, avatarFile) => {
+  try {
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== null && data[key] !== undefined && data[key] !== '' && key !== 'anh') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (avatarFile) formData.append('anh', avatarFile);
+
+    const response = await api.put(`/api/admin/users/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Không thể cập nhật tài khoản!';
+  }
+},
   // ===== CẬP NHẬT PROFILE KHÁCH HÀNG (giữ nguyên) =====
-  updateCustomerAccount: async (id, data) => {
-    try {
-      const response = await api.put(`/api/v1/laptops/account/update/${id}`, data, {
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('accessToken')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return response.data.data || response.data;
-    } catch (error) {
-      throw error.response?.data?.message || 'Không thể cập nhật tài khoản!';
-    }
-  },
+  updateCustomerAccount: async (data) => {
+  try {
+    const response = await api.put(`/api/v1/laptops/account/update`, data, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return response.data.data || response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Không thể cập nhật tài khoản!';
+  }
+},
 
-  uploadAvatar: async (file) => {
-    try {
-      const formData = new FormData();
-      formData.append('anh', file);
-      const response = await api.post('/api/v1/laptops/account/upload-avatar', formData, {
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem('accessToken')}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data.data || response.data;
-    } catch (error) {
-      throw error.response?.data?.message || 'Không thể upload ảnh!';
-    }
-  },
+ updateCustomerAccountForm: async (data, avatarFile) => {
+  try {
+    const formData = new FormData();
+    Object.keys(data || {}).forEach((key) => {
+      if (data[key] !== null && data[key] !== undefined && data[key] !== '') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (avatarFile) formData.append('anh', avatarFile);
+
+    const response = await api.put(`/api/v1/laptops/account/update-form`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data || response.data;
+  } catch (error) {
+    throw error.response?.data?.message || 'Không thể cập nhật (form-data)!';
+  }
+},
+
 
   // ===== MỚI: QUẢN LÝ ĐỊA CHỈ KHÁCH HÀNG (CHO POS GIAO HÀNG NHANH) =====
 getAddressesByCustomer: async (taiKhoanId) => {
@@ -171,6 +208,26 @@ setDefaultAddress: async (addressId) => {
     return response.data.data;
   } catch (error) {
     throw error.response?.data?.message || 'Không thể đặt địa chỉ mặc định!';
+  }
+},
+
+createAdmin: async (data, avatarFile) => {
+  try {
+    const formData = new FormData();
+    Object.keys(data).forEach((key) => {
+      if (data[key] !== null && data[key] !== undefined && data[key] !== '') {
+        formData.append(key, data[key]);
+      }
+    });
+    if (avatarFile) formData.append("anh", avatarFile);
+
+    // ⚠️ đổi đúng endpoint controller của bạn (ví dụ create-admin)
+    const response = await api.post("/api/admin/users/create-admin", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data.data;
+  } catch (error) {
+    throw error.response?.data?.message || "Không thể tạo tài khoản admin!";
   }
 },
 

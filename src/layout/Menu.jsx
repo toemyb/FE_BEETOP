@@ -13,7 +13,7 @@ import {
 } from '@ant-design/icons';
 import beeTopLogo from "../img/BeeTop.png";
 const { Sider } = Layout;
-const { SubMenu } = Menu;
+
 
 const AppSider = ({ collapsed, user }) => {
   const location = useLocation();
@@ -35,7 +35,7 @@ const AppSider = ({ collapsed, user }) => {
     if (pathname.startsWith('/admin/kich-thuoc')) return 'sanpham-kichthuoc';
     if (pathname.startsWith('/admin/thuong-hieu')) return 'sanpham-thuonghieu';
     if (pathname.startsWith('/admin/man-hinh')) return 'sanpham-manhinh';
-   
+
 
     if (pathname.startsWith('/admin/nhan-vien')) return 'taikhoan-nhanvien';
     if (pathname.startsWith('/admin/khach-hang')) return 'taikhoan-khachhang';
@@ -60,10 +60,14 @@ const AppSider = ({ collapsed, user }) => {
     return '';
   };
 
-  const [openKeys, setOpenKeys] = useState([getOpenKey()]);
+  const [openKeys, setOpenKeys] = useState(() => {
+    const k = getOpenKey();
+    return k ? [k] : [];
+  });
 
   useEffect(() => {
-    setOpenKeys(collapsed ? [] : [getOpenKey()]);
+    const k = getOpenKey();
+    setOpenKeys(collapsed ? [] : (k ? [k] : []));
   }, [pathname, collapsed]);
 
   const handleOpenChange = (keys) => {
@@ -71,102 +75,124 @@ const AppSider = ({ collapsed, user }) => {
     setOpenKeys(latest ? [latest] : []);
   };
 
-  const menuItems = user?.role === 'KHACH_HANG' ? [
-    {
-      key: 'customer',
-      icon: <UserOutlined />,
-      label: <Link to="/customer/home">Trang Khách Hàng</Link>,
-    },
-  ] : [
-    {
-      key: 'thongke',
-      icon: <PieChartOutlined />,
-      label: <Link to="/admin/thong-ke">Thống Kê</Link>,
-      disabled: !['ADMIN', 'NHAN_VIEN'].includes(user?.role),
-    },
-    {
-      key: 'banhang',
-      icon: <ShoppingCartOutlined />,
-      label: <Link to="/admin/ban-hang-tai-quay">Bán Hàng Tại Quầy</Link>,
-      disabled: !['ADMIN', 'NHAN_VIEN'].includes(user?.role),
-    },
-    {
-      key: 'donhang',
-      icon: <DropboxOutlined />,
-      label: <Link to="/admin/don-hang">Đơn Hàng</Link>,
-      disabled: !['ADMIN', 'NHAN_VIEN'].includes(user?.role),
-    },
-    {
-      key: 'trahang',
-      icon: <RollbackOutlined />,
-      label: <Link to="/admin/tra-hang">Bảo hành</Link>,
-      disabled: !['ADMIN', 'NHAN_VIEN'].includes(user?.role),
-    },
-    {
-      key: 'sanpham',
-      icon: <AppstoreOutlined />,
-      label: 'Quản Lý Sản Phẩm',
-      disabled: user?.role !== 'ADMIN',
-      children: [
-        { key: 'sanpham-sp', label: <Link to="/admin/lap-top">Sản Phẩm</Link> },
-        // { key: 'sanpham-tsp', label: <Link to="/admin/add-lap-top">Sản Phẩm</Link> },
-        { key: 'sanpham-dohoa', label: <Link to="/admin/do-hoa">Đồ Họa</Link> },
-        { key: 'sanpham-mausac', label: <Link to="/admin/mau-sac">Màu Sắc</Link> },
-        { key: 'sanpham-cpu', label: <Link to="/admin/cpu">Cpu</Link> },
-        // { key: 'sanpham-seri', label: <Link to="/admin/seri">Seri</Link> },
-        { key: 'sanpham-ram', label: <Link to="/admin/ram">Ram</Link> },
-        { key: 'sanpham-rom', label: <Link to="/admin/rom">Rom</Link> },
-        { key: 'sanpham-pin', label: <Link to="/admin/pin">Pin</Link> },
-        { key: 'sanpham-hedieuhanh', label: <Link to="/admin/he-dieu-hanh">Hệ Điều Hành</Link> },
-        { key: 'sanpham-kichthuoc', label: <Link to="/admin/kich-thuoc">Kích Thước</Link> },
-        { key: 'sanpham-thuonghieu', label: <Link to="/admin/thuong-hieu">Thương Hiệu</Link> },
-        { key: 'sanpham-manhinh', label: <Link to="/admin/man-hinh">Màn Hình</Link> },
-      ],
-    },
-    {
-      key: 'taikhoan',
-      icon: <TeamOutlined />,
-      label: 'Tài Khoản',
-      disabled: user?.role !== 'ADMIN',
-      children: [
-        { key: 'taikhoan-nhanvien', label: <Link to="/admin/nhan-vien">Nhân Viên</Link> },
-        { key: 'taikhoan-khachhang', label: <Link to="/admin/khach-hang">Khách Hàng</Link> },
-      ],
-    },
-    {
-      key: 'giamgia',
-      icon: <StarOutlined />,
-      label: 'Giảm Giá',
-      disabled: user?.role !== 'ADMIN',
-      children: [
-        { key: 'giamgia-phieu', label: <Link to="/admin/phieu-giam-gia">Phiếu Giảm Giá</Link> },
-      ],
-    },
-  ];
+  const role = (user?.role || "").trim().replace(/^ROLE_/, "");
 
+  const isCustomer = role === "KHACH_HANG";
+  const isAdmin = role === "ADMIN";
+  const isStaff = role === "NHAN_VIEN";
+
+  const menuItems = isCustomer
+    ? [
+      {
+        key: "customer",
+        icon: <UserOutlined />,
+        label: <Link to="/customer/home">Trang Khách Hàng</Link>,
+      },
+    ]
+    : [
+      // ✅ NHAN_VIEN và ADMIN đều thấy
+      {
+        key: "thongke",
+        icon: <PieChartOutlined />,
+        label: <Link to="/admin/thong-ke">Thống Kê</Link>,
+      },
+      {
+        key: "banhang",
+        icon: <ShoppingCartOutlined />,
+        label: <Link to="/admin/ban-hang-tai-quay">Bán Hàng Tại Quầy</Link>,
+      },
+      {
+        key: "donhang",
+        icon: <DropboxOutlined />,
+        label: <Link to="/admin/don-hang">Đơn Hàng</Link>,
+      },
+      {
+        key: "trahang",
+        icon: <RollbackOutlined />,
+        label: <Link to="/admin/tra-hang">Bảo hành</Link>,
+      },
+
+      // ✅ Quản lý sản phẩm: NHAN_VIEN + ADMIN đều thấy
+      {
+        key: "sanpham",
+        icon: <AppstoreOutlined />,
+        label: "Quản Lý Sản Phẩm",
+        children: [
+          { key: "sanpham-sp", label: <Link to="/admin/lap-top">Sản Phẩm</Link> },
+          { key: "sanpham-dohoa", label: <Link to="/admin/do-hoa">Đồ Họa</Link> },
+          { key: "sanpham-mausac", label: <Link to="/admin/mau-sac">Màu Sắc</Link> },
+          { key: "sanpham-cpu", label: <Link to="/admin/cpu">Cpu</Link> },
+          { key: "sanpham-ram", label: <Link to="/admin/ram">Ram</Link> },
+          { key: "sanpham-rom", label: <Link to="/admin/rom">Rom</Link> },
+          { key: "sanpham-pin", label: <Link to="/admin/pin">Pin</Link> },
+          { key: "sanpham-hedieuhanh", label: <Link to="/admin/he-dieu-hanh">Hệ Điều Hành</Link> },
+          { key: "sanpham-kichthuoc", label: <Link to="/admin/kich-thuoc">Kích Thước</Link> },
+          { key: "sanpham-thuonghieu", label: <Link to="/admin/thuong-hieu">Thương Hiệu</Link> },
+          { key: "sanpham-manhinh", label: <Link to="/admin/man-hinh">Màn Hình</Link> },
+        ],
+      },
+
+      // ✅ Tài khoản: NHAN_VIEN chỉ thấy Khách Hàng, ADMIN thấy cả Nhân Viên
+      {
+        key: "taikhoan",
+        icon: <TeamOutlined />,
+        label: "Tài Khoản",
+        children: [
+          // ADMIN mới thấy menu Nhân Viên
+          isAdmin && { key: "taikhoan-nhanvien", label: <Link to="/admin/nhan-vien">Nhân Viên</Link> },
+
+          // NHAN_VIEN + ADMIN đều thấy Khách Hàng
+          { key: "taikhoan-khachhang", label: <Link to="/admin/khach-hang">Khách Hàng</Link> },
+        ].filter(Boolean),
+      },
+
+      // ✅ Giảm giá: NHAN_VIEN + ADMIN đều có quyền xem list theo BE của bạn
+      {
+        key: "giamgia",
+        icon: <StarOutlined />,
+        label: "Giảm Giá",
+        children: [
+          { key: "giamgia-phieu", label: <Link to="/admin/phieu-giam-gia">Phiếu Giảm Giá</Link> },
+        ],
+      },
+    ].filter(Boolean);
+
+  const items = menuItems.map((item) => ({
+    key: item.key,
+    icon: item.icon,
+    label: item.label,
+    disabled: !!item.disabled,
+    children: item.children
+      ? item.children.map((child) => ({
+        key: child.key,
+        label: child.label,
+        disabled: !!child.disabled,
+      }))
+      : undefined,
+  }));
   return (
     <Sider trigger={null} collapsible collapsed={collapsed} style={{ background: '#001529' }}>
       <div
-  style={{
-    height: 64,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-  }}
->
-  <img
-    src={beeTopLogo}
-    alt="BeeTop"
-    style={{
-      height: collapsed ? 32 : 44, // thu nhỏ khi collapsed
-      width: "auto",
-      objectFit: "contain",
-      display: "block",
-      transition: "all 0.2s ease",
-    }}
-  />
-</div>
+        style={{
+          height: 64,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 12,
+        }}
+      >
+        <img
+          src={beeTopLogo}
+          alt="BeeTop"
+          style={{
+            height: collapsed ? 32 : 44, // thu nhỏ khi collapsed
+            width: "auto",
+            objectFit: "contain",
+            display: "block",
+            transition: "all 0.2s ease",
+          }}
+        />
+      </div>
 
       <Menu
         theme="dark"
@@ -174,21 +200,8 @@ const AppSider = ({ collapsed, user }) => {
         openKeys={collapsed ? [] : openKeys}
         onOpenChange={handleOpenChange}
         selectedKeys={[selectedKey]}
-      >
-        {menuItems.map((item) =>
-          item.children ? (
-            <SubMenu key={item.key} icon={item.icon} title={item.label} disabled={item.disabled}>
-              {item.children.map((child) => (
-                <Menu.Item key={child.key}>{child.label}</Menu.Item>
-              ))}
-            </SubMenu>
-          ) : (
-            <Menu.Item key={item.key} icon={item.icon} disabled={item.disabled}>
-              {item.label}
-            </Menu.Item>
-          )
-        )}
-      </Menu>
+        items={items}
+      />
     </Sider>
   );
 };

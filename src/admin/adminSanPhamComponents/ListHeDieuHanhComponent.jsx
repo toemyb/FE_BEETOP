@@ -13,7 +13,7 @@ import {
 } from 'antd';
 import { listHeDieuHanh } from '../../service/HeDieuHanhService';
 import AddHeDieuHanhModal from './AddHeDieuHanhComponent';
-import AdminBreadcrumb from '../components/Breadcrumb';
+
 
 const { Option } = Select;
 const { Title } = Typography;
@@ -168,30 +168,17 @@ const ListHeDieuHanhComponent = () => {
   ];
 
   return (
-    <div style={{ padding: '24px 32px' }}>
-      <AdminBreadcrumb items={[{ label: 'Hệ điều hành' }]} />
+    <div style={{ padding: 24 }}>
+  
 
-      <Card
-        style={{
-          borderRadius: 12,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
-        }}
-      >
+     
         <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
           <Col>
             <Title level={3} style={{ margin: 0 }}>
               Danh sách hệ điều hành
             </Title>
           </Col>
-          <Col>
-            <Button
-              type="primary"
-              onClick={() => openModal()}
-              style={{ fontWeight: 500 }}
-            >
-              + Thêm Hệ điều hành
-            </Button>
-          </Col>
+         
         </Row>
 
         <Space
@@ -212,12 +199,7 @@ const ListHeDieuHanhComponent = () => {
             style={{ width: 250 }}
           />
 
-          <Button
-            onClick={handleRefresh}
-            style={{ background: '#FFD700', color: '#000' }}
-          >
-            Làm Mới
-          </Button>
+        
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span>Trạng thái:</span>
@@ -244,6 +226,23 @@ const ListHeDieuHanhComponent = () => {
               <Option value="za">Tên Z-A</Option>
             </Select>
           </div>
+
+           <Button
+            onClick={handleRefresh}
+            style={{ background: '#FFD700', color: '#000' }}
+          >
+            Làm Mới
+          </Button>
+
+           <Col>
+            <Button
+              type="primary"
+              onClick={() => openModal()}
+              style={{ fontWeight: 500 }}
+            >
+              + Thêm Hệ điều hành
+            </Button>
+          </Col>
         </Space>
 
         <Table
@@ -267,7 +266,7 @@ const ListHeDieuHanhComponent = () => {
             });
           }}
         />
-      </Card>
+     
 
       {modalVisible && (
         <AddHeDieuHanhModal

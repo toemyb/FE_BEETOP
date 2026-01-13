@@ -1,0 +1,24 @@
+/* global.css */
+
+/* Thêm border cho tất cả Select components */
+.ant-select {
+  border: 1px solid #dee2e6; /* Thêm border xám cho tất cả các Select */
+  border-radius: 4px; /* Bo tròn viền */
+}
+
+/* Khi Select được focus */
+.ant-select-focused {
+  border-color: #62a1ff; /* Màu border khi Select được focus */
+  box-shadow: 0 0 0 2px rgba(18, 184, 134, 0.2); /* Hiệu ứng shadow khi focus */
+}
+
+/* Thêm border cho selector (phần hiển thị của Select) */
+.ant-select-selector {
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+}
+
+/* Thêm border cho các tùy chọn trong combobox */
+.ant-select-item-option {
+  border: 1px solid #ffffff;
+}

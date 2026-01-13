@@ -8,14 +8,16 @@ export const getOrderTimeline = async (orderId) => {
   const res = await api.get(`${BASE_PATH}/${orderId}/timeline`, {
     withCredentials: true,
   });
-  return unwrapApi(res); // ✅ return thẳng OrderTimelineResponse
+  return unwrapApi(res);
 };
 
-export const updateOrderStatus = async (orderId, payload) => {
+export const updateOrderStatus = async (orderId, payload = {}) => {
   const res = await api.put(`${BASE_PATH}/${orderId}/status`, payload, {
     withCredentials: true,
   });
-  return unwrapApi(res); // ✅ return thẳng OrderTimelineResponse sau update
+  return unwrapApi(res);
 };
+
+
 
 export default { getOrderTimeline, updateOrderStatus };

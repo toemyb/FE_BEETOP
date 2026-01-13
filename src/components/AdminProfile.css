@@ -1,33 +1,29 @@
 .profileWrap {
-  padding: 18px;
+  padding: 16px;
 }
 
 .profileCard {
-  max-width: 980px;
+  max-width: 1100px;
   margin: 0 auto;
-  border-radius: 16px;
-  box-shadow: 0 14px 40px rgba(17, 24, 39, 0.08);
+  border-radius: 14px;
 }
 
+/* Header giống ảnh 2: trái thông tin, phải cụm nút */
 .profileTop {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(17, 24, 39, 0.06);
-  margin-bottom: 14px;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .profileIdentity {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
 }
 
 .profileAvatar {
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  background: #f3f4f6;
+  border: 1px solid #f0f0f0;
 }
 
 .profileNameBlock {
@@ -44,28 +40,27 @@
 
 .profileName {
   font-size: 20px;
-  font-weight: 900;
-  color: #111827;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .profileRole {
   margin: 0;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .profileSub {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
   align-items: center;
-  color: rgba(17, 24, 39, 0.60);
-  font-size: 13px;
+  gap: 8px;
+  color: rgba(0, 0, 0, 0.55);
+  flex-wrap: wrap;
 }
 
 .muted {
   display: inline-flex;
-  gap: 6px;
   align-items: center;
+  gap: 6px;
 }
 
 .dot {
@@ -74,36 +69,94 @@
 
 .profileActions {
   display: flex;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 10px;
-}
-
-.profileDesc .ant-descriptions-title {
-  font-weight: 900;
-  color: #111827;
-}
-
-.descRow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .profileEmpty {
   display: grid;
+  gap: 12px;
+  justify-items: center;
+  padding: 24px 0;
+}
+
+/* Avatar edit mini box */
+.profileAvatarSection {
+  display: flex;
+  align-items: center;
+}
+
+.avatarEditBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Body */
+.adminContent {
+  margin-top: 14px;
+}
+
+.adminInfoCard {
+  border-radius: 14px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  place-items: center;
-  padding: 36px 12px;
-  color: rgba(17, 24, 39, 0.65);
+  font-weight: 700;
+}
+
+/* Grid kiểu Profile */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
 }
 
 @media (max-width: 768px) {
-  .profileTop {
-    flex-direction: column;
-    align-items: stretch;
+  .infoGrid {
+    grid-template-columns: 1fr;
   }
-  .profileActions {
-    justify-content: flex-start;
-  }
+}
+
+.infoItem {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+}
+
+.infoIcon {
+  font-size: 18px;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
+.infoDetails {
+  flex: 1;
+  min-width: 0;
+}
+
+.infoLabel {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+  margin-bottom: 6px;
+}
+
+.infoValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  word-break: break-word;
+}
+
+.errorText {
+  color: #ff4d4f;
+  font-size: 12px;
+  margin-top: 4px;
 }

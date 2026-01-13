@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { message } from 'antd';
+import { Modal } from "antd";
+
 import ProductSelector from '../../components/ProductSelector.jsx';
 import CustomerSelector from '../../components/CustomerSelector.jsx';
 import ConfirmationModal from '../../components/ConfirmationModal.jsx';
@@ -20,13 +21,16 @@ import {
   startMomoPayment,
   addItemsBySeriCode,
   clearVoucherForOrder,
-  updateShippingForOrder,
+  updateShipping,
   ghnGetProvinces,
   ghnGetDistricts,
   ghnGetWards,
 } from '../../service/PosOrderService';
 import { listPaymentMethods } from '../../service/HinhThucThanhToanService';
 // THÊM import này nếu chưa có (cho getSeriByIdSeri)
+
+
+
 
 const formatCurrencyDefault = (amount) => {
   if (typeof amount !== 'number') return '0 ₫';
@@ -35,93 +39,19 @@ const formatCurrencyDefault = (amount) => {
     currency: 'VND',
   });
 };
+const PAYMENT = {
+  CASH: 'CASH',
+  VNPAY: 'VNPAY',
+  MOMO: 'MOMO',
+};
+const paymentOptions = [
+  { value: PAYMENT.CASH, title: 'Tiền mặt', desc: 'Thanh toán bằng tiền mặt tại quầy' },
+  { value: PAYMENT.VNPAY, title: 'VNPay', desc: 'Thanh toán qua ví và QR VNPay' },
+  { value: PAYMENT.MOMO, title: 'MoMo', desc: 'Thanh toán qua ví điện tử MoMo' },
+];
 
 // ✅ Modal nhắc nhở / confirm ở giữa màn hình
-const ReminderModal = ({ title, message, onConfirm, onCancel }) => {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 9998,
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 10,
-          padding: '18px 20px 14px',
-          minWidth: 320,
-          maxWidth: 420,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.25)',
-          fontFamily: 'Arial, sans-serif',
-        }}
-      >
-        <h4
-          style={{
-            margin: 0,
-            marginBottom: 8,
-            fontSize: '1rem',
-            color: '#212529',
-          }}
-        >
-          {title || 'Xác nhận thao tác'}
-        </h4>
-        <p
-          style={{
-            margin: 0,
-            marginBottom: 14,
-            fontSize: '0.9rem',
-            color: '#495057',
-          }}
-        >
-          {message}
-        </p>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            marginTop: 4,
-          }}
-        >
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '7px 14px',
-              borderRadius: 6,
-              border: '1px solid #ced4da',
-              backgroundColor: '#fff',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
-            Hủy
-          </button>
-          <button
-            onClick={onConfirm}
-            style={{
-              padding: '7px 16px',
-              borderRadius: 6,
-              border: 'none',
-              backgroundColor: '#fa5252',
-              color: '#fff',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-            }}
-          >
-            Xác nhận
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+
 
 const InvoiceWorkingArea = ({
   invoice,
@@ -133,6 +63,24 @@ const InvoiceWorkingArea = ({
   const orderId = invoice?.orderId;
 
   const notify = showNotification || (() => { });
+  const confirmAction = ({
+  title,
+  content,
+  okText = "Xác nhận",
+  cancelText = "Hủy",
+  danger = false,
+  onOk,
+}) => {
+  Modal.confirm({
+    title,
+    content,
+    centered: true,
+    okText,
+    cancelText,
+    okButtonProps: danger ? { danger: true } : undefined,
+    onOk,
+  });
+};
   const formatCurrency = formatCurrencyProp || formatCurrencyDefault;
 
   // Giỏ hàng hiển thị trên FE
@@ -145,11 +93,9 @@ const InvoiceWorkingArea = ({
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showVoucherSelector, setShowVoucherSelector] = useState(false);
-
+  const [useInsurance, setUseInsurance] = useState(false); // default = false đúng builder const GHN_USE_INSURANCE_VALUE=false
   // Modal nhắc nhở chung
-  const [reminderConfig, setReminderConfig] = useState(null);
 
-  const openReminder = (config) => setReminderConfig(config);
 
   // Khách hàng
   const [customers, setCustomers] = useState([]);
@@ -190,7 +136,7 @@ const InvoiceWorkingArea = ({
   // ✅ FIX: chống spam call + spam notify khi tính phí ship
   const shipTimerRef = useRef(null);
   const lastFeeRef = useRef(null);
-
+  const lastShipCalcKeyRef = useRef(null);
   // POS Order
   const [orderDetail, setOrderDetail] = useState(null);
   const [loadingOrder, setLoadingOrder] = useState(false);
@@ -228,7 +174,7 @@ const InvoiceWorkingArea = ({
     const fetchPaymentMethods = async () => {
       try {
         const res = await listPaymentMethods();
-        const raw = res?.data?.data ?? res?.data;
+        const raw = unwrapApi(res);
         setPaymentMethods(Array.isArray(raw) ? raw : []);
       } catch (err) {
         console.error('Lỗi load hình thức thanh toán:', err);
@@ -254,7 +200,7 @@ const InvoiceWorkingArea = ({
 
     setOrderDetail(data);
     setShippingFee(Number(data.phiVanChuyen || 0));
-
+    lastFeeRef.current = Number(data?.phiVanChuyen || 0); // ✅ THÊM
     // ✅ FIX: đánh dấu để các effect province/district KHÔNG reset ngay sau khi sync
     skipResetProvinceRef.current = true;
     skipResetDistrictRef.current = true;
@@ -524,10 +470,32 @@ const InvoiceWorkingArea = ({
   }, [giaoHang, shipForm.districtId]);
 
   // ✅ FIX: debounce + chống spam notify khi tính phí
+  const shipCalcKey = useMemo(() => {
+    if (!giaoHang || !orderId) return null;
+    if (!shipForm.districtId || !shipForm.wardCode) return null;
+
+    const subtotal = posTotals.giaTriChuaGiam ?? orderDetail?.giaTriChuaGiam ?? null;
+    const addrKey = `${shipForm.provinceId || ""}|${shipForm.districtId || ""}|${shipForm.wardCode || ""}|${(shipForm.diaChiChiTiet || "").trim()}`;
+
+
+    return `${orderId}|${addrKey}|sub=${subtotal ?? "na"}|ins=${useInsurance ? 1 : 0}`;
+  }, [
+    giaoHang,
+    orderId,
+    shipForm.provinceId,
+    shipForm.districtId,
+    shipForm.wardCode,
+    shipForm.diaChiChiTiet,
+    posTotals.giaTriChuaGiam,
+    orderDetail?.giaTriChuaGiam,
+    useInsurance,
+  ]);
+
   useEffect(() => {
-    if (!giaoHang) return;
-    if (!orderId) return;
-    if (!shipForm.districtId || !shipForm.wardCode) return;
+    if (!shipCalcKey) return;
+
+    // ✅ chống lặp vô hạn: key không đổi thì không call lại
+    if (lastShipCalcKeyRef.current === shipCalcKey) return;
 
     if (shipTimerRef.current) clearTimeout(shipTimerRef.current);
 
@@ -548,35 +516,43 @@ const InvoiceWorkingArea = ({
           districtId: shipForm.districtId,
           wardCode: shipForm.wardCode,
 
-          // ✅ QUAN TRỌNG: chỉ tính phí, KHÔNG LƯU địa chỉ
           saveAddress: false,
           setAsDefault: false,
+          useInsurance: !!useInsurance,
         };
 
-        const res = await updateShippingForOrder(orderId, payload);
-        const data = unwrapApi(res); // PosOrderDetailDTO
+
+        const res = await updateShipping(orderId, payload);
+        const data = unwrapApi(res);
         syncFromOrder(data);
+
+        // ✅ đánh dấu đã tính cho key này
+        lastShipCalcKeyRef.current = shipCalcKey;
 
         const feeNow = Number(data?.phiVanChuyen || 0);
         if (lastFeeRef.current !== feeNow) {
           lastFeeRef.current = feeNow;
-          notify('success', `Tính phí vận chuyển thành công (GHN: ${feeNow.toLocaleString('vi-VN')} ₫)`);
+          notify("success", `Phí vận chuyển (GHN): ${feeNow.toLocaleString("vi-VN")} ₫`);
         }
       } catch (e) {
+        // ✅ tránh spam call nếu BE lỗi liên tục
+        lastShipCalcKeyRef.current = shipCalcKey;
         console.error(e);
-        notify('error', e?.response?.data?.message || 'Tính phí vận chuyển thất bại.');
-        setShippingFee(0);
+        const msg = e?.response?.data?.message || "Tính phí vận chuyển thất bại.";
+        if (msg.toLowerCase().includes("thêm sản phẩm")) {
+          notify("warning", msg);
+        } else {
+          notify("error", msg);
+        }
       } finally {
         setShippingLoading(false);
       }
-    }, 300);
+    }, 350);
 
     return () => {
       if (shipTimerRef.current) clearTimeout(shipTimerRef.current);
     };
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [giaoHang, orderId, shipForm.districtId, shipForm.wardCode]);
+  }, [shipCalcKey]);
 
   // ===== TỔNG KẾT ĐƠN HÀNG (ưu tiên số từ BE) =====
   const orderSummary = useMemo(() => {
@@ -690,10 +666,12 @@ const InvoiceWorkingArea = ({
     const group = cartItems.find((item) => item.idLaptopCt === idLaptopCt);
     if (!group || !group.orderCtIds?.length) return;
 
-    openReminder({
-      title: 'Xóa sản phẩm khỏi đơn',
-      message: 'Bạn có chắc muốn xóa toàn bộ phiên bản sản phẩm này khỏi đơn hàng?',
-      onConfirm: async () => {
+    confirmAction({
+  title: "Xóa sản phẩm khỏi đơn",
+  content: "Bạn có chắc muốn xóa toàn bộ phiên bản sản phẩm này khỏi đơn hàng?",
+  okText: "Xóa",
+  danger: true,
+  onOk: async () => {
         try {
           const uniqueIds = Array.from(new Set(group.orderCtIds.filter(Boolean)));
 
@@ -715,10 +693,12 @@ const InvoiceWorkingArea = ({
   const handleRemoveSerial = (orderCtId, seriCode) => {
     if (!orderId || !orderCtId) return;
 
-    openReminder({
-      title: 'Xóa seri khỏi đơn',
-      message: `Xóa seri ${seriCode} khỏi đơn hàng?`,
-      onConfirm: async () => {
+    confirmAction({
+  title: "Xóa seri khỏi đơn",
+  content: `Xóa seri ${seriCode} khỏi đơn hàng?`,
+  okText: "Xóa",
+  danger: true,
+  onOk: async () => {
         try {
           await removeItemFromOrder(orderId, orderCtId);
           await refreshOrderFromServer();
@@ -744,10 +724,12 @@ const InvoiceWorkingArea = ({
   const handleCancelInvoice = () => {
     if (!orderId) return;
 
-    openReminder({
-      title: 'Huỷ đơn hàng',
-      message: 'Huỷ toàn bộ đơn hàng này?',
-      onConfirm: async () => {
+    confirmAction({
+  title: "Huỷ đơn hàng",
+  content: "Huỷ toàn bộ đơn hàng này?",
+  okText: "Huỷ đơn",
+  danger: true,
+  onOk: async () => {
         try {
           await cancelOrder(orderId);
           notify('success', 'Đã huỷ đơn hàng.');
@@ -789,72 +771,81 @@ const InvoiceWorkingArea = ({
 
   // ===== VOUCHER =====
   const handleApplyVouchers = async (list) => {
-    // ✅ VoucherSelector sẽ trả về mảng, nhưng mình chỉ lấy 1 voucher đầu tiên
     const chosen = Array.isArray(list) ? list[0] : null;
+    const voucherId = chosen?.id ? String(chosen.id) : "";
 
-    // ✅ BE nhận voucherId = mã voucher (ví dụ "PGG001", "VC123")
-    const voucherId = chosen?.id ? String(chosen.id) : '';
-
-    // Update UI: chỉ giữ 1 voucher
+    // Update UI trước
     setAppliedVouchers(chosen ? [chosen] : []);
-
-    // Nếu bạn muốn lưu vào invoice
     updateInvoice({ voucherId: voucherId || null });
 
-    // Nếu chưa có orderId thì đóng modal
     if (!orderId) {
       setShowVoucherSelector(false);
       return;
     }
 
     try {
-      // Nếu không chọn voucher thì chỉ đóng modal (hoặc gọi API clear nếu bạn có)
+      // ✅ Nếu bỏ voucher => clear trên BE
       if (!voucherId) {
-        // ⚠️ Nếu bạn có làm API DELETE /api/pos/orders/{orderId}/voucher thì mở dòng này:
-        // await clearVoucherForOrder(orderId);
-
-        setShowVoucherSelector(false);
+        await clearVoucherForOrder(orderId);
+        await refreshOrderFromServer();
+        notify("success", "Đã bỏ voucher.");
         return;
       }
 
-      // ✅ Gửi 1 voucherId lên BE
+      // ✅ Apply voucher
       await applyVoucherForOrder(orderId, voucherId);
-
       await refreshOrderFromServer();
-      notify('success', 'Đã áp dụng voucher cho đơn hàng.');
+      notify("success", "Đã áp dụng voucher cho đơn hàng.");
     } catch (err) {
-      console.error('Lỗi áp dụng voucher:', err);
+      console.error("Lỗi áp dụng/clear voucher:", err);
       notify(
-        'error',
-        err?.response?.data?.message ||
-        'Không thể áp dụng voucher, vui lòng thử lại!'
+        "error",
+        err?.response?.data?.message || "Không thể áp dụng voucher, vui lòng thử lại!"
       );
+
+      // (tuỳ chọn) nếu muốn rollback UI khi lỗi:
+      // await refreshOrderFromServer();
     } finally {
       setShowVoucherSelector(false);
     }
   };
 
+
   // ===== THANH TOÁN =====
   const getCurrentPaymentMethodEntity = () => {
     if (!paymentMethods.length || !invoice.paymentMethod) return null;
-    const lowerName = invoice.paymentMethod.toLowerCase();
 
+    const code = String(invoice.paymentMethod).toUpperCase().trim(); // CASH/VNPAY/MOMO
+
+    // Ưu tiên match theo code nếu BE có field code/maHinhThuc
     let method =
-      paymentMethods.find(
-        (m) =>
-          (m.tenHinhThuc || m.ten || m.name || '')
-            .toLowerCase()
-            .trim() === lowerName
-      ) || null;
+      paymentMethods.find((m) => {
+        const mCode = String(m.maHinhThuc || m.code || '').toUpperCase().trim();
+        return mCode && mCode === code;
+      }) || null;
 
+    // Fallback: match theo tên hình thức (nhiều dự án lưu tenHinhThuc = CASH/VNPAY/MOMO)
     if (!method) {
       method =
-        paymentMethods.find((m) =>
-          (m.tenHinhThuc || m.ten || m.name || '')
-            .toLowerCase()
-            .includes(lowerName)
-        ) || null;
+        paymentMethods.find((m) => {
+          const name = String(m.tenHinhThuc || m.ten || m.name || '')
+            .toUpperCase()
+            .trim();
+          return name === code;
+        }) || null;
     }
+
+    // Fallback cuối: contains
+    if (!method) {
+      method =
+        paymentMethods.find((m) => {
+          const name = String(m.tenHinhThuc || m.ten || m.name || '')
+            .toUpperCase()
+            .trim();
+          return name.includes(code);
+        }) || null;
+    }
+
     return method;
   };
 
@@ -881,7 +872,7 @@ const InvoiceWorkingArea = ({
       return;
     }
     if (
-      invoice.paymentMethod === 'Tiền mặt' &&
+      invoice.paymentMethod === PAYMENT.CASH &&
       (invoice.customerCash || 0) < orderSummary.total
     ) {
       notify('warning', 'Số tiền khách đưa chưa đủ để thanh toán.');
@@ -894,8 +885,7 @@ const InvoiceWorkingArea = ({
     shippingLoading ||
     orderSummary.total === 0 ||
     (giaoHang && (!shipForm.districtId || !shipForm.wardCode)) ||
-    (invoice.paymentMethod === 'Tiền mặt' &&
-      (invoice.customerCash || 0) < orderSummary.total);
+    (invoice.paymentMethod === PAYMENT.CASH && (invoice.customerCash || 0) < orderSummary.total)
 
   const handleConfirmPayment = async () => {
     if (!orderId) return;
@@ -915,19 +905,19 @@ const InvoiceWorkingArea = ({
 
       const mustPay = Number(latest?.tongTienThuHo ?? orderSummary.total ?? 0);
       if (mustPay <= 0) {
-        message.error('Tổng tiền không hợp lệ. Vui lòng kiểm tra lại đơn hàng.');
+        notify("error", "Tổng tiền không hợp lệ. Vui lòng kiểm tra lại đơn hàng.");
         return;
       }
 
       // Nếu tiền mặt mà khách đưa < tổng mới nhất thì chặn
-      if (invoice.paymentMethod === 'Tiền mặt' && (invoice.customerCash || 0) < mustPay) {
-        message.error('Số tiền khách đưa chưa đủ theo tổng mới nhất (có thể do phí vận chuyển vừa cập nhật).');
+      if (invoice.paymentMethod === PAYMENT.CASH && (invoice.customerCash || 0) < mustPay) {
+        notify("error","Số tiền khách đưa chưa đủ theo tổng mới nhất (có thể do phí vận chuyển vừa cập nhật).");
         return;
       }
 
       // 👉 Nếu chọn VNPay
       // VNPAY – MỞ TRONG CÙNG TAB (khách quét QR ngon lành)
-      if (invoice.paymentMethod === 'VNPay') {
+      if (invoice.paymentMethod === PAYMENT.VNPAY) {
         const res = await startVnpayPayment(orderId);
         const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
 
@@ -951,7 +941,7 @@ const InvoiceWorkingArea = ({
       }
 
       // MOMO – MỞ TRONG CÙNG TAB (tuyệt vời trên mobile)
-      if (invoice.paymentMethod === 'MoMo') {
+      if (invoice.paymentMethod === PAYMENT.MOMO) {
         const res = await startMomoPayment(orderId);
         const data = unwrapApi ? unwrapApi(res) : (res?.data || res);
 
@@ -984,13 +974,14 @@ const InvoiceWorkingArea = ({
       }
 
       const khachDua =
-        invoice.paymentMethod === 'Tiền mặt'
+        invoice.paymentMethod === PAYMENT.CASH
           ? (invoice.customerCash || mustPay)
           : mustPay;
 
       await addPaymentToOrder(orderId, {
         idHinhThucThanhToan: methodEntity.id,
-        khachDua,
+        soTien: mustPay,     // ✅ bắt buộc để BE sum paid đúng
+        khachDua,            // tiền khách đưa (đặc biệt tiền mặt)
       });
 
       // ✅ FIX: refresh lại trước khi complete để chắc chắn paid >= mustPay mới nhất
@@ -1001,7 +992,7 @@ const InvoiceWorkingArea = ({
 
       onConfirmOrder();
       setShowConfirmation(false);
-      message.success('Thanh toán đơn hàng thành công.');
+      notify("success",'Thanh toán đơn hàng thành công.');
     } catch (err) {
       console.error('Lỗi xác nhận thanh toán POS:', err);
       message.error(
@@ -1066,24 +1057,6 @@ const InvoiceWorkingArea = ({
     fontWeight: '500',
     fontSize: '0.85rem',
   };
-
-  const paymentOptions = [
-    {
-      value: 'Tiền mặt',
-      title: 'Tiền mặt',
-      desc: 'Thanh toán bằng tiền mặt tại quầy',
-    },
-    {
-      value: 'VNPay',
-      title: 'VNPay',
-      desc: 'Thanh toán qua ví và QR VNPay',
-    },
-    {
-      value: 'MoMo',
-      title: 'MoMo',
-      desc: 'Thanh toán qua ví điện tử MoMo',
-    },
-  ];
 
   // ===== RENDER =====
   return (
@@ -1415,9 +1388,44 @@ const InvoiceWorkingArea = ({
                   {hasCustomer && (
                     <button
                       onClick={async () => {
+                        // 1) clear customer UI
                         updateInvoice({ customer: null });
                         setCustomerSearch('');
-                        await attachCustomerToOrder(null);
+
+                        // 2) ✅ clear giao hàng UI ngay lập tức
+                        setSaveAddress(false);
+                        setSetAsDefault(false);
+
+                        setDistricts([]);
+                        setWards([]);
+
+                        setShipForm({
+                          hoTen: '',
+                          soDienThoai: '',
+                          diaChiChiTiet: '',
+                          quocGia: 'Việt Nam',
+                          tinhThanh: '',
+                          quanHuyen: '',
+                          phuongXa: '',
+                          provinceId: null,
+                          districtId: null,
+                          wardCode: '',
+                        });
+
+                        setShippingFee(0);
+                        lastFeeRef.current = null;
+                        lastShipCalcKeyRef.current = null;
+
+                        // 3) clear BE customer + ship-note/fee
+                        await selectCustomerForOrder(orderId, {
+                          idTaiKhoan: null,
+                          idDiaChi: null,
+                          tenKhachHang: "",   // ✅ bắt buộc để clear
+                          sdtKhachHang: "",   // ✅ bắt buộc để clear
+                        });
+
+                        // 4) reload
+                        await refreshOrderFromServer();
                       }}
                       style={{
                         position: 'absolute',
@@ -1437,6 +1445,7 @@ const InvoiceWorkingArea = ({
                       ×
                     </button>
                   )}
+
                 </div>
 
                 {!hasCustomer && customerSearch && (
@@ -1568,6 +1577,12 @@ const InvoiceWorkingArea = ({
                 checked={giaoHang}
                 onChange={async (e) => {
                   const val = e.target.checked;
+
+                  if (val && totalCartQuantity === 0) {
+                    notify("warning", "Vui lòng thêm sản phẩm trước khi bật giao hàng.");
+                    return; // không setGiaoHang(true)
+                  }
+
                   setGiaoHang(val);
 
                   if (!orderId) return;
@@ -1580,7 +1595,7 @@ const InvoiceWorkingArea = ({
                   if (!val) {
                     try {
                       setShippingLoading(true);
-                      const res = await updateShippingForOrder(orderId, { giaoHang: false });
+                      const res = await updateShipping(orderId, { giaoHang: false, ghiChu: "" });
                       const data = unwrapApi(res);
                       syncFromOrder(data);
                       notify('success', 'Đã tắt giao hàng và reset phí vận chuyển.');
@@ -1600,10 +1615,11 @@ const InvoiceWorkingArea = ({
 
                     // 1) Khách có tài khoản -> gọi BE để lấy địa chỉ mặc định (và tính phí nếu đủ ward/district)
                     if (hasAccount) {
-                      const res = await updateShippingForOrder(orderId, {
+                      const res = await updateShipping(orderId, {
                         giaoHang: true,
                         saveAddress: false,
                         setAsDefault: false,
+                        useInsurance: !!useInsurance,
                       });
                       const data = unwrapApi(res);
                       syncFromOrder(data);
@@ -1763,7 +1779,7 @@ const InvoiceWorkingArea = ({
                         try {
                           setShippingLoading(true);
 
-                          const res = await updateShippingForOrder(orderId, {
+                          const res = await updateShipping(orderId, {
                             giaoHang: true,
                             hoTen: shipForm.hoTen,
                             soDienThoai: shipForm.soDienThoai,
@@ -1779,6 +1795,7 @@ const InvoiceWorkingArea = ({
                             // ✅ chỉ lúc bấm nút mới lưu DB
                             saveAddress: true,
                             setAsDefault: !!setAsDefault,
+                            useInsurance: !!useInsurance,
                           });
 
                           const data = unwrapApi(res);
@@ -1800,6 +1817,19 @@ const InvoiceWorkingArea = ({
                   )}
                 </div>
               )}
+              <div style={{paddingTop: 15}}>
+              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={useInsurance}
+                  onChange={(e) => {
+                    setUseInsurance(e.target.checked);
+                    lastShipCalcKeyRef.current = null; // force recalc nếu cần
+    }}
+  />
+                Bảo hiểm hàng hóa 
+              </label>
+</div>
 
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e9ecef' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -2039,7 +2069,7 @@ const InvoiceWorkingArea = ({
             </strong>
           </div>
 
-          {invoice.paymentMethod === 'Tiền mặt' && (
+          {invoice.paymentMethod === PAYMENT.CASH && (
             <div
               style={{
                 borderTop: '1px solid #e9ecef',
@@ -2192,22 +2222,7 @@ const InvoiceWorkingArea = ({
       )}
 
       {/* ✅ Modal nhắc nhở ở giữa */}
-      {reminderConfig && (
-        <ReminderModal
-          title={reminderConfig.title}
-          message={reminderConfig.message}
-          onCancel={() => setReminderConfig(null)}
-          onConfirm={async () => {
-            try {
-              if (reminderConfig.onConfirm) {
-                await reminderConfig.onConfirm();
-              }
-            } finally {
-              setReminderConfig(null);
-            }
-          }}
-        />
-      )}
+      
     </div>
   );
 };

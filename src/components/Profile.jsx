@@ -13,7 +13,7 @@ import {
   CloseOutlined,
   PlusOutlined,
   DeleteOutlined,
-  CheckOutlined
+  LockOutlined,
 } from '@ant-design/icons';
 import { Card, Avatar, Button, Tag, Spin, Input, Select, DatePicker, Modal, message, Upload } from 'antd';
 import dayjs from 'dayjs';
@@ -43,6 +43,28 @@ const Profile = () => {
   const [wards, setWards] = useState([]);
   const [loadingAddress, setLoadingAddress] = useState({ province: false, district: false, ward: false });
   const navigate = useNavigate();
+  const handleChangePassword = () => navigate('/change-password');
+  const isNumeric = (v) => v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v));
+  const toNumberOrNull = (v) => (isNumeric(v) ? Number(v) : null);
+
+  const getSelectedProvinceName = (provinceId) => {
+    const pid = toNumberOrNull(provinceId);
+    if (!pid) return "";
+    return provinces.find(p => Number(p.ProvinceID) === pid)?.ProvinceName || "";
+  };
+
+  const getSelectedDistrictName = (districtId) => {
+    const did = toNumberOrNull(districtId);
+    if (!did) return "";
+    return districts.find(d => Number(d.DistrictID) === did)?.DistrictName || "";
+  };
+
+
+
+  const getSelectedWardName = (wardCode) => {
+    if (!wardCode) return "";
+    return wards.find(w => String(w.WardCode) === String(wardCode))?.WardName || "";
+  };
 
   // Form chỉnh sửa thông tin
   const [editForm, setEditForm] = useState({
@@ -118,6 +140,7 @@ const Profile = () => {
   useEffect(() => {
     fetchAddresses();
     fetchProvinces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAddresses = async () => {
@@ -130,25 +153,36 @@ const Profile = () => {
         const raw = Array.isArray(response) ? response : response?.data || [];
         const mapped = await Promise.all(raw.map(async (a) => {
           const id = a.id || a.idDiaChi || a.idAddress;
+
           const name = a.name || a.ten || a.hoTen || "";
           const phone = a.phone || a.soDienThoai || "";
           const addressText = a.address || a.diaChiChiTiet || a.diaChi || "";
-          // Lấy ID từ database (có thể là tinhThanh, quanHuyen, phuongXa hoặc provinceId, districtId, wardCode)
-          const provinceId = a.provinceId || a.tinhThanhId || a.tinhThanh || null;
-          const districtId = a.districtId || a.quanHuyenId || a.quanHuyen || null;
-          const wardCode = a.wardCode || a.phuongXa || null;
+
+          // Ưu tiên lấy đúng ID (provinceId/districtId/wardCode). Nếu backend trả tên (tinhThanh/quanHuyen/phuongXa)
+          // thì sẽ không ép kiểu số để tránh NaN.
+          const provinceId = toNumberOrNull(
+            a.provinceId ?? a.tinhThanhId ?? a.province_id ?? a.provinceID ?? a.tinhThanh
+          );
+          const districtId = toNumberOrNull(
+            a.districtId ?? a.quanHuyenId ?? a.district_id ?? a.districtID ?? a.quanHuyen
+          );
+          const wardCode = a.wardCode ?? a.ward_code ?? a.phuongXa ?? null;
+
           const isDefault = !!(a.macDinh || a.isDefault || a.diaChiMacDinh);
 
-          // Luôn load tên từ ID qua API, không dùng tên có sẵn
           let province = "";
           let district = "";
           let ward = "";
 
           if (provinceId || districtId || wardCode) {
             const names = await loadAddressNamesFromIds(provinceId, districtId, wardCode);
-            province = names.provinceName || "";
-            district = names.districtName || "";
-            ward = names.wardName || "";
+            province = names.provinceName || a.tinhThanh || "";
+            district = names.districtName || a.quanHuyen || "";
+            ward = names.wardName || a.phuongXa || "";
+          } else {
+            province = a.tinhThanh || "";
+            district = a.quanHuyen || "";
+            ward = a.phuongXa || "";
           }
 
           return {
@@ -166,6 +200,7 @@ const Profile = () => {
             isDefault
           };
         }));
+
         // Sắp xếp: địa chỉ mặc định lên đầu
         const sorted = mapped.sort((a, b) => {
           if (a.isDefault && !b.isDefault) return -1;
@@ -184,100 +219,60 @@ const Profile = () => {
   const loadAddressNamesFromIds = async (provinceId, districtId, wardCode) => {
     const result = { provinceName: "", districtName: "", wardName: "" };
     try {
-      if (provinceId) {
-        // Chuyển đổi ID sang số nếu cần
-        const provinceIdNum = typeof provinceId === 'string' ? parseInt(provinceId) : provinceId;
+      const provinceIdNum = toNumberOrNull(provinceId);
+      const districtIdNum = toNumberOrNull(districtId);
+
+      if (provinceIdNum) {
         const resProvince = await axios.get(urlProvince, { headers: { token: tokenApiGHN } });
 
-        // Xử lý cả trường hợp API trả về object đơn lẻ hoặc array
         let provinceList = [];
         if (Array.isArray(resProvince.data.data)) {
           provinceList = resProvince.data.data;
         } else if (resProvince.data.data && resProvince.data.data.ProvinceID) {
-          // Nếu trả về object đơn lẻ
           provinceList = [resProvince.data.data];
         }
 
-        const province = provinceList.find(p => {
-          const pId = p.ProvinceID;
-          return pId === provinceIdNum ||
-            pId === provinceId ||
-            String(pId) === String(provinceId) ||
-            Number(pId) === Number(provinceId);
-        });
-
+        const province = provinceList.find(p => Number(p.ProvinceID) === Number(provinceIdNum));
         if (province?.ProvinceName) {
           result.provinceName = province.ProvinceName;
-          console.log(`✅ Load tên tỉnh: ID ${provinceId} → ${province.ProvinceName}`);
-        } else {
-          console.warn(`⚠️ Không tìm thấy tỉnh với ID: ${provinceId}`);
         }
       }
 
-      if (districtId && provinceId) {
-        // Chuyển đổi ID sang số nếu cần
-        const districtIdNum = typeof districtId === 'string' ? parseInt(districtId) : districtId;
-        const provinceIdNum = typeof provinceId === 'string' ? parseInt(provinceId) : provinceId;
-
+      if (districtIdNum && provinceIdNum) {
         const resDistrict = await axios.get(urlDistricts, {
           params: { province_id: provinceIdNum },
           headers: { token: tokenApiGHN }
         });
 
-        // Xử lý cả trường hợp API trả về object đơn lẻ hoặc array
         let districtList = [];
         if (Array.isArray(resDistrict.data.data)) {
           districtList = resDistrict.data.data;
         } else if (resDistrict.data.data && resDistrict.data.data.DistrictID) {
-          // Nếu trả về object đơn lẻ
           districtList = [resDistrict.data.data];
         }
 
-        const district = districtList.find(d => {
-          const dId = d.DistrictID;
-          return dId === districtIdNum ||
-            dId === districtId ||
-            String(dId) === String(districtId) ||
-            Number(dId) === Number(districtId);
-        });
-
+        const district = districtList.find(d => Number(d.DistrictID) === Number(districtIdNum));
         if (district?.DistrictName) {
           result.districtName = district.DistrictName;
-          console.log(`✅ Load tên huyện: ID ${districtId} → ${district.DistrictName}`);
-        } else {
-          console.warn(`⚠️ Không tìm thấy huyện với ID: ${districtId}`);
         }
       }
 
-      if (wardCode && districtId) {
-        const districtIdNum = typeof districtId === 'string' ? parseInt(districtId) : districtId;
-
+      if (wardCode && districtIdNum) {
         const resWard = await axios.get(urlWard, {
           params: { district_id: districtIdNum },
           headers: { token: tokenApiGHN }
         });
 
-        // Xử lý cả trường hợp API trả về object đơn lẻ hoặc array
         let wardList = [];
         if (Array.isArray(resWard.data.data)) {
           wardList = resWard.data.data;
         } else if (resWard.data.data && resWard.data.data.WardCode) {
-          // Nếu trả về object đơn lẻ
           wardList = [resWard.data.data];
         }
 
-        const ward = wardList.find(w => {
-          const wCode = w.WardCode;
-          return wCode === wardCode ||
-            String(wCode) === String(wardCode) ||
-            Number(wCode) === Number(wardCode);
-        });
-
+        const ward = wardList.find(w => String(w.WardCode) === String(wardCode));
         if (ward?.WardName) {
           result.wardName = ward.WardName;
-          console.log(`✅ Load tên xã: Code ${wardCode} → ${ward.WardName}`);
-        } else {
-          console.warn(`⚠️ Không tìm thấy xã với Code: ${wardCode}`);
         }
       }
     } catch (error) {
@@ -428,7 +423,6 @@ const Profile = () => {
   };
 
   const handleUpdateProfile = async () => {
-    // Validate form trước khi gửi
     if (!validateForm()) {
       message.error('Vui lòng kiểm tra lại thông tin đã nhập');
       return;
@@ -445,18 +439,15 @@ const Profile = () => {
 
       let anhUrl = user?.anh || user?.anhUrl || null;
 
-      // Nếu có ảnh mới, thử upload lên endpoint riêng trước
       if (avatarFile) {
         try {
           const uploadResponse = await userService.uploadAvatar(avatarFile);
-          // Lấy URL từ response
           anhUrl = uploadResponse?.anhUrl || uploadResponse?.anh || uploadResponse?.url || null;
           if (anhUrl) {
             message.success('Upload ảnh thành công!');
           }
         } catch (uploadError) {
           console.warn('Không thể upload ảnh, giữ nguyên ảnh cũ:', uploadError);
-          // Nếu không upload được, giữ nguyên ảnh cũ
           message.warning('Không thể upload ảnh mới, giữ nguyên ảnh cũ');
         }
       }
@@ -467,13 +458,11 @@ const Profile = () => {
         soDienThoai: editForm.soDienThoai.trim(),
         gioiTinh: editForm.gioiTinh,
         ngaySinh: editForm.ngaySinh ? editForm.ngaySinh.format('YYYY-MM-DD') : null,
-        anhUrl: anhUrl, // Gửi URL ảnh trong JSON
+        anhUrl: anhUrl,
       };
 
-      // Gửi payload JSON (không có file)
       const response = await userService.updateCustomerAccount(customerId, payload);
 
-      // Cập nhật user với dữ liệu từ response
       const updatedUser = {
         ...user,
         ...payload,
@@ -485,7 +474,6 @@ const Profile = () => {
       sessionStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
 
-      // Cập nhật preview ảnh nếu có ảnh mới
       if (updatedUser.anh || updatedUser.anhUrl) {
         const newAvatarUrl = updatedUser.anh || updatedUser.anhUrl;
         if (newAvatarUrl.startsWith('http')) {
@@ -495,7 +483,6 @@ const Profile = () => {
         }
       }
 
-      // Reset avatar file sau khi upload thành công
       setAvatarFile(null);
       setIsEditing(false);
       setValidationErrors({ ten: '', email: '', soDienThoai: '', gioiTinh: '', ngaySinh: '' });
@@ -518,7 +505,6 @@ const Profile = () => {
     };
     let isValid = true;
 
-    // Validate tên
     const name = addressForm.name?.trim() || '';
     if (!name) {
       errors.name = 'Họ và tên không được để trống';
@@ -531,7 +517,6 @@ const Profile = () => {
       isValid = false;
     }
 
-    // Validate số điện thoại
     const phone = addressForm.phone?.trim() || '';
     if (!phone) {
       errors.phone = 'Số điện thoại không được để trống';
@@ -547,7 +532,6 @@ const Profile = () => {
       isValid = false;
     }
 
-    // Validate địa chỉ chi tiết
     const address = addressForm.address?.trim() || '';
     if (!address) {
       errors.address = 'Địa chỉ chi tiết không được để trống';
@@ -557,19 +541,14 @@ const Profile = () => {
       isValid = false;
     }
 
-    // Validate tỉnh/thành phố
     if (!addressForm.provinceId) {
       errors.provinceId = 'Vui lòng chọn tỉnh/thành phố';
       isValid = false;
     }
-
-    // Validate quận/huyện
     if (!addressForm.districtId) {
       errors.districtId = 'Vui lòng chọn quận/huyện';
       isValid = false;
     }
-
-    // Validate phường/xã
     if (!addressForm.wardCode) {
       errors.wardCode = 'Vui lòng chọn phường/xã';
       isValid = false;
@@ -580,7 +559,6 @@ const Profile = () => {
   };
 
   const handleAddAddress = async () => {
-    // Validate form trước khi gửi
     if (!validateAddressForm()) {
       message.error('Vui lòng kiểm tra lại thông tin đã nhập');
       return;
@@ -589,23 +567,32 @@ const Profile = () => {
     try {
       setAddressLoading(true);
       const customerId =
-  localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+        localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+
+      const provinceName = getSelectedProvinceName(addressForm.provinceId);
+      const districtName = getSelectedDistrictName(addressForm.districtId);
+      const wardName = getSelectedWardName(addressForm.wardCode);
+
       const addressData = {
-        idTaiKhoan: customerId,                 // UUID string
+        idTaiKhoan: customerId,
         quocGia: "VN",
         hoTen: addressForm.name,
         soDienThoai: addressForm.phone,
         diaChiChiTiet: addressForm.address,
 
-        tinhThanh: String(addressForm.provinceId),
-        quanHuyen: String(addressForm.districtId),
-        phuongXa: String(addressForm.wardCode),
+        // ✅ Gửi cả ID chuẩn lẫn tên (backend dùng field nào cũng nhận được)
+        provinceId: toNumberOrNull(addressForm.provinceId),
+        districtId: toNumberOrNull(addressForm.districtId),
+        wardCode: addressForm.wardCode,
+
+        tinhThanh: provinceName || (addressForm.provinceId != null ? String(addressForm.provinceId) : ""),
+        quanHuyen: districtName || (addressForm.districtId != null ? String(addressForm.districtId) : ""),
+        phuongXa: wardName || (addressForm.wardCode != null ? String(addressForm.wardCode) : ""),
       };
 
       const newAddress = await addAddress(addressData);
       message.success("Thêm địa chỉ thành công!");
 
-      // Lưu thông tin địa chỉ vừa thêm để so sánh
       const newAddressInfo = {
         name: addressForm.name.trim(),
         phone: addressForm.phone.trim(),
@@ -615,7 +602,6 @@ const Profile = () => {
         wardCode: addressForm.wardCode
       };
 
-      // Fetch lại danh sách và sắp xếp để đưa địa chỉ mới lên đầu
       const response = await getAllAddress(customerId);
       const raw = Array.isArray(response) ? response : response?.data || [];
       const mapped = await Promise.all(raw.map(async (a) => {
@@ -623,22 +609,29 @@ const Profile = () => {
         const name = a.name || a.ten || a.hoTen || "";
         const phone = a.phone || a.soDienThoai || "";
         const addressText = a.address || a.diaChiChiTiet || a.diaChi || "";
-        // Lấy ID từ database
-        const provinceId = a.provinceId || a.tinhThanhId || a.tinhThanh || null;
-        const districtId = a.districtId || a.quanHuyenId || a.quanHuyen || null;
-        const wardCode = a.wardCode || a.phuongXa || null;
+
+        const provinceId = toNumberOrNull(
+          a.provinceId ?? a.tinhThanhId ?? a.province_id ?? a.provinceID ?? a.tinhThanh
+        );
+        const districtId = toNumberOrNull(
+          a.districtId ?? a.quanHuyenId ?? a.district_id ?? a.districtID ?? a.quanHuyen
+        );
+        const wardCode = a.wardCode ?? a.ward_code ?? a.phuongXa ?? null;
+
         const isDefault = !!(a.macDinh || a.isDefault || a.diaChiMacDinh);
 
-        // Luôn load tên từ ID qua API, không dùng tên có sẵn
         let province = "";
         let district = "";
         let ward = "";
-
         if (provinceId || districtId || wardCode) {
           const names = await loadAddressNamesFromIds(provinceId, districtId, wardCode);
-          province = names.provinceName || "";
-          district = names.districtName || "";
-          ward = names.wardName || "";
+          province = names.provinceName || a.tinhThanh || "";
+          district = names.districtName || a.quanHuyen || "";
+          ward = names.wardName || a.phuongXa || "";
+        } else {
+          province = a.tinhThanh || "";
+          district = a.quanHuyen || "";
+          ward = a.phuongXa || "";
         }
 
         return {
@@ -657,8 +650,6 @@ const Profile = () => {
         };
       }));
 
-      // Sắp xếp: địa chỉ mặc định lên đầu, sau đó địa chỉ mới
-      // Lấy ID từ response của addAddress - thử nhiều cách
       const newAddressId = newAddress?.id ||
         newAddress?.data?.id ||
         newAddress?.data?.idDiaChi ||
@@ -666,13 +657,11 @@ const Profile = () => {
         newAddress?.idDiaChi ||
         newAddress?.idAddress;
 
-      // Nếu không tìm được ID từ response, dùng cách so sánh thông tin
       const sorted = mapped.sort((a, b) => {
         const aId = String(a.id || '');
         const bId = String(b.id || '');
         const newId = String(newAddressId || '');
 
-        // Kiểm tra xem địa chỉ có phải là địa chỉ mới không (so sánh ID hoặc thông tin)
         const aIsNew = aId === newId || (
           String(a.provinceId) === String(newAddressInfo.provinceId) &&
           String(a.districtId) === String(newAddressInfo.districtId) &&
@@ -690,12 +679,9 @@ const Profile = () => {
           b.address.trim() === newAddressInfo.address
         );
 
-        // Ưu tiên 1: Địa chỉ mặc định lên đầu
         if (a.isDefault && !b.isDefault) return -1;
         if (!a.isDefault && b.isDefault) return 1;
 
-        // Ưu tiên 2: Nếu cả hai đều mặc định hoặc cả hai đều không mặc định
-        // Thì địa chỉ mới lên trước (ngay sau địa chỉ mặc định nếu có)
         if (aIsNew && !bIsNew) return -1;
         if (!aIsNew && bIsNew) return 1;
 
@@ -716,18 +702,15 @@ const Profile = () => {
   };
 
   const handleEditAddress = async (address) => {
-    // Lấy ID từ database (có thể là tinhThanh, quanHuyen, phuongXa hoặc provinceId, districtId, wardCode)
-    const provinceId = address.provinceId || address.tinhThanhId || address.tinhThanh || null;
-    const districtId = address.districtId || address.quanHuyenId || address.quanHuyen || null;
-    const wardCode = address.wardCode || address.phuongXa || null;
+    const provinceId = toNumberOrNull(address.provinceId ?? address.tinhThanhId ?? address.province_id ?? address.tinhThanh);
+    const districtId = toNumberOrNull(address.districtId ?? address.quanHuyenId ?? address.district_id ?? address.quanHuyen);
+    const wardCode = address.wardCode ?? address.ward_code ?? address.phuongXa ?? null;
 
-    // Load districts và wards trước khi set form
     if (provinceId) {
       setLoadingAddress(prev => ({ ...prev, district: true }));
       try {
-        const provinceIdNum = typeof provinceId === 'string' ? parseInt(provinceId) : provinceId;
         const res = await axios.get(urlDistricts, {
-          params: { province_id: provinceIdNum },
+          params: { province_id: provinceId },
           headers: { token: tokenApiGHN }
         });
         const districtList = Array.isArray(res.data.data) ? res.data.data : (res.data.data ? [res.data.data] : []);
@@ -742,9 +725,8 @@ const Profile = () => {
       if (districtId) {
         setLoadingAddress(prev => ({ ...prev, ward: true }));
         try {
-          const districtIdNum = typeof districtId === 'string' ? parseInt(districtId) : districtId;
           const res = await axios.get(urlWard, {
-            params: { district_id: districtIdNum },
+            params: { district_id: districtId },
             headers: { token: tokenApiGHN }
           });
           const wardList = Array.isArray(res.data.data) ? res.data.data : (res.data.data ? [res.data.data] : []);
@@ -758,14 +740,12 @@ const Profile = () => {
       }
     }
 
-    // Set form sau khi đã load districts và wards
-    // Đảm bảo giá trị là số hoặc string tùy theo format của select
     setAddressForm({
       name: address.name || '',
       phone: address.phone || '',
       address: address.address || '',
-      provinceId: provinceId ? (typeof provinceId === 'string' ? parseInt(provinceId) : provinceId) : null,
-      districtId: districtId ? (typeof districtId === 'string' ? parseInt(districtId) : districtId) : null,
+      provinceId: provinceId || null,
+      districtId: districtId || null,
       wardCode: wardCode,
     });
     setEditingAddressId(address.id);
@@ -773,13 +753,11 @@ const Profile = () => {
   };
 
   const handleUpdateAddress = async () => {
-    // Validate form trước khi gửi
     if (!validateAddressForm()) {
       message.error('Vui lòng kiểm tra lại thông tin đã nhập');
       return;
     }
 
-    // Confirm trước khi update
     Modal.confirm({
       title: 'Xác nhận cập nhật',
       content: 'Bạn có chắc chắn muốn cập nhật địa chỉ này?',
@@ -792,24 +770,33 @@ const Profile = () => {
   };
 
   const performUpdateAddress = async () => {
-
     try {
       setAddressLoading(true);
+
+      const provinceName = getSelectedProvinceName(addressForm.provinceId);
+      const districtName = getSelectedDistrictName(addressForm.districtId);
+      const wardName = getSelectedWardName(addressForm.wardCode);
+
       const addressData = {
         hoTen: addressForm.name,
         soDienThoai: addressForm.phone,
         diaChiChiTiet: addressForm.address,
-        tinhThanh: addressForm.provinceId,
-        quanHuyen: addressForm.districtId,
-        phuongXa: addressForm.wardCode,
+
+        // ✅ gửi cả ID + tên
+        provinceId: toNumberOrNull(addressForm.provinceId),
+        districtId: toNumberOrNull(addressForm.districtId),
+        wardCode: addressForm.wardCode,
+
+        tinhThanh: provinceName || (addressForm.provinceId != null ? String(addressForm.provinceId) : ""),
+        quanHuyen: districtName || (addressForm.districtId != null ? String(addressForm.districtId) : ""),
+        phuongXa: wardName || (addressForm.wardCode != null ? String(addressForm.wardCode) : ""),
       };
 
       await updateAddress(editingAddressId, addressData);
       message.success("Cập nhật địa chỉ thành công!");
 
-      // Fetch lại danh sách và sắp xếp để đưa địa chỉ vừa cập nhật lên đầu
-     const customerId =
-  localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
+      const customerId =
+        localStorage.getItem("customerId") || sessionStorage.getItem("idTaiKhoan");
       const response = await getAllAddress(customerId);
       const raw = Array.isArray(response) ? response : response?.data || [];
       const mapped = await Promise.all(raw.map(async (a) => {
@@ -817,22 +804,30 @@ const Profile = () => {
         const name = a.name || a.ten || a.hoTen || "";
         const phone = a.phone || a.soDienThoai || "";
         const addressText = a.address || a.diaChiChiTiet || a.diaChi || "";
-        // Lấy ID từ database
-        const provinceId = a.provinceId || a.tinhThanhId || a.tinhThanh || null;
-        const districtId = a.districtId || a.quanHuyenId || a.quanHuyen || null;
-        const wardCode = a.wardCode || a.phuongXa || null;
+
+        const provinceId = toNumberOrNull(
+          a.provinceId ?? a.tinhThanhId ?? a.province_id ?? a.provinceID ?? a.tinhThanh
+        );
+        const districtId = toNumberOrNull(
+          a.districtId ?? a.quanHuyenId ?? a.district_id ?? a.districtID ?? a.quanHuyen
+        );
+        const wardCode = a.wardCode ?? a.ward_code ?? a.phuongXa ?? null;
+
         const isDefault = !!(a.macDinh || a.isDefault || a.diaChiMacDinh);
 
-        // Luôn load tên từ ID qua API, không dùng tên có sẵn
         let province = "";
         let district = "";
         let ward = "";
 
         if (provinceId || districtId || wardCode) {
           const names = await loadAddressNamesFromIds(provinceId, districtId, wardCode);
-          province = names.provinceName || "";
-          district = names.districtName || "";
-          ward = names.wardName || "";
+          province = names.provinceName || a.tinhThanh || "";
+          district = names.districtName || a.quanHuyen || "";
+          ward = names.wardName || a.phuongXa || "";
+        } else {
+          province = a.tinhThanh || "";
+          district = a.quanHuyen || "";
+          ward = a.phuongXa || "";
         }
 
         return {
@@ -851,7 +846,6 @@ const Profile = () => {
         };
       }));
 
-      // Sắp xếp: địa chỉ mặc định lên đầu, sau đó địa chỉ vừa cập nhật
       const sorted = mapped.sort((a, b) => {
         const aId = String(a.id || '');
         const bId = String(b.id || '');
@@ -859,12 +853,9 @@ const Profile = () => {
         const aIsUpdated = aId === editId;
         const bIsUpdated = bId === editId;
 
-        // Ưu tiên 1: Địa chỉ mặc định lên đầu
         if (a.isDefault && !b.isDefault) return -1;
         if (!a.isDefault && b.isDefault) return 1;
 
-        // Ưu tiên 2: Nếu cả hai đều mặc định hoặc cả hai đều không mặc định
-        // Thì địa chỉ vừa cập nhật lên trước (ngay sau địa chỉ mặc định nếu có)
         if (aIsUpdated && !bIsUpdated) return -1;
         if (!aIsUpdated && bIsUpdated) return 1;
 
@@ -930,11 +921,9 @@ const Profile = () => {
   };
 
   const getAvatarUrl = () => {
-    // Ưu tiên preview ảnh mới nếu có (khi đang edit và đã chọn ảnh mới)
     if (avatarPreview) {
       return avatarPreview;
     }
-    // Nếu không có preview, dùng ảnh từ user
     if (user?.anh) {
       if (user.anh.startsWith('http')) return user.anh;
       return `http://localhost:8080${user.anh.startsWith('/') ? '' : '/'}${user.anh}`;
@@ -951,19 +940,16 @@ const Profile = () => {
       return false;
     }
 
-    // Kiểm tra kích thước file (max 5MB)
     if (fileObj.size > 5 * 1024 * 1024) {
       message.error('Kích thước ảnh không được vượt quá 5MB');
       return false;
     }
 
-    // Kiểm tra định dạng file
     if (!fileObj.type.startsWith('image/')) {
       message.error('Chỉ chấp nhận file ảnh');
       return false;
     }
 
-    // Tạo preview ngay lập tức
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target.result;
@@ -974,22 +960,18 @@ const Profile = () => {
     };
     reader.readAsDataURL(fileObj);
 
-    // Lưu file để upload
     setAvatarFile(fileObj);
     return true;
   };
 
   const handleAvatarChange = (info) => {
     const { file } = info;
-
-    // Lấy file object (có thể là file.originFileObj hoặc file trực tiếp)
     const fileObj = file.originFileObj || file;
     processAvatarFile(fileObj);
   };
 
   const handleAvatarRemove = () => {
     setAvatarFile(null);
-    // Reset về ảnh cũ nếu có
     if (user?.anh || user?.anhUrl) {
       const avatarUrl = user.anh || user.anhUrl;
       if (avatarUrl.startsWith('http')) {
@@ -1052,9 +1034,8 @@ const Profile = () => {
                     name="avatar"
                     showUploadList={false}
                     beforeUpload={(file) => {
-                      // Xử lý file ngay khi chọn
                       processAvatarFile(file);
-                      return false; // Ngăn upload tự động
+                      return false;
                     }}
                     onChange={handleAvatarChange}
                     accept="image/*"
@@ -1096,7 +1077,6 @@ const Profile = () => {
                   onClick={() => {
                     setIsEditing(false);
                     setAvatarFile(null);
-                    // Reset preview về ảnh cũ
                     if (user?.anh || user?.anhUrl) {
                       const avatarUrl = user.anh || user.anhUrl;
                       if (avatarUrl.startsWith('http')) {
@@ -1107,7 +1087,6 @@ const Profile = () => {
                     } else {
                       setAvatarPreview(null);
                     }
-                    // Reset form về giá trị ban đầu
                     setEditForm({
                       ten: user.ten || '',
                       email: user.email || '',
@@ -1138,7 +1117,6 @@ const Profile = () => {
                     });
                   } else {
                     setIsEditing(true);
-                    // Reset avatar preview về ảnh hiện tại khi bắt đầu edit
                     if (user?.anh || user?.anhUrl) {
                       const avatarUrl = user.anh || user.anhUrl;
                       if (avatarUrl.startsWith('http')) {
@@ -1153,6 +1131,14 @@ const Profile = () => {
                 {isEditing ? 'Lưu' : 'Chỉnh sửa'}
               </Button>
             </div>
+            <Button
+              icon={<LockOutlined />}
+              size="large"
+              onClick={handleChangePassword}
+              disabled={isEditing} // optional: đang sửa thì disable cho khỏi rối
+            >
+              Đổi mật khẩu
+            </Button>
           </div>
         </Card>
 

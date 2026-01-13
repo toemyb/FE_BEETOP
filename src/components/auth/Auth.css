@@ -1,169 +1,121 @@
 /* Page */
-.authPage {
+.authPageLite {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 24px;
-  background:
-    radial-gradient(900px 500px at 15% 10%, rgba(59, 130, 246, 0.18), transparent 60%),
-    radial-gradient(900px 500px at 90% 25%, rgba(16, 185, 129, 0.14), transparent 55%),
-    #f5f7fb;
+  background: #f5f7fb;
 }
 
 /* Card */
-.authShell {
-  width: min(980px, 100%);
-  border-radius: 22px;
-  overflow: hidden;
-  box-shadow: 0 18px 60px rgba(17, 24, 39, 0.14);
-  border: 1px solid rgba(17, 24, 39, 0.06);
+.authCardWhite {
+  width: min(420px, 92vw);
   background: #fff;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
-/* Left panel (Brand) */
-.authBrand {
+  border-radius: 18px;
   padding: 26px 26px 22px;
-  color: #fff;
-  background: linear-gradient(160deg, #0b1b3a 0%, #0a2a57 45%, #0b3a7a 100%);
-  position: relative;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 18px 60px rgba(17, 24, 39, 0.12);
 }
 
-.authBrand::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.10) 0 2px, transparent 3px),
-    radial-gradient(circle at 70% 55%, rgba(255, 255, 255, 0.08) 0 2px, transparent 3px);
-  background-size: 90px 90px, 120px 120px;
-  opacity: .65;
-  pointer-events: none;
+/* Header */
+.authHeader {
+  text-align: center;
+  margin-bottom: 18px;
 }
 
-.brandTop, .brandTitle, .brandList, .brandNote {
-  position: relative;
-  z-index: 1;
+.authLogo {
+  height: 64px;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
 }
 
-.brandTop {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.brandIcon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  font-size: 20px;
-}
-
-.brandName {
-  font-weight: 900;
-  letter-spacing: .2px;
-  font-size: 18px;
-  margin: 0;
-}
-
-.brandSub {
-  margin-top: 2px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.brandTitle {
-  margin: 16px 0 8px;
-  font-size: 24px;
-  font-weight: 900;
-  letter-spacing: .4px;
-}
-
-.brandList {
-  margin: 12px 0 0;
-  padding-left: 18px;
-  color: rgba(255, 255, 255, 0.80);
-  font-size: 13px;
-}
-.brandList li { margin: 10px 0; }
-
-.brandNote {
-  margin-top: 16px;
-  padding: 12px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.80);
-  font-size: 13px;
-}
-
-/* Right panel (Form) */
-.authPanel {
-  padding: 26px 26px 22px;
-  background: #fff;
-}
-
-.panelHead h2 {
+.authTitle {
   margin: 0;
   font-size: 22px;
   font-weight: 900;
   color: #111827;
+  line-height: 1.2;
 }
 
-.panelHead p {
-  margin: 6px 0 16px;
-  color: rgba(17, 24, 39, 0.55);
+.authSub {
+  margin: 6px 0 0;
   font-size: 13px;
+  color: rgba(17, 24, 39, 0.55);
 }
 
-/* Inputs & Buttons */
-.authInputRound .ant-input,
-.authInputRound.ant-input-affix-wrapper {
+/* Antd Form spacing */
+.authCardWhite .ant-form-item {
+  margin-bottom: 14px;
+}
+
+.authCardWhite .ant-form-item-label > label {
+  font-weight: 600;
+  color: rgba(17, 24, 39, 0.85);
+}
+
+/* Make input same height & round */
+.authInput.ant-input-affix-wrapper,
+.authInput .ant-input {
+  height: 44px;
   border-radius: 12px !important;
+  padding: 0 12px;
 }
 
-.btnFull {
+.authInput.ant-input-affix-wrapper .ant-input {
+  height: 42px;
+}
+
+.authInput.ant-input-affix-wrapper .ant-input-prefix {
+  margin-right: 10px;
+  color: rgba(17, 24, 39, 0.45);
+}
+
+.authInput.ant-input-affix-wrapper .ant-input-suffix {
+  color: rgba(17, 24, 39, 0.45);
+}
+
+/* Button */
+.authBtn {
   width: 100%;
   height: 44px;
   border-radius: 12px;
   font-weight: 800;
+  margin-top: 4px;
 }
 
-.btnGhost {
-  width: 100%;
-  height: 44px;
-  border-radius: 12px;
-  font-weight: 800;
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  background: #fff;
-}
-
-.rowBetween {
+/* Row remember/forgot */
+.authRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin: -4px 0 12px;
+  margin: 6px 0 14px;
 }
 
-.linkBtn {
+/* Align checkbox nicer */
+.authRow .ant-checkbox-wrapper {
+  align-items: center;
+}
+
+/* Link */
+.authLink {
   border: none;
   background: transparent;
   cursor: pointer;
   padding: 0;
   color: #2563eb;
   font-size: 13px;
+  font-weight: 600;
 }
 
-.linkBtn:hover { text-decoration: underline; }
+.authLink:hover {
+  text-decoration: underline;
+}
 
-.formError {
-  margin: 6px 0 12px;
+/* Error */
+.authError {
+  margin: 0 0 12px;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(255, 77, 79, 0.10);
@@ -172,36 +124,33 @@
   font-size: 13px;
 }
 
-.hrText {
-  text-align: center;
-  margin: 12px 0 10px;
-  font-size: 12.5px;
-  color: rgba(17, 24, 39, 0.55);
-}
-
-.bottomText {
+/* Bottom */
+.authBottom {
   margin-top: 14px;
   text-align: center;
   font-size: 13px;
   color: rgba(17, 24, 39, 0.60);
 }
 
-/* Single card variant (Forgot/Reset) */
-.authShellOne {
-  width: min(420px, 100%);
-  border-radius: 18px;
-  overflow: hidden;
-  box-shadow: 0 18px 60px rgba(17, 24, 39, 0.14);
-  border: 1px solid rgba(17, 24, 39, 0.06);
-  background: #fff;
-}
+/* dùng lại cho mọi form auth */
+.authHeader { text-align: center; margin-bottom: 18px; }
+.authLogo { height: 64px; width: auto; object-fit: contain; display:block; margin:0 auto 10px; }
+.authTitle { margin: 0; font-size: 22px; font-weight: 900; color: #111827; line-height: 1.2; }
+.authSub { margin: 6px 0 0; font-size: 13px; color: rgba(17,24,39,.55); }
 
-.authPanelOne {
-  padding: 22px 20px 18px;
-}
+.authCardWhite .ant-form-item { margin-bottom: 14px; }
+.authCardWhite .ant-form-item-label > label { font-weight: 600; color: rgba(17,24,39,.85); }
 
-/* Responsive */
-@media (max-width: 880px) {
-  .authShell { grid-template-columns: 1fr; }
-  .authBrand { display: none; }
+.authInput.ant-input-affix-wrapper,
+.authInput .ant-input {
+  height: 44px;
+  border-radius: 12px !important;
+  padding: 0 12px;
 }
+.authInput.ant-input-affix-wrapper .ant-input { height: 42px; }
+.authInput.ant-input-affix-wrapper .ant-input-prefix { margin-right: 10px; color: rgba(17,24,39,.45); }
+
+.authBtn { width: 100%; height: 44px; border-radius: 12px; font-weight: 800; margin-top: 4px; }
+
+.authBottom { margin-top: 14px; text-align: center; font-size: 13px; color: rgba(17,24,39,.60); }
+
