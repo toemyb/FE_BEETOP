@@ -248,15 +248,14 @@ const CustomerInfoCard = ({ orders = [] }) => {
   }, [orderInfo.address]);
 
   const totalOrders = orders.length;
-  const totalSpent = orders.reduce((sum, order) => {
-    const orderAmount = order.tongTienThuHo || 0;
- 
-    if (order.trangThai === 7) {
-      return sum - orderAmount;
-    }
-  
-    return sum + orderAmount;
-  }, 0);
+  const totalSpent = useMemo(() => {
+    return orders.reduce((sum, order) => {
+      const amount = Number(order?.tongTienThuHo || 0);
+
+      // ✅ Chỉ tính đơn HOÀN THÀNH (trangThai = 6)
+      return Number(order?.trangThai) === 6 ? sum + amount : sum;
+    }, 0);
+  }, [orders]);
 
   const joinedDate = React.useMemo(() => {
     if (orders.length > 0) {

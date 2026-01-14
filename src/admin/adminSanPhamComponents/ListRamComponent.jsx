@@ -23,8 +23,22 @@ const ListRamComponent = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+  // ✅ Phân quyền: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -45,13 +59,13 @@ const ListRamComponent = () => {
     let temp = [...ramList];
 
     if (searchText.trim()) {
-      temp = temp.filter(item =>
+      temp = temp.filter((item) =>
         item.dungLuongRam?.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
     if (filterTrangThai !== 'all') {
-      temp = temp.filter(item => item.trangThai === Number(filterTrangThai));
+      temp = temp.filter((item) => item.trangThai === Number(filterTrangThai));
     }
 
     if (sortOption === 'az') {
@@ -81,7 +95,8 @@ const ListRamComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
       render: (_, __, index) =>
@@ -94,7 +109,7 @@ const ListRamComponent = () => {
     {
       title: 'Dung lượng RAM',
       dataIndex: 'dungLuongRam',
-      render: text => <strong>{text}</strong>,
+      render: (text) => <strong>{text}</strong>,
     },
     {
       title: 'Bus',
@@ -108,10 +123,15 @@ const ListRamComponent = () => {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
       render: (val) =>
-        val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngưng</Tag>,
+        val === 1 ? (
+          <Tag color="green">Hoạt động</Tag>
+        ) : (
+          <Tag color="red">Ngưng</Tag>
+        ),
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -120,9 +140,13 @@ const ListRamComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div style={{ padding: 24 }}>
-
       <h2>Danh sách RAM</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -134,35 +158,30 @@ const ListRamComponent = () => {
           style={{ width: 200 }}
         />
 
-     
-
         <span>Trạng thái:</span>
-        <Select
-          value={filterTrangThai}
-          onChange={setFilterTrangThai}
-          style={{ width: 140 }}
-        >
+        <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 140 }}>
           <Option value="all">Tất cả</Option>
           <Option value="1">Hoạt động</Option>
           <Option value="0">Ngưng</Option>
         </Select>
 
         <span>Sắp xếp:</span>
-        <Select
-          value={sortOption}
-          onChange={setSortOption}
-          style={{ width: 140 }}
-        >
+        <Select value={sortOption} onChange={setSortOption} style={{ width: 140 }}>
           <Option value="default">Mặc định</Option>
           <Option value="az">Dung lượng A-Z</Option>
           <Option value="za">Dung lượng Z-A</Option>
         </Select>
-   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
           Làm mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm RAM
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm RAM
+          </Button>
+        )}
       </Space>
 
       <Table
@@ -186,7 +205,8 @@ const ListRamComponent = () => {
         }}
       />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal */}
+      {!isEmployee && modalVisible && (
         <AddRamModal
           open={modalVisible}
           id={editingId}

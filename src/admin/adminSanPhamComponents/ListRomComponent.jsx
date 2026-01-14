@@ -3,7 +3,6 @@ import { Table, Button, Tag, Input, Select, Space, message } from 'antd';
 import { listRom } from '../../service/RomService';
 import AddRomModal from './AddRomComponent'; // modal dạng form
 
-
 const { Option } = Select;
 
 const ListRomComponent = () => {
@@ -23,6 +22,9 @@ const ListRomComponent = () => {
     pageSize: 5,
   });
 
+  // ✅ Phân quyền: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -38,20 +40,31 @@ const ListRomComponent = () => {
   };
 
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     let temp = [...romList];
 
     if (searchText.trim()) {
-      temp = temp.filter(item =>
+      temp = temp.filter((item) =>
         item.dungLuongSsd?.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
     if (filterTrangThai !== 'all') {
-      temp = temp.filter(item => item.trangThai === Number(filterTrangThai));
+      temp = temp.filter((item) => item.trangThai === Number(filterTrangThai));
     }
 
     if (sortOption === 'az') {
@@ -81,10 +94,12 @@ const ListRomComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
-      render: (_, __, index) => (pagination.current - 1) * pagination.pageSize + index + 1,
+      render: (_, __, index) =>
+        (pagination.current - 1) * pagination.pageSize + index + 1,
     },
     {
       title: 'Mã ROM',
@@ -93,7 +108,7 @@ const ListRomComponent = () => {
     {
       title: 'Dung lượng SSD',
       dataIndex: 'dungLuongSsd',
-      render: text => <strong>{text}</strong>,
+      render: (text) => <strong>{text}</strong>,
     },
     {
       title: 'Loại SSD',
@@ -114,10 +129,12 @@ const ListRomComponent = () => {
     {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
-      render: val => val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngưng</Tag>,
+      render: (val) =>
+        val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngưng</Tag>,
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -126,9 +143,13 @@ const ListRomComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div style={{ padding: 24 }}>
-  
       <h2>Danh sách ROM</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -139,7 +160,6 @@ const ListRomComponent = () => {
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 200 }}
         />
-     
 
         <span>Trạng thái:</span>
         <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 140 }}>
@@ -154,12 +174,17 @@ const ListRomComponent = () => {
           <Option value="az">Dung lượng A-Z</Option>
           <Option value="za">Dung lượng Z-A</Option>
         </Select>
-   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
           Làm mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm ROM
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm ROM
+          </Button>
+        )}
       </Space>
 
       <Table
@@ -180,7 +205,8 @@ const ListRomComponent = () => {
         }}
       />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal */}
+      {!isEmployee && modalVisible && (
         <AddRomModal
           open={modalVisible}
           id={editingId}

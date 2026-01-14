@@ -16,6 +16,21 @@ import {
   updateAnh,
 } from "../../service/AnhService";
 
+// ✅ chuẩn hoá url + chống cache
+const normalizeImgUrl = (url) => {
+  if (!url) return null;
+  let u = String(url).trim().replaceAll("\\", "/");
+  // cloudinary http -> https (tránh mixed content)
+  if (u.startsWith("http://res.cloudinary.com/")) {
+    u = u.replace("http://", "https://");
+  }
+  return u;
+};
+
+const bustCache = (src) =>
+  src ? `${src}${src.includes("?") ? "&" : "?"}v=${Date.now()}` : null;
+
+
 // nhận props giống AddSeri: idLaptopCt + onClose
 const AddAnhComponent = ({ idLaptopCt: propIdLaptopCt, onClose }) => {
   const params = useParams();
@@ -134,16 +149,23 @@ const AddAnhComponent = ({ idLaptopCt: propIdLaptopCt, onClose }) => {
       width: 140,
     },
     {
-      title: "Ảnh",
-      dataIndex: "imgURL",
-      width: 160,
-      render: (url) =>
-        url ? (
-          <Image src={url} width={80} height={80} style={{ objectFit: "cover" }} />
-        ) : (
-          <span style={{ color: "#aaa" }}>(Chưa có)</span>
-        ),
-    },
+  title: "Ảnh",
+  dataIndex: "imgURL",
+  width: 160,
+  render: (url) => {
+    const src = normalizeImgUrl(url);
+    return src ? (
+      <Image
+        src={bustCache(src)}   // ✅ chống cache khi update
+        width={80}
+        height={80}
+        style={{ objectFit: "cover" }}
+      />
+    ) : (
+      <span style={{ color: "#aaa" }}>(Chưa có)</span>
+    );
+  },
+},
     {
       title: "URL",
       dataIndex: "imgURL",

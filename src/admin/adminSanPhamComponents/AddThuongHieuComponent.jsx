@@ -1,20 +1,34 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select } from 'antd';
-import {
-  addThuongHieu,
-  getAllById,
-  updateThuongHieu,
-} from '../../service/ThuongHieuService';
-import useToast from '../../hooks/useNotify';
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Form, Input, Select } from "antd";
+import { toast } from "react-toastify";
+import { addThuongHieu, getAllById, updateThuongHieu } from "../../service/ThuongHieuService";
 
 const { Option } = Select;
 
 const AddThuongHieuModal = ({ open, id, onClose, onSuccess }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const { success, error } = useToast();
+  const tenRef = useRef(null);
+
+  const isDuplicate = (err) => {
+    const status = err?.response?.status;
+    const msg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      err?.message ||
+      "";
+    return status === 409 || /trùng|đã tồn tại|duplicate|exists/i.test(String(msg));
+  };
+
+  const getBeMsg = (err) =>
+    err?.response?.data?.message || err?.response?.data?.error || err?.message || "";
 
   useEffect(() => {
+    if (!open) return;
+
+    // clear lỗi cũ
+    form.setFields([{ name: "ten", errors: [] }]);
+
     if (id) {
       getAllById(id)
         .then((res) => {
@@ -23,6 +37,7 @@ const AddThuongHieuModal = ({ open, id, onClose, onSuccess }) => {
             res?.data?.content ??
             (Array.isArray(res?.data) ? res.data : res?.data) ??
             null;
+
           if (data) {
             form.setFieldsValue({
               ten: data.ten,
@@ -30,90 +45,89 @@ const AddThuongHieuModal = ({ open, id, onClose, onSuccess }) => {
               trangThai: Number(data.trangThai ?? 1),
             });
           } else {
-            error('Không tìm thấy dữ liệu Thương hiệu');
+            toast.error("Không tìm thấy dữ liệu Thương hiệu");
           }
         })
-        .catch(() => {
-          error('Không thể tải dữ liệu Thương hiệu');
+        .catch((e) => {
+          console.error(e);
+          toast.error("Không thể tải dữ liệu Thương hiệu");
         });
     } else {
       form.resetFields();
       form.setFieldsValue({ trangThai: 1 });
+      setTimeout(() => tenRef.current?.focus?.(), 0);
     }
-  }, [id, form, error]);
+  }, [open, id, form]);
 
-  // Hàm thực sự gọi API
   const doSubmit = async (values) => {
     try {
       setLoading(true);
+      form.setFields([{ name: "ten", errors: [] }]);
 
       const payload = {
         ...values,
         trangThai: Number(values.trangThai ?? 1),
       };
 
-      const req = id
-        ? updateThuongHieu({ id, ...payload })
-        : addThuongHieu(payload);
-
+      const req = id ? updateThuongHieu({ id, ...payload }) : addThuongHieu(payload);
       await req;
 
-      success(
-        id
-          ? `Đã cập nhật thương hiệu: ${values.ten}`
-          : `Đã thêm thương hiệu: ${values.ten}`
-      );
-      onSuccess?.(id ? 'edit' : 'add', values.ten);
-      onClose();
+      toast.success(id ? `Đã cập nhật thương hiệu: ${values.ten}` : `Đã thêm thương hiệu: ${values.ten}`);
+      onSuccess?.(id ? "edit" : "add", values.ten);
+      onClose?.();
     } catch (err) {
-      console.error('Lỗi khi submit Thương hiệu:', err);
-      error(id ? 'Cập nhật thất bại' : 'Thêm mới thất bại');
+      console.error("Lỗi khi submit Thương hiệu:", err);
+
+      if (isDuplicate(err)) {
+        const msg = `Thương hiệu "${values.ten}" đã tồn tại. Vui lòng nhập tên khác.`;
+        toast.error(msg);
+        form.setFields([{ name: "ten", errors: [msg] }]);
+        setTimeout(() => tenRef.current?.focus?.(), 0);
+        return;
+      }
+
+      const beMsg = getBeMsg(err);
+      toast.error(beMsg || (id ? "Cập nhật thất bại" : "Thêm mới thất bại"));
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  // Nút OK: validate + popup xác nhận
   const handleOk = async () => {
+    if (loading) return;
+
     try {
       const values = await form.validateFields();
 
-      if (id) {
-        Modal.confirm({
-          title: 'Xác nhận cập nhật',
-          content: `Bạn có chắc chắn muốn thay đổi thương hiệu "${values.ten}"?`,
-          okText: 'Đồng ý',
-          cancelText: 'Hủy',
-          centered: true,
-          onOk: () => doSubmit(values),
-        });
-      } else {
-        Modal.confirm({
-          title: 'Xác nhận thêm mới',
-          content: `Bạn có chắc chắn muốn thêm thương hiệu "${values.ten}"?`,
-          okText: 'Đồng ý',
-          cancelText: 'Hủy',
-          centered: true,
-          onOk: () => doSubmit(values),
-        });
-      }
+      Modal.confirm({
+        title: id ? "Xác nhận cập nhật" : "Xác nhận thêm mới",
+        content: id
+          ? `Bạn có chắc chắn muốn thay đổi thương hiệu "${values.ten}"?`
+          : `Bạn có chắc chắn muốn thêm thương hiệu "${values.ten}"?`,
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => doSubmit(values),
+      });
     } catch (err) {
-      if (err?.errorFields) {
-        error('Vui lòng kiểm tra lại các trường bắt buộc');
-      }
+      if (err?.errorFields) toast.error("Vui lòng kiểm tra lại các trường bắt buộc");
     }
   };
 
   return (
     <Modal
       open={open}
-      title={id ? 'CẬP NHẬT THƯƠNG HIỆU' : 'THÊM THƯƠNG HIỆU'}
-      onCancel={onClose}
+      title={id ? "CẬP NHẬT THƯƠNG HIỆU" : "THÊM THƯƠNG HIỆU"}
+      onCancel={() => {
+        if (!loading) onClose?.();
+      }}
       onOk={handleOk}
       okText="Xác nhận"
       cancelText="Hủy"
       confirmLoading={loading}
+      okButtonProps={{ disabled: loading }}
+      cancelButtonProps={{ disabled: loading }}
       destroyOnClose
       centered
     >
@@ -121,9 +135,9 @@ const AddThuongHieuModal = ({ open, id, onClose, onSuccess }) => {
         <Form.Item
           label="Tên Thương Hiệu"
           name="ten"
-          rules={[{ required: true, message: 'Vui lòng nhập Tên Thương Hiệu' }]}
+          rules={[{ required: true, message: "Vui lòng nhập Tên Thương Hiệu" }]}
         >
-          <Input placeholder="Ví dụ: Lenovo" />
+          <Input ref={tenRef} placeholder="Ví dụ: Lenovo" />
         </Form.Item>
 
         <Form.Item label="Mô Tả" name="moTa">
@@ -133,7 +147,7 @@ const AddThuongHieuModal = ({ open, id, onClose, onSuccess }) => {
         <Form.Item
           label="Trạng thái"
           name="trangThai"
-          rules={[{ required: true, message: 'Vui lòng chọn Trạng thái' }]}
+          rules={[{ required: true, message: "Vui lòng chọn Trạng thái" }]}
         >
           <Select>
             <Option value={1}>Hoạt động</Option>

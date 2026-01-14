@@ -3,7 +3,6 @@ import { Table, Button, Input, Select, Space, Tag } from 'antd';
 import { listKichthuoc } from '../../service/KichThuocService';
 import AddKichThuocModal from './AddKichThuocComponent';
 
-
 const { Option } = Select;
 
 const s = (v) => String(v ?? '');
@@ -30,7 +29,23 @@ const ListKichThuocComponent = () => {
 
   const [pagination, setPagination] = useState({ current: 1, pageSize: 5 });
 
-  useEffect(() => { fetchData(); }, []);
+  // ✅ role: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
+  useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,12 +81,13 @@ const ListKichThuocComponent = () => {
     // 🔎 Tìm theo idKichThuoc hoặc giá trị số
     if (searchText.trim()) {
       const q = lower(searchText);
-      temp = temp.filter((it) =>
-        lower(it?.idKichThuoc).includes(q) ||
-        lower(s(it?.chieuDai)).includes(q) ||
-        lower(s(it?.chieuRong)).includes(q) ||
-        lower(s(it?.chieuCao)).includes(q) ||
-        lower(s(it?.khoiLuong)).includes(q)
+      temp = temp.filter(
+        (it) =>
+          lower(it?.idKichThuoc).includes(q) ||
+          lower(s(it?.chieuDai)).includes(q) ||
+          lower(s(it?.chieuRong)).includes(q) ||
+          lower(s(it?.chieuCao)).includes(q) ||
+          lower(s(it?.khoiLuong)).includes(q)
       );
     }
 
@@ -122,10 +138,18 @@ const ListKichThuocComponent = () => {
     fetchData();
   };
 
-  const openModal = (id = null) => { setEditingId(id); setModalVisible(true); };
-  const closeModal = () => { setModalVisible(false); setEditingId(null); fetchData(); };
+  const openModal = (id = null) => {
+    setEditingId(id);
+    setModalVisible(true);
+  };
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingId(null);
+    fetchData();
+  };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
       render: (_v, _r, index) =>
@@ -151,6 +175,7 @@ const ListKichThuocComponent = () => {
 
     {
       title: 'Hành động',
+      key: 'action',
       render: (_v, record) => (
         <Button type="link" onClick={() => openModal(record?.id)}>
           Sửa
@@ -160,9 +185,13 @@ const ListKichThuocComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div style={{ padding: 24 }}>
-   
       <h2>Danh sách Kích thước</h2>
 
       <Space style={{ marginBottom: 16, flexWrap: 'wrap', gap: 12 }} size="middle">
@@ -173,8 +202,6 @@ const ListKichThuocComponent = () => {
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 260 }}
         />
-
-      
 
         <span>Sắp xếp:</span>
         <Select value={sortOption} onChange={setSortOption} style={{ width: 200 }}>
@@ -193,21 +220,22 @@ const ListKichThuocComponent = () => {
 
         {/* 🔥 Filter trạng thái giống Đồ họa */}
         <span>Trạng thái:</span>
-        <Select
-          value={filterTrangThai}
-          onChange={setFilterTrangThai}
-          style={{ width: 160 }}
-        >
+        <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 160 }}>
           <Option value="all">Tất cả</Option>
           <Option value="1">Đang hoạt động</Option>
           <Option value="0">Ngừng hoạt động</Option>
         </Select>
-  <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
           Làm Mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm Kích thước
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm Kích thước
+          </Button>
+        )}
       </Space>
 
       <Table
@@ -228,7 +256,8 @@ const ListKichThuocComponent = () => {
         }}
       />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal (phòng trường hợp mở bằng code) */}
+      {!isEmployee && modalVisible && (
         <AddKichThuocModal
           open={modalVisible}
           id={editingId}

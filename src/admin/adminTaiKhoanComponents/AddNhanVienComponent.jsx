@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import userService from "../../service/userService";
 import api from "../../service/api"; // ✅ ADD
 import { getGHNProvinces, getGHNDistricts, getGHNWards } from "../../service/ghnApi";
-
+import 'react-toastify/dist/ReactToastify.css';
 const { Option } = Select;
 
 const removeAccents = (str) => {

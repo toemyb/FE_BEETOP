@@ -5,9 +5,9 @@ const REST_API_URL = "/api/anh";
 export const getAnhByLaptopCt = (idLaptopCt) =>
   api.get(`${REST_API_URL}/by-laptop-ct/${idLaptopCt}`);
 
-export const uploadAnh = (idLaptopChiTiet, file) => {
+export const uploadAnh = (idLaptopCt, file) => {
   const formData = new FormData();
-  formData.append("idLaptopChiTiet", idLaptopChiTiet);
+  formData.append("idLaptopChiTiet", idLaptopCt);
   formData.append("file", file);
 
   return api.post(`${REST_API_URL}/upload`, formData, {

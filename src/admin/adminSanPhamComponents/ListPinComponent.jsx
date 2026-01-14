@@ -3,7 +3,6 @@ import { Table, Button, Input, Select, Space, Tag } from 'antd';
 import { listPin } from '../../service/PinService';
 import AddPinModal from './AddPinComponent';
 
-
 const { Option } = Select;
 
 const s = (v) => String(v ?? '');
@@ -20,6 +19,9 @@ const ListPinComponent = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+  // ✅ Phân quyền: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   // ✅ Phân trang
   const [pagination, setPagination] = useState({
     current: 1,
@@ -27,7 +29,18 @@ const ListPinComponent = () => {
   });
 
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -57,9 +70,7 @@ const ListPinComponent = () => {
     if (searchText.trim()) {
       const q = lower(searchText);
       temp = temp.filter(
-        (item) =>
-          lower(item?.idPin).includes(q) ||
-          lower(item?.dungLuong).includes(q)
+        (item) => lower(item?.idPin).includes(q) || lower(item?.dungLuong).includes(q)
       );
     }
 
@@ -93,11 +104,11 @@ const ListPinComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
-      render: (_v, _r, index) =>
-        (pagination.current - 1) * pagination.pageSize + index + 1,
+      render: (_v, _r, index) => (pagination.current - 1) * pagination.pageSize + index + 1,
     },
     {
       title: 'Mã Pin',
@@ -119,16 +130,19 @@ const ListPinComponent = () => {
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_v, record) => (
-        <Button
-          type="link"
-          onClick={() => openModal(record?.id)}
-        >
+        <Button type="link" onClick={() => openModal(record?.id)}>
           Sửa
         </Button>
       ),
     },
   ];
+
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -143,8 +157,6 @@ const ListPinComponent = () => {
           style={{ width: 220 }}
         />
 
-     
-
         <span>Sắp xếp:</span>
         <Select value={sortOption} onChange={setSortOption} style={{ width: 160 }}>
           <Option value="default">Mặc định</Option>
@@ -153,12 +165,17 @@ const ListPinComponent = () => {
           <Option value="dl_az">Dung lượng A-Z</Option>
           <Option value="dl_za">Dung lượng Z-A</Option>
         </Select>
-   <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
           Làm Mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm Pin
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm Pin
+          </Button>
+        )}
       </Space>
 
       <Table
@@ -182,7 +199,8 @@ const ListPinComponent = () => {
         }}
       />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal */}
+      {!isEmployee && modalVisible && (
         <AddPinModal
           open={modalVisible}
           id={editingId}

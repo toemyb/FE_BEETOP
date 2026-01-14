@@ -7,7 +7,6 @@ import {
   Space,
   Tag,
   message,
-  Card,
   Row,
   Col,
   Typography,
@@ -39,8 +38,22 @@ const ListManHinhComponent = () => {
 
   const [pagination, setPagination] = useState({ current: 1, pageSize: 5 });
 
+  // ✅ role: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -118,7 +131,8 @@ const ListManHinhComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
       width: 70,
@@ -162,6 +176,7 @@ const ListManHinhComponent = () => {
     },
     {
       title: 'Hành động',
+      key: 'action',
       width: 90,
       align: 'center',
       render: (_v, record) => (
@@ -172,116 +187,95 @@ const ListManHinhComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div
       style={{
         padding: '24px',
-       
       }}
     >
-      
-        {/* Header */}
-        <Row
-          justify="space-between"
-          align="middle"
-          style={{ marginBottom: 16 }}
+      {/* Header */}
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Title level={3} style={{ margin: 0 }}>
+            Danh sách màn hình
+          </Title>
+        </Col>
+      </Row>
+
+      {/* Thanh filter */}
+      <Space style={{ marginBottom: 16, width: '100%' }} size="middle" wrap>
+        <Input
+          placeholder="Tìm mã hoặc độ phân giải"
+          value={search}
+          allowClear
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 160 }}
+        />
+
+        <span>Tần số:</span>
+        <Select value={filterTanSo} onChange={setFilterTanSo} style={{ width: 160 }}>
+          <Option value="all">Tất cả</Option>
+          <Option value="60">60Hz</Option>
+          <Option value="75">75Hz</Option>
+          <Option value="120">120Hz</Option>
+          <Option value="144">144Hz</Option>
+        </Select>
+
+        <span>Kích thước:</span>
+        <Select value={sortSize} onChange={setSortSize} style={{ width: 160 }}>
+          <Option value="default">Mặc định</Option>
+          <Option value="az">Kích thước A-Z</Option>
+          <Option value="za">Kích thước Z-A</Option>
+        </Select>
+
+        <span>Trạng thái:</span>
+        <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 160 }}>
+          <Option value="all">Tất cả</Option>
+          <Option value="1">Hoạt động</Option>
+          <Option value="0">Ngưng hoạt động</Option>
+        </Select>
+
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={handleRefresh}
+          style={{ background: '#FFD700', color: '#000' }}
         >
+          Làm mới
+        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
           <Col>
-            <Title level={3} style={{ margin: 0 }}>
-              Danh sách màn hình
-            </Title>
-          </Col>
-          
-        </Row>
-
-        {/* Thanh filter */}
-        <Space
-          style={{ marginBottom: 16, width: '100%' }}
-          size="middle"
-          wrap
-        >
-          <Input
-            placeholder="Tìm mã hoặc độ phân giải"
-            value={search}
-            allowClear
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 160 }}
-          />
-
-          
-
-          <span>Tần số:</span>
-          <Select
-            value={filterTanSo}
-            onChange={setFilterTanSo}
-            style={{ width: 160 }}
-          >
-            <Option value="all">Tất cả</Option>
-            <Option value="60">60Hz</Option>
-            <Option value="75">75Hz</Option>
-            <Option value="120">120Hz</Option>
-            <Option value="144">144Hz</Option>
-          </Select>
-
-          <span>Kích thước:</span>
-          <Select
-            value={sortSize}
-            onChange={setSortSize}
-            style={{ width: 160 }}
-          >
-            <Option value="default">Mặc định</Option>
-            <Option value="az">Kích thước A-Z</Option>
-            <Option value="za">Kích thước Z-A</Option>
-          </Select>
-
-          <span>Trạng thái:</span>
-          <Select
-            value={filterTrangThai}
-            onChange={setFilterTrangThai}
-            style={{ width: 160 }}
-          >
-            <Option value="all">Tất cả</Option>
-            <Option value="1">Hoạt động</Option>
-            <Option value="0">Ngưng hoạt động</Option>
-          </Select>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={handleRefresh}
-            style={{ background: '#FFD700', color: '#000' }}
-          >
-            Làm mới
-          </Button>
-          <Col>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-            >
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
               Thêm Màn Hình
             </Button>
           </Col>
-        </Space>
+        )}
+      </Space>
 
-        {/* Bảng */}
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={filtered}
-          loading={loading}
-          bordered
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            pageSizeOptions: ['5', '10', '20'],
-            total: filtered.length,
-          }}
-          onChange={(pag) =>
-            setPagination({ current: pag.current, pageSize: pag.pageSize })
-          }
-        />
-   
+      {/* Bảng */}
+      <Table
+        rowKey="id"
+        columns={columns}
+        dataSource={filtered}
+        loading={loading}
+        bordered
+        pagination={{
+          ...pagination,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20'],
+          total: filtered.length,
+        }}
+        onChange={(pag) => setPagination({ current: pag.current, pageSize: pag.pageSize })}
+      />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal */}
+      {!isEmployee && modalVisible && (
         <AddManHinhModal
           open={modalVisible}
           id={editingId}

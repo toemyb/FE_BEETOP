@@ -1,16 +1,43 @@
-import React, { useEffect } from 'react';
-import { Modal, Form, Input, Select } from 'antd';
-import { addHeDieuHanh, getAllById, updateHeDieuHanh } from '../../service/HeDieuHanhService';
-import useToast from '../../hooks/useNotify';
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Form, Input, Select } from "antd";
+import { toast } from "react-toastify";
+import {
+  addHeDieuHanh,
+  getAllById,
+  updateHeDieuHanh,
+} from "../../service/HeDieuHanhService";
 
 const { Option } = Select;
 
 const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
   const [form] = Form.useForm();
-  const { success, error } = useToast();
+  const [loading, setLoading] = useState(false);
+  const maRef = useRef(null);
 
+  const isDuplicate = (err) => {
+    const status = err?.response?.status;
+    const msg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      err?.message ||
+      "";
+    return status === 409 || /trùng|đã tồn tại|duplicate|exists/i.test(String(msg));
+  };
+
+  const getBeMsg = (err) =>
+    err?.response?.data?.message ||
+    err?.response?.data?.error ||
+    err?.message ||
+    "";
+
+  // ===== Load data khi edit =====
   useEffect(() => {
-    if (id && open) {
+    if (!open) return;
+
+    // clear lỗi cũ
+    form.setFields([{ name: "ma", errors: [] }]);
+
+    if (id) {
       getAllById(id)
         .then((res) => {
           const data =
@@ -20,106 +47,134 @@ const AddHeDieuHanhModal = ({ open, id, onClose, onSuccess }) => {
             null;
 
           if (data) {
-            form.setFieldsValue(data);
+            form.setFieldsValue({
+              ma: data.ma,
+              ten: data.ten,
+              trangThai: Number(data.trangThai ?? 1),
+            });
+          } else {
+            toast.error("Không tìm thấy dữ liệu hệ điều hành");
           }
         })
-        .catch(() => error('Không thể tải dữ liệu hệ điều hành'));
-    } else if (open) {
-      form.resetFields();
-    }
-  }, [id, open, form, error]);
-
-  const doSave = async (values) => {
-    if (id) {
-      // 🟡 GỌI API UPDATE
-      await updateHeDieuHanh({ id, ...values });
-      success('Cập nhật hệ điều hành thành công!');
+        .catch((e) => {
+          console.error(e);
+          toast.error("Không thể tải dữ liệu hệ điều hành");
+        });
     } else {
-      // 🟢 GỌI API ADD
-      await addHeDieuHanh(values);
-      success('Thêm hệ điều hành thành công!');
+      form.resetFields();
+      form.setFieldsValue({ trangThai: 1 });
+      setTimeout(() => maRef.current?.focus?.(), 0);
     }
+  }, [open, id, form]);
 
-    onSuccess?.();
-    onClose();
+  // ===== Save =====
+  const doSave = async (values) => {
+    try {
+      setLoading(true);
+      form.setFields([{ name: "ma", errors: [] }]);
+
+      const payload = {
+        ...values,
+        trangThai: Number(values.trangThai ?? 1),
+      };
+
+      if (id) {
+        await updateHeDieuHanh({ id, ...payload });
+        toast.success(`Cập nhật hệ điều hành "${values.ten}" thành công`);
+      } else {
+        await addHeDieuHanh(payload);
+        toast.success(`Thêm hệ điều hành "${values.ten}" thành công`);
+      }
+
+      onSuccess?.(id ? "edit" : "add", values.ma);
+      onClose?.();
+    } catch (err) {
+      console.error("Lỗi lưu hệ điều hành:", err);
+
+      // ❌ trùng mã
+      if (isDuplicate(err)) {
+        const msg = `Mã hệ điều hành "${values.ma}" đã tồn tại. Vui lòng nhập mã khác.`;
+        toast.error(msg);
+        form.setFields([{ name: "ma", errors: [msg] }]);
+        setTimeout(() => maRef.current?.focus?.(), 0);
+        return;
+      }
+
+      toast.error(
+        getBeMsg(err) ||
+        (id
+          ? "Cập nhật hệ điều hành thất bại"
+          : "Thêm hệ điều hành thất bại")
+      );
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // ===== OK =====
   const handleOk = async () => {
+    if (loading) return;
+
     try {
       const values = await form.validateFields();
 
-      if (id) {
-        // 🔔 HỎI XÁC NHẬN KHI SỬA
-        Modal.confirm({
-          title: 'Xác nhận cập nhật',
-          content: `Bạn có chắc chắn muốn cập nhật hệ điều hành "${values.ten}"?`,
-          okText: 'Đồng ý',
-          cancelText: 'Hủy',
-          onOk: async () => {
-            try {
-              await doSave(values);
-            } catch (e) {
-              console.error(e);
-              error('Cập nhật hệ điều hành thất bại');
-            }
-          },
-        });
-      } else {
-        // THÊM MỚI – KHÔNG CẦN CONFIRM
-        try {
-          await doSave(values);
-        } catch (e) {
-          console.error(e);
-          error('Thêm hệ điều hành thất bại');
-        }
-      }
+      Modal.confirm({
+        title: id ? "Xác nhận cập nhật" : "Xác nhận thêm mới",
+        content: id
+          ? `Bạn có chắc chắn muốn cập nhật hệ điều hành "${values.ten}"?`
+          : `Bạn có chắc chắn muốn thêm hệ điều hành "${values.ten}"?`,
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => doSave(values),
+      });
     } catch (e) {
-      // lỗi validate form -> không làm gì thêm
-      console.error(e);
+      if (e?.errorFields) {
+        toast.error("Vui lòng kiểm tra lại các trường bắt buộc");
+      } else {
+        console.error(e);
+      }
     }
   };
 
   return (
     <Modal
-      title={id ? 'Cập nhật hệ điều hành' : 'Thêm hệ điều hành mới'}
+      title={id ? "Cập nhật hệ điều hành" : "Thêm hệ điều hành mới"}
       open={open}
-      onCancel={onClose}
+      onCancel={() => !loading && onClose?.()}
       onOk={handleOk}
       okText="Lưu"
       cancelText="Hủy"
+      confirmLoading={loading}
+      okButtonProps={{ disabled: loading }}
+      cancelButtonProps={{ disabled: loading }}
       destroyOnClose
+      centered
     >
       <Form layout="vertical" form={form} initialValues={{ trangThai: 1 }}>
         <Form.Item
           name="ma"
           label="Mã hệ điều hành"
-          rules={[{ required: true, message: 'Vui lòng nhập mã hệ điều hành' }]}
+          rules={[{ required: true, message: "Vui lòng nhập mã hệ điều hành" }]}
         >
-          <Input placeholder="Ví dụ: hdh1, win11, mac01..." />
+          <Input ref={maRef} placeholder="Ví dụ: hdh1, win11, mac01..." />
         </Form.Item>
 
         <Form.Item
           name="ten"
           label="Tên hệ điều hành"
-          rules={[{ required: true, message: 'Vui lòng nhập tên hệ điều hành' }]}
+          rules={[{ required: true, message: "Vui lòng nhập tên hệ điều hành" }]}
         >
-          <Input placeholder="Ví dụ: Windows 11, macOS Ventura..." />
-        </Form.Item>
-
-        <Form.Item
-          name="phienBan"
-          label="Phiên bản"
-          rules={[{ required: true, message: 'Vui lòng nhập phiên bản (ví dụ 22H2)' }]}
-        >
-          <Input placeholder="Ví dụ: 22H2, 2023, 12.4..." />
+          <Input placeholder="Ví dụ: Windows, macOS, Linux..." />
         </Form.Item>
 
         <Form.Item
           name="trangThai"
           label="Trạng thái"
-          rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+          rules={[{ required: true, message: "Vui lòng chọn trạng thái" }]}
         >
-          <Select placeholder="Chọn trạng thái">
+          <Select>
             <Option value={1}>Hoạt động</Option>
             <Option value={0}>Ngưng</Option>
           </Select>

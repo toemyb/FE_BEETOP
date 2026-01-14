@@ -15,7 +15,7 @@ import {
   getAllThuongHieu,
   getAllKichThuoc,
 } from '../../service/OptionService';
-
+import 'react-toastify/dist/ReactToastify.css';
 const { Option } = Select;
 
 const statusMap = {
@@ -58,6 +58,10 @@ const ListSanPhamComponent = () => {
   const [filteredList, setFilteredList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+
+  // ✅ role flags (CHỈ THÊM)
+  const [role, setRole] = useState(null);
+  const isEmployee = role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN';
 
   // filters: Pin, Màn hình, Kích thước, HĐH, Thương hiệu, Trạng thái
   const [filters, setFilters] = useState({
@@ -280,6 +284,9 @@ const ListSanPhamComponent = () => {
       return;
     }
 
+    // ✅ set role (CHỈ THÊM)
+    setRole(user.role);
+
     fetchData();
     fetchOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -382,13 +389,18 @@ const ListSanPhamComponent = () => {
       width: 120,
       render: (_, record) => (
         <Space>
-          <Tooltip title="Sửa">
-            <Button
-              icon={<EditOutlined />}
-              type="text"
-              onClick={() => navigate(`/admin/sua-lap-top/${record.id}`)}
-            />
-          </Tooltip>
+          {/* ✅ NHÂN VIÊN KHÔNG ĐƯỢC SỬA */}
+          {!isEmployee && (
+            <Tooltip title="Sửa">
+              <Button
+                icon={<EditOutlined />}
+                type="text"
+                onClick={() => navigate(`/admin/sua-lap-top/${record.id}`)}
+              />
+            </Tooltip>
+          )}
+
+          {/* ✅ NHÂN VIÊN VẪN ĐƯỢC XEM BIẾN THỂ */}
           <Tooltip title="Xem biến thể">
             <Button
               icon={<EyeOutlined />}
@@ -422,13 +434,16 @@ const ListSanPhamComponent = () => {
           Làm Mới
         </Button>
 
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => navigate('/admin/add-lap-top')}
-        >
-          Tạo sản phẩm
-        </Button>
+        {/* ✅ ẨN NÚT TẠO NẾU ROLE LÀ NHÂN VIÊN */}
+        {!isEmployee && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => navigate('/admin/add-lap-top')}
+          >
+            Tạo sản phẩm
+          </Button>
+        )}
       </Space>
 
       {/* Filter row */}
@@ -561,4 +576,4 @@ const ListSanPhamComponent = () => {
   );
 };
 
-export default ListSanPhamComponent;
+export default ListSanPhamComponent; 

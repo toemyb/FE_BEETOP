@@ -299,7 +299,7 @@ const ProductDetailPage = () => {
                             {productDetail.productName}
                         </Title>
                         <div className="product-subtitle-left">
-                            {productDetail.cpu} • {productDetail.ram} • {productDetail.ssd} • {productDetail.card}
+                            {productDetail.cpu} • {productDetail.ram} • {productDetail.ssd} • {productDetail.card} • {productDetail.color} 
                         </div>
                         <div className="product-badges-left">
                       
@@ -415,7 +415,7 @@ const ProductDetailPage = () => {
                                         </div>
 
                                         <Text type="secondary" className="variant-detail">
-                                            {item.cpu} • {item.card}
+                                            {item.cpu} • {item.card} • {item.color}
                                         </Text>
 
                                         <div className="variant-price">{item.price.toLocaleString()} ₫</div>

@@ -1,75 +1,164 @@
-import React, { useEffect, useState } from 'react';
-import { Modal, Form, Input, Select } from 'antd';
-import { addRam, getAllById, updateRam } from '../../service/RamService';
-import useToast from '../../hooks/useNotify';
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Form, Input, Select } from "antd";
+import { toast } from "react-toastify";
+import { addRam, getAllById, updateRam } from "../../service/RamService";
 
 const { Option } = Select;
 
 const AddRamModal = ({ open, id, onClose, onSuccess }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
-  const { success, error } = useToast();
+  const codeRef = useRef(null);
 
+  const isDuplicate = (err) => {
+    const status = err?.response?.status;
+    const msg =
+      err?.response?.data?.message ||
+      err?.response?.data?.error ||
+      err?.message ||
+      "";
+    return status === 409 || /trùng|đã tồn tại|duplicate|exists/i.test(String(msg));
+  };
+
+  const getBeMsg = (err) =>
+    err?.response?.data?.message || err?.response?.data?.error || err?.message || "";
+
+  // ===== Load dữ liệu khi edit =====
   useEffect(() => {
+    if (!open) return;
+
+    // clear lỗi cũ
+    form.setFields([{ name: "idLoaiRam", errors: [] }]);
+
     if (id) {
       getAllById(id)
         .then((res) => {
-          const data = res.data.data;
-          form.setFieldsValue(data);
+          const data =
+            res?.data?.data ??
+            res?.data?.content ??
+            (Array.isArray(res?.data) ? res.data : res?.data) ??
+            null;
+
+          if (data) {
+            form.setFieldsValue({
+              idLoaiRam: data.idLoaiRam,
+              dungLuongRam: data.dungLuongRam,
+              bus: data.bus,
+              moTa: data.moTa,
+              trangThai: Number(data.trangThai ?? 1),
+            });
+          } else {
+            toast.error("Không tìm thấy dữ liệu RAM");
+          }
         })
-        .catch(() => {
-          error('Không thể tải dữ liệu RAM');
+        .catch((e) => {
+          console.error(e);
+          toast.error("Không thể tải dữ liệu RAM");
         });
     } else {
       form.resetFields();
       form.setFieldsValue({ trangThai: 1 });
+      setTimeout(() => codeRef.current?.focus?.(), 0);
     }
-  }, [id, form]);
+  }, [open, id, form]);
 
-  const handleOk = async () => {
+  // ===== Submit =====
+  const doSubmit = async (values) => {
     try {
       setLoading(true);
-      const values = await form.validateFields();
-      const payload = { ...values, trangThai: Number(values.trangThai) };
+      form.setFields([{ name: "idLoaiRam", errors: [] }]);
+
+      const payload = {
+        ...values,
+        trangThai: Number(values.trangThai ?? 1),
+      };
 
       const request = id ? updateRam({ id, ...payload }) : addRam(payload);
       await request;
 
-      success(id ? `Cập nhật thành công: ${values.idLoaiRam}` : `Thêm mới thành công: ${values.idLoaiRam}`);
-      if (onSuccess) onSuccess(id ? 'edit' : 'add', values.idLoaiRam);
-      onClose();
+      toast.success(
+        id
+          ? `Cập nhật RAM "${values.idLoaiRam}" thành công`
+          : `Thêm RAM "${values.idLoaiRam}" thành công`
+      );
+
+      onSuccess?.(id ? "edit" : "add", values.idLoaiRam);
+      onClose?.();
     } catch (err) {
-      error(id ? 'Cập nhật thất bại' : 'Thêm thất bại');
+      console.error("Lỗi submit RAM:", err);
+
+      // ✅ trùng mã
+      if (isDuplicate(err)) {
+        const msg = `Mã RAM "${values.idLoaiRam}" đã tồn tại. Vui lòng nhập mã khác.`;
+        toast.error(msg);
+        form.setFields([{ name: "idLoaiRam", errors: [msg] }]);
+        setTimeout(() => codeRef.current?.focus?.(), 0);
+        return;
+      }
+
+      const beMsg = getBeMsg(err);
+      toast.error(beMsg || (id ? "Cập nhật RAM thất bại" : "Thêm RAM thất bại"));
+      throw err;
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ===== OK: validate + confirm =====
+  const handleOk = async () => {
+    if (loading) return;
+
+    try {
+      const values = await form.validateFields();
+
+      Modal.confirm({
+        title: id ? "Xác nhận cập nhật" : "Xác nhận thêm mới",
+        content: id
+          ? `Bạn có chắc chắn muốn cập nhật RAM "${values.idLoaiRam}"?`
+          : `Bạn có chắc chắn muốn thêm RAM "${values.idLoaiRam}"?`,
+        okText: "Xác nhận",
+        cancelText: "Hủy",
+        centered: true,
+        onOk: () => doSubmit(values),
+      });
+    } catch (err) {
+      if (err?.errorFields) {
+        toast.error("Vui lòng kiểm tra lại các trường bắt buộc");
+      } else {
+        console.error(err);
+      }
     }
   };
 
   return (
     <Modal
       open={open}
-      title={id ? 'CẬP NHẬT RAM' : 'THÊM RAM'}
-      onCancel={onClose}
+      title={id ? "CẬP NHẬT RAM" : "THÊM RAM"}
+      onCancel={() => {
+        if (!loading) onClose?.();
+      }}
       onOk={handleOk}
       okText="Xác nhận"
       cancelText="Hủy"
       confirmLoading={loading}
+      okButtonProps={{ disabled: loading }}
+      cancelButtonProps={{ disabled: loading }}
       destroyOnClose
       centered
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" initialValues={{ trangThai: 1 }}>
         <Form.Item
           label="Mã RAM"
           name="idLoaiRam"
-          rules={[{ required: true, message: 'Vui lòng nhập mã RAM' }]}
+          rules={[{ required: true, message: "Vui lòng nhập mã RAM" }]}
         >
-          <Input />
+          <Input ref={codeRef} />
         </Form.Item>
 
         <Form.Item
           label="Dung lượng RAM"
           name="dungLuongRam"
-          rules={[{ required: true, message: 'Vui lòng nhập dung lượng RAM' }]}
+          rules={[{ required: true, message: "Vui lòng nhập dung lượng RAM" }]}
         >
           <Input />
         </Form.Item>
@@ -77,7 +166,7 @@ const AddRamModal = ({ open, id, onClose, onSuccess }) => {
         <Form.Item
           label="Bus"
           name="bus"
-          rules={[{ required: true, message: 'Vui lòng nhập bus' }]}
+          rules={[{ required: true, message: "Vui lòng nhập bus" }]}
         >
           <Input />
         </Form.Item>
@@ -86,7 +175,11 @@ const AddRamModal = ({ open, id, onClose, onSuccess }) => {
           <Input />
         </Form.Item>
 
-        <Form.Item label="Trạng thái" name="trangThai" initialValue={1}>
+        <Form.Item
+          label="Trạng thái"
+          name="trangThai"
+          rules={[{ required: true, message: "Vui lòng chọn trạng thái" }]}
+        >
           <Select>
             <Option value={1}>Hoạt động</Option>
             <Option value={0}>Ngưng hoạt động</Option>

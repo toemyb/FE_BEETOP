@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import api from '../../service/api';
 import { toast } from 'react-toastify';
-
+import 'react-toastify/dist/ReactToastify.css';
 const { Option } = Select;
 
 const ListKhachHangComponent = () => {

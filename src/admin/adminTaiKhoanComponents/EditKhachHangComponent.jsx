@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import userService from "../../service/userService";
 import api from "../../service/api";
 import AddressManager from "../../components/AddressManager";
-
+import 'react-toastify/dist/ReactToastify.css';
 const EditKhachHangComponent = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();

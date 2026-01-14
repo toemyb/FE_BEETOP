@@ -25,8 +25,22 @@ const ListCpuComponent = () => {
 
   const { error } = useToast();
 
+  // ✅ check role: NHÂN VIÊN sẽ ẩn nút + cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage giống các màn khác
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -83,7 +97,8 @@ const ListCpuComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns để dạng let để có thể filter cột hành động
+  let columns = [
     {
       title: 'STT',
       render: (_, __, index) =>
@@ -106,10 +121,15 @@ const ListCpuComponent = () => {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
       render: (val) =>
-        val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngừng</Tag>,
+        val === 1 ? (
+          <Tag color="green">Hoạt động</Tag>
+        ) : (
+          <Tag color="red">Ngừng</Tag>
+        ),
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -117,6 +137,11 @@ const ListCpuComponent = () => {
       ),
     },
   ];
+
+  // ✅ NHÂN VIÊN: ẩn luôn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -131,8 +156,6 @@ const ListCpuComponent = () => {
           style={{ width: 200 }}
         />
 
-       
-
         <span>Trạng Thái:</span>
         <Select
           value={filterTrangThai}
@@ -145,24 +168,25 @@ const ListCpuComponent = () => {
         </Select>
 
         <span>Sắp xếp:</span>
-        <Select
-          value={sortOption}
-          onChange={setSortOption}
-          style={{ width: 120 }}
-        >
+        <Select value={sortOption} onChange={setSortOption} style={{ width: 120 }}>
           <Option value="default">Mặc định</Option>
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
- <Button
+
+        <Button
           onClick={handleRefresh}
           style={{ background: '#FFD700', color: '#000' }}
         >
           Làm mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm CPU
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm CPU
+          </Button>
+        )}
       </Space>
 
       <Table

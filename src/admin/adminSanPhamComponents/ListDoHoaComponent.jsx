@@ -3,7 +3,6 @@ import { Table, Button, Tag, Input, Select, Space } from 'antd';
 import { listDoHoa } from '../../service/DoHoaService';
 import AddDoHoaModal from './AddDoHoaComponent';
 
-
 const { Option } = Select;
 
 const ListDoHoaComponent = () => {
@@ -24,8 +23,22 @@ const ListDoHoaComponent = () => {
     pageSize: 5,
   });
 
+  // ✅ check role: NHÂN VIÊN sẽ ẩn nút + cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage giống các màn khác
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -46,13 +59,13 @@ const ListDoHoaComponent = () => {
     let temp = [...dohoaList];
 
     if (searchText.trim()) {
-      temp = temp.filter(item =>
+      temp = temp.filter((item) =>
         item.tenDayDu?.toLowerCase().includes(searchText.toLowerCase())
       );
     }
 
     if (filterTrangThai !== 'all') {
-      temp = temp.filter(item => item.trangThai === Number(filterTrangThai));
+      temp = temp.filter((item) => item.trangThai === Number(filterTrangThai));
     }
 
     if (sortOption === 'az') {
@@ -82,7 +95,8 @@ const ListDoHoaComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns để dạng let để có thể filter cột hành động
+  let columns = [
     {
       title: 'STT',
       render: (_, __, index) =>
@@ -103,7 +117,7 @@ const ListDoHoaComponent = () => {
     {
       title: 'Tên đầy đủ',
       dataIndex: 'tenDayDu',
-      render: text => <strong>{text}</strong>,
+      render: (text) => <strong>{text}</strong>,
     },
     {
       title: 'Loại card',
@@ -120,11 +134,16 @@ const ListDoHoaComponent = () => {
     {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
-      render: val =>
-        val === 1 ? <Tag color="green">Hoạt động</Tag> : <Tag color="red">Ngưng</Tag>,
+      render: (val) =>
+        val === 1 ? (
+          <Tag color="green">Hoạt động</Tag>
+        ) : (
+          <Tag color="red">Ngưng</Tag>
+        ),
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -132,6 +151,11 @@ const ListDoHoaComponent = () => {
       ),
     },
   ];
+
+  // ✅ NHÂN VIÊN: ẩn luôn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
 
   return (
     <div style={{ padding: 24 }}>
@@ -146,10 +170,12 @@ const ListDoHoaComponent = () => {
           style={{ width: 200 }}
         />
 
-      
-
         <span>Trạng Thái:</span>
-        <Select value={filterTrangThai} onChange={setFilterTrangThai} style={{ width: 120 }}>
+        <Select
+          value={filterTrangThai}
+          onChange={setFilterTrangThai}
+          style={{ width: 120 }}
+        >
           <Option value="all">Tất cả</Option>
           <Option value="1">Hoạt động</Option>
           <Option value="0">Ngưng</Option>
@@ -161,12 +187,17 @@ const ListDoHoaComponent = () => {
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
-  <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
           Làm Mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm Đồ Họa
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm Đồ Họa
+          </Button>
+        )}
       </Space>
 
       <Table

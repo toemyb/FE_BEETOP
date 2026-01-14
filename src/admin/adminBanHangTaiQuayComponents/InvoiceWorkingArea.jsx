@@ -39,6 +39,22 @@ const formatCurrencyDefault = (amount) => {
     currency: 'VND',
   });
 };
+
+const notifyAddSeriError = (err, notify) => {
+  const msg = err?.response?.data?.message || err?.message || "";
+
+  if (msg.includes("SERI_ALREADY_IN_CART")) {
+    notify("warning", "Seri đã có trong giỏ.");
+    return true;
+  }
+
+  if (msg.includes("SERI_NOT_AVAILABLE")) {
+    notify("warning", "Sản phẩm không có sẵn.");
+    return true;
+  }
+
+  return false;
+};
 const PAYMENT = {
   CASH: 'CASH',
   VNPAY: 'VNPAY',
@@ -64,23 +80,23 @@ const InvoiceWorkingArea = ({
 
   const notify = showNotification || (() => { });
   const confirmAction = ({
-  title,
-  content,
-  okText = "Xác nhận",
-  cancelText = "Hủy",
-  danger = false,
-  onOk,
-}) => {
-  Modal.confirm({
     title,
     content,
-    centered: true,
-    okText,
-    cancelText,
-    okButtonProps: danger ? { danger: true } : undefined,
+    okText = "Xác nhận",
+    cancelText = "Hủy",
+    danger = false,
     onOk,
-  });
-};
+  }) => {
+    Modal.confirm({
+      title,
+      content,
+      centered: true,
+      okText,
+      cancelText,
+      okButtonProps: danger ? { danger: true } : undefined,
+      onOk,
+    });
+  };
   const formatCurrency = formatCurrencyProp || formatCurrencyDefault;
 
   // Giỏ hàng hiển thị trên FE
@@ -93,6 +109,10 @@ const InvoiceWorkingArea = ({
   const [showCustomerForm, setShowCustomerForm] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showVoucherSelector, setShowVoucherSelector] = useState(false);
+  const [voucherReloadToken, setVoucherReloadToken] = useState(0); // ✅ để VoucherSelector refetch
+  const prevCartSnapshotRef = useRef({ count: null, subtotal: null });
+  const voucherAutoFixRunningRef = useRef(false);
+
   const [useInsurance, setUseInsurance] = useState(false); // default = false đúng builder const GHN_USE_INSURANCE_VALUE=false
   // Modal nhắc nhở chung
 
@@ -555,8 +575,8 @@ const InvoiceWorkingArea = ({
   }, [shipCalcKey]);
 
   // ===== TỔNG KẾT ĐƠN HÀNG (ưu tiên số từ BE) =====
+  // ===== TỔNG KẾT ĐƠN HÀNG (ưu tiên số từ BE) =====
   const orderSummary = useMemo(() => {
-    // ✅ FIX: không dùng "||" vì 0 là falsy -> dễ sai tổng
     const hasGiaTriChuaGiam =
       posTotals.giaTriChuaGiam !== null && posTotals.giaTriChuaGiam !== undefined;
 
@@ -572,10 +592,7 @@ const InvoiceWorkingArea = ({
 
     const totalDiscount = hasGiaTriGiamGia
       ? Number(posTotals.giaTriGiamGia || 0)
-      : appliedVouchers.reduce(
-        (sum, voucher) => sum + (voucher.discount || 0),
-        0
-      );
+      : appliedVouchers.reduce((sum, v) => sum + (v.discount || 0), 0);
 
     const hasTongTienThuHo =
       posTotals.tongTienThuHo !== null && posTotals.tongTienThuHo !== undefined;
@@ -591,9 +608,7 @@ const InvoiceWorkingArea = ({
 
     const totalNum = Number(total) || 0;
     const change =
-      (invoice.customerCash || 0) > totalNum
-        ? (invoice.customerCash || 0) - totalNum
-        : 0;
+      (invoice.customerCash || 0) > totalNum ? (invoice.customerCash || 0) - totalNum : 0;
 
     return {
       subtotal: Number(subtotal) || 0,
@@ -602,6 +617,78 @@ const InvoiceWorkingArea = ({
       change,
     };
   }, [cartItems, appliedVouchers, invoice.customerCash, posTotals, orderDetail?.phiVanChuyen]);
+
+  // ✅ AUTO reload voucher + auto re-apply/clear khi giỏ thay đổi
+  useEffect(() => {
+    if (!orderId) return;
+
+    const count = totalCartQuantity;
+    const subtotalNow = Number(orderSummary.subtotal || 0);
+
+    const prev = prevCartSnapshotRef.current;
+    const isFirst = prev.count === null;
+
+    const changed = !isFirst && (prev.count !== count || prev.subtotal !== subtotalNow);
+
+    // cập nhật snapshot
+    prevCartSnapshotRef.current = { count, subtotal: subtotalNow };
+
+    if (!changed) return;
+
+    // mỗi lần giỏ thay đổi -> cho VoucherSelector fetch lại
+    setVoucherReloadToken((t) => t + 1);
+
+    if (voucherAutoFixRunningRef.current) return;
+
+    // CASE 1: giỏ rỗng => auto clear voucher (FE + BE)
+    if (count === 0) {
+      if (!appliedVouchers.length) return;
+
+      voucherAutoFixRunningRef.current = true;
+      (async () => {
+        try {
+          await clearVoucherForOrder(orderId);
+        } catch (e) {
+          // ignore
+        } finally {
+          setAppliedVouchers([]);
+          updateInvoice({ voucherId: null });
+          await refreshOrderFromServer();
+          voucherAutoFixRunningRef.current = false;
+        }
+      })();
+      return;
+    }
+
+    // CASE 2: có voucher => re-apply để tính lại theo subtotal mới / validate min
+    const currentVoucher = appliedVouchers?.[0];
+    const voucherCode = String(currentVoucher?.id || currentVoucher?.code || "").trim();
+    if (!voucherCode) return;
+
+    voucherAutoFixRunningRef.current = true;
+    (async () => {
+      try {
+        await applyVoucherForOrder(orderId, voucherCode);
+      } catch (err) {
+        const msg = err?.response?.data?.message || "Voucher không còn hợp lệ, đã tự bỏ.";
+        try {
+          await clearVoucherForOrder(orderId);
+        } catch (e) { }
+        notify("warning", msg);
+        setAppliedVouchers([]);
+        updateInvoice({ voucherId: null });
+      } finally {
+        await refreshOrderFromServer();
+        voucherAutoFixRunningRef.current = false;
+      }
+    })();
+  }, [
+    orderId,
+    totalCartQuantity,
+    orderSummary.subtotal,
+    appliedVouchers?.[0]?.id,
+    appliedVouchers?.[0]?.code,
+  ]);
 
   // ===== SẢN PHẨM (seri) =====
   const handleAddProducts = async (selectedSerialItems) => {
@@ -623,12 +710,14 @@ const InvoiceWorkingArea = ({
       setShowProductSelector(false);
       notify('success', 'Đã thêm sản phẩm vào đơn hàng.');
     } catch (err) {
-      console.error('Lỗi thêm seri vào đơn hàng:', err);
-      notify(
-        'error',
-        err?.response?.data?.message ||
-        'Không thể thêm sản phẩm vào đơn, vui lòng thử lại!'
-      );
+      console.error("Lỗi thêm seri vào đơn hàng:", err);
+
+      if (!notifyAddSeriError(err, notify)) {
+        notify(
+          "error",
+          err?.response?.data?.message || "Không thể thêm sản phẩm vào đơn, vui lòng thử lại!"
+        );
+      }
     }
   };
 
@@ -643,7 +732,14 @@ const InvoiceWorkingArea = ({
     if (!seriCode) {
       notify('error', 'Mã QR không hợp lệ.');
       return;
+
     }
+    const existedCodes = new Set(cartItems.flatMap(g => g.serials || []).map(s => (s || "").toUpperCase()));
+    if (existedCodes.has(seriCode)) {
+      notify("warning", "Seri đã có trong giỏ.");
+      return;
+    }
+
 
     try {
       await addItemsBySeriCode(orderId, [seriCode]);
@@ -654,9 +750,12 @@ const InvoiceWorkingArea = ({
       setShowQrScanner(false);
 
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Seri không hợp lệ hoặc đã bán!';
-      notify('error', msg);
-      // Không đóng modal → cho phép quét lại nếu sai
+      console.error(err);
+
+      if (!notifyAddSeriError(err, notify)) {
+        const msg = err?.response?.data?.message || "Sản phẩm không có sẵn.";
+        notify("warning", msg);
+      }
     }
   };
 
@@ -667,23 +766,38 @@ const InvoiceWorkingArea = ({
     if (!group || !group.orderCtIds?.length) return;
 
     confirmAction({
-  title: "Xóa sản phẩm khỏi đơn",
-  content: "Bạn có chắc muốn xóa toàn bộ phiên bản sản phẩm này khỏi đơn hàng?",
-  okText: "Xóa",
-  danger: true,
-  onOk: async () => {
+      title: "Xóa sản phẩm khỏi đơn",
+      content: "Bạn có chắc muốn xóa toàn bộ phiên bản sản phẩm này khỏi đơn hàng?",
+      okText: "Xóa",
+      danger: true,
+      onOk: async () => {
         try {
           const uniqueIds = Array.from(new Set(group.orderCtIds.filter(Boolean)));
 
-          await Promise.all(
-            uniqueIds.map((orderCtId) => removeItemFromOrder(orderId, orderCtId))
-          );
+          // ✅ XÓA TUẦN TỰ (tránh lock/500)
+          for (const orderCtId of uniqueIds) {
+            try {
+              await removeItemFromOrder(orderId, orderCtId);
+            } catch (err) {
+              const msg = err?.response?.data?.message || "";
+              const status = err?.response?.status;
+
+              // ✅ Nếu đã xóa rồi / không tìm thấy -> bỏ qua, không coi là lỗi
+              if (status === 404 || msg.includes("Không tìm thấy OrderCT")) continue;
+
+              // lỗi thật thì throw để rơi vào catch ngoài
+              throw err;
+            }
+          }
 
           await refreshOrderFromServer();
-          notify('success', 'Đã xóa sản phẩm khỏi đơn hàng.');
+          notify("success", "Đã xóa sản phẩm khỏi đơn hàng.");
         } catch (err) {
-          console.error('Lỗi xóa sản phẩm khỏi đơn hàng:', err);
-          notify('error', err?.response?.data?.message || 'Không thể xóa sản phẩm khỏi đơn, vui lòng thử lại!');
+          console.error("Lỗi xóa sản phẩm khỏi đơn hàng:", err);
+          notify(
+            "error",
+            err?.response?.data?.message || "Không thể xóa sản phẩm khỏi đơn, vui lòng thử lại!"
+          );
         }
       },
     });
@@ -694,11 +808,11 @@ const InvoiceWorkingArea = ({
     if (!orderId || !orderCtId) return;
 
     confirmAction({
-  title: "Xóa seri khỏi đơn",
-  content: `Xóa seri ${seriCode} khỏi đơn hàng?`,
-  okText: "Xóa",
-  danger: true,
-  onOk: async () => {
+      title: "Xóa seri khỏi đơn",
+      content: `Xóa seri ${seriCode} khỏi đơn hàng?`,
+      okText: "Xóa",
+      danger: true,
+      onOk: async () => {
         try {
           await removeItemFromOrder(orderId, orderCtId);
           await refreshOrderFromServer();
@@ -725,11 +839,11 @@ const InvoiceWorkingArea = ({
     if (!orderId) return;
 
     confirmAction({
-  title: "Huỷ đơn hàng",
-  content: "Huỷ toàn bộ đơn hàng này?",
-  okText: "Huỷ đơn",
-  danger: true,
-  onOk: async () => {
+      title: "Huỷ đơn hàng",
+      content: "Huỷ toàn bộ đơn hàng này?",
+      okText: "Huỷ đơn",
+      danger: true,
+      onOk: async () => {
         try {
           await cancelOrder(orderId);
           notify('success', 'Đã huỷ đơn hàng.');
@@ -771,6 +885,21 @@ const InvoiceWorkingArea = ({
 
   // ===== VOUCHER =====
   const handleApplyVouchers = async (list) => {
+    if ((orderSummary?.subtotal || 0) <= 0) {
+      notify("warning", "Giỏ hàng trống, không thể áp dụng voucher.");
+      setAppliedVouchers([]);
+      updateInvoice({ voucherId: null });
+
+      if (orderId) {
+        try {
+          await clearVoucherForOrder(orderId);
+          await refreshOrderFromServer();
+        } catch (e) { }
+      }
+
+      setShowVoucherSelector(false);
+      return;
+    }
     const chosen = Array.isArray(list) ? list[0] : null;
     const voucherId = chosen?.id ? String(chosen.id) : "";
 
@@ -867,10 +996,7 @@ const InvoiceWorkingArea = ({
       return;
     }
 
-    if (orderSummary.total <= 0) {
-      notify('warning', 'Tổng tiền phải lớn hơn 0.');
-      return;
-    }
+
     if (
       invoice.paymentMethod === PAYMENT.CASH &&
       (invoice.customerCash || 0) < orderSummary.total
@@ -883,9 +1009,8 @@ const InvoiceWorkingArea = ({
 
   const isPayDisabled =
     shippingLoading ||
-    orderSummary.total === 0 ||
     (giaoHang && (!shipForm.districtId || !shipForm.wardCode)) ||
-    (invoice.paymentMethod === PAYMENT.CASH && (invoice.customerCash || 0) < orderSummary.total)
+    (invoice.paymentMethod === PAYMENT.CASH && (invoice.customerCash || 0) < orderSummary.total);
 
   const handleConfirmPayment = async () => {
     if (!orderId) return;
@@ -904,14 +1029,24 @@ const InvoiceWorkingArea = ({
       }
 
       const mustPay = Number(latest?.tongTienThuHo ?? orderSummary.total ?? 0);
-      if (mustPay <= 0) {
+      if (mustPay < 0) {
         notify("error", "Tổng tiền không hợp lệ. Vui lòng kiểm tra lại đơn hàng.");
+        return;
+      }
+
+      // ✅ TOTAL = 0 => không cần thanh toán, chỉ complete
+      if (mustPay === 0) {
+        await completeOrder(orderId);
+        await refreshOrderFromServer();
+        onConfirmOrder();
+        setShowConfirmation(false);
+        notify("success", "Đơn hàng 0₫ đã được hoàn tất.");
         return;
       }
 
       // Nếu tiền mặt mà khách đưa < tổng mới nhất thì chặn
       if (invoice.paymentMethod === PAYMENT.CASH && (invoice.customerCash || 0) < mustPay) {
-        notify("error","Số tiền khách đưa chưa đủ theo tổng mới nhất (có thể do phí vận chuyển vừa cập nhật).");
+        notify("error", "Số tiền khách đưa chưa đủ theo tổng mới nhất (có thể do phí vận chuyển vừa cập nhật).");
         return;
       }
 
@@ -992,7 +1127,7 @@ const InvoiceWorkingArea = ({
 
       onConfirmOrder();
       setShowConfirmation(false);
-      notify("success",'Thanh toán đơn hàng thành công.');
+      notify("success", 'Thanh toán đơn hàng thành công.');
     } catch (err) {
       console.error('Lỗi xác nhận thanh toán POS:', err);
       message.error(
@@ -1817,19 +1952,20 @@ const InvoiceWorkingArea = ({
                   )}
                 </div>
               )}
-              <div style={{paddingTop: 15}}>
-              <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={useInsurance}
-                  onChange={(e) => {
-                    setUseInsurance(e.target.checked);
-                    lastShipCalcKeyRef.current = null; // force recalc nếu cần
-    }}
-  />
-                Bảo hiểm hàng hóa 
-              </label>
-</div>
+              <div style={{ paddingTop: 10 }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={useInsurance}
+                    onChange={(e) => {
+                      setUseInsurance(e.target.checked);
+                      lastShipCalcKeyRef.current = null; // force recalc nếu cần
+                    }}
+                  />
+
+                  Bảo hiểm hàng hóa
+                </label>
+              </div>
 
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e9ecef' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -1862,7 +1998,13 @@ const InvoiceWorkingArea = ({
               Voucher giảm giá
             </h5>
             <button
-              onClick={() => setShowVoucherSelector(true)}
+              onClick={() => {
+                if (totalCartQuantity === 0) {
+                  notify("warning", "Vui lòng thêm sản phẩm trước khi áp dụng voucher.");
+                  return;
+                }
+                setShowVoucherSelector(true);
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -1912,7 +2054,6 @@ const InvoiceWorkingArea = ({
             </p>
           )}
         </div>
-
         {/* PHƯƠNG THỨC THANH TOÁN */}
         <div style={cardStyle}>
           <h5
@@ -2162,6 +2303,7 @@ const InvoiceWorkingArea = ({
           onApplyVouchers={handleApplyVouchers}
           orderSummary={orderSummary}
           formatCurrency={formatCurrency}
+          reloadToken={voucherReloadToken}
         />
       )}
 
@@ -2222,7 +2364,7 @@ const InvoiceWorkingArea = ({
       )}
 
       {/* ✅ Modal nhắc nhở ở giữa */}
-      
+
     </div>
   );
 };

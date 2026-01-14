@@ -824,7 +824,9 @@ const CartPage = () => {
 
             setAppliedDiscount(discountValue);
             const totalAfterDiscount = totalAmount - discountValue;
-            const actualShippingFee = totalAfterDiscount >= 30000000 ? 0 : stepShippingFee;
+
+            // ✅ freeship theo tiền hàng trước giảm (totalAmount)
+            const actualShippingFee = totalAmount >= 30000000 ? 0 : stepShippingFee;
 
             setFinalTotal(Math.max(totalAfterDiscount + actualShippingFee, 0));
         } else {
@@ -1639,12 +1641,8 @@ const CartPage = () => {
             // Hiển thị loading
             message.loading({ content: 'Đang tạo đơn hàng...', key: 'creatingOrder', duration: 0 });
 
-            // Tính phí ship thực tế (có thể free ship nếu >= 15tr)
-            const totalAfterDiscount = totalAmount - appliedDiscount;
-            const actualShippingFee = totalAfterDiscount >= 30000000 ? 0 : shippingFee;
-            // (nếu bạn chưa dùng actualShippingFee thì để đó hoặc bỏ đi)
-
-            // Lấy voucher ID từ selectedDiscount
+            const actualShippingFee = totalAmount >= 30000000 ? 0 : shippingFee;
+         
             let voucherId = null;
             if (selectedDiscount) {
                 voucherId = selectedDiscount.idPhieuGiamGia || selectedDiscount.id || null;
@@ -2408,21 +2406,21 @@ const CartPage = () => {
                                 />
                             </div>
                         )}
-       <div style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    fontSize: '14px',
-                                    color: '#595959'
-                                }}>
-                                    <span>Bảo hiểm hàng hóa:</span>
-                                    <Checkbox
-                                        checked={useInsurance}
-                                        onChange={(e) => setUseInsurance(e.target.checked)}
-                                    >
-                                        {useInsurance ? "Có" : "Không"}
-                                    </Checkbox>
-                                </div>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            fontSize: '14px',
+                            color: '#595959'
+                        }}>
+                            <span>Bảo hiểm hàng hóa:</span>
+                            <Checkbox
+                                checked={useInsurance}
+                                onChange={(e) => setUseInsurance(e.target.checked)}
+                            >
+                                {useInsurance ? "Có" : "Không"}
+                            </Checkbox>
+                        </div>
                         <div className="form-section" style={{ marginTop: '20px' }}>
                             <label style={{
                                 display: 'block',
@@ -2549,7 +2547,7 @@ const CartPage = () => {
                                         </span>
                                     </div>
                                 )}
-                         
+
                                 {/* Phí ship */}
                                 <div style={{
                                     display: 'flex',
@@ -2563,8 +2561,7 @@ const CartPage = () => {
                                             <Spin size="small" />
                                         ) : (
                                             (() => {
-                                                const totalAfterDiscount = totalAmount - appliedDiscount;
-                                                const isFreeShip = totalAfterDiscount >= 30000000;
+                                                const isFreeShip = totalAmount >= 30000000;
                                                 return isFreeShip ? (
                                                     <span style={{ color: '#52c41a', fontWeight: '600' }}>Miễn phí</span>
                                                 ) : (

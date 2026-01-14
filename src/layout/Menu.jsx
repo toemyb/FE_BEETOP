@@ -45,7 +45,7 @@ const AppSider = ({ collapsed, user }) => {
 
     if (pathname.startsWith('/admin/ban-hang-tai-quay')) return 'banhang';
     if (pathname.startsWith('/admin/don-hang')) return 'donhang';
-    if (pathname.startsWith('/admin/tra-hang')) return 'trahang';
+  
     if (pathname.startsWith('/admin/thong-ke')) return 'thongke';
 
 
@@ -106,11 +106,7 @@ const AppSider = ({ collapsed, user }) => {
         icon: <DropboxOutlined />,
         label: <Link to="/admin/don-hang">Đơn Hàng</Link>,
       },
-      {
-        key: "trahang",
-        icon: <RollbackOutlined />,
-        label: <Link to="/admin/tra-hang">Bảo hành</Link>,
-      },
+     
 
       // ✅ Quản lý sản phẩm: NHAN_VIEN + ADMIN đều thấy
       {

@@ -14,7 +14,6 @@ import {
 import { listHeDieuHanh } from '../../service/HeDieuHanhService';
 import AddHeDieuHanhModal from './AddHeDieuHanhComponent';
 
-
 const { Option } = Select;
 const { Title } = Typography;
 
@@ -35,8 +34,22 @@ const ListHeDieuHanhComponent = () => {
     pageSize: 5,
   });
 
+  // ✅ role: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -46,7 +59,11 @@ const ListHeDieuHanhComponent = () => {
       const data =
         res?.data?.data?.content ||
         res?.data?.content ||
-        (Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : []) ||
+        (Array.isArray(res?.data?.data)
+          ? res.data.data
+          : Array.isArray(res?.data)
+          ? res.data
+          : []) ||
         [];
       setHdhList(data);
       setFilteredList(data);
@@ -81,13 +98,9 @@ const ListHeDieuHanhComponent = () => {
     }
 
     if (sortOption === 'az') {
-      temp.sort((a, b) =>
-        (pickName(a) || '').localeCompare(pickName(b) || '')
-      );
+      temp.sort((a, b) => (pickName(a) || '').localeCompare(pickName(b) || ''));
     } else if (sortOption === 'za') {
-      temp.sort((a, b) =>
-        (pickName(b) || '').localeCompare(pickName(a) || '')
-      );
+      temp.sort((a, b) => (pickName(b) || '').localeCompare(pickName(a) || ''));
     }
 
     setFilteredList(temp);
@@ -112,7 +125,8 @@ const ListHeDieuHanhComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns để dạng let để filter cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
       render: (_val, _record, index) =>
@@ -123,8 +137,7 @@ const ListHeDieuHanhComponent = () => {
     {
       title: 'Mã HĐH',
       dataIndex: 'ma',
-      render: (_val, record) =>
-        record?.ma ?? record?.idHedieuhanh ?? record?.ma,
+      render: (_val, record) => record?.ma ?? record?.idHedieuhanh ?? record?.ma,
       width: 150,
       align: 'center',
     },
@@ -134,13 +147,7 @@ const ListHeDieuHanhComponent = () => {
       render: (_val, record) => <strong>{pickName(record) || '—'}</strong>,
       align: 'center',
     },
-    {
-      title: 'Phiên bản',
-      dataIndex: 'phienBan',
-      render: (val, record) => val ?? record?.version ?? '—',
-      width: 150,
-      align: 'center',
-    },
+  
     {
       title: 'Trạng thái',
       dataIndex: 'trangThai',
@@ -154,6 +161,7 @@ const ListHeDieuHanhComponent = () => {
     },
     {
       title: 'Hành động',
+      key: 'action',
       width: 120,
       align: 'center',
       render: (_val, record) => (
@@ -167,74 +175,68 @@ const ListHeDieuHanhComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div style={{ padding: 24 }}>
-  
+      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+        <Col>
+          <Title level={3} style={{ margin: 0 }}>
+            Danh sách hệ điều hành
+          </Title>
+        </Col>
+      </Row>
 
-     
-        <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
-          <Col>
-            <Title level={3} style={{ margin: 0 }}>
-              Danh sách hệ điều hành
-            </Title>
-          </Col>
-         
-        </Row>
+      <Space
+        style={{
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 12,
+          justifyContent: 'space-between',
+        }}
+        size="middle"
+      >
+        <Input
+          placeholder="Tìm kiếm tên hệ điều hành..."
+          allowClear
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          style={{ width: 250 }}
+        />
 
-        <Space
-          style={{
-            marginBottom: 16,
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 12,
-            justifyContent: 'space-between',
-          }}
-          size="middle"
-        >
-          <Input
-            placeholder="Tìm kiếm tên hệ điều hành..."
-            allowClear
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            style={{ width: 250 }}
-          />
-
-        
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Trạng thái:</span>
-            <Select
-              value={filterTrangThai}
-              onChange={setFilterTrangThai}
-              style={{ width: 140 }}
-            >
-              <Option value="all">Tất cả</Option>
-              <Option value="1">Hoạt động</Option>
-              <Option value="0">Ngưng</Option>
-            </Select>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>Sắp xếp:</span>
-            <Select
-              value={sortOption}
-              onChange={setSortOption}
-              style={{ width: 140 }}
-            >
-              <Option value="default">Mặc định</Option>
-              <Option value="az">Tên A-Z</Option>
-              <Option value="za">Tên Z-A</Option>
-            </Select>
-          </div>
-
-           <Button
-            onClick={handleRefresh}
-            style={{ background: '#FFD700', color: '#000' }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Trạng thái:</span>
+          <Select
+            value={filterTrangThai}
+            onChange={setFilterTrangThai}
+            style={{ width: 140 }}
           >
-            Làm Mới
-          </Button>
+            <Option value="all">Tất cả</Option>
+            <Option value="1">Hoạt động</Option>
+            <Option value="0">Ngưng</Option>
+          </Select>
+        </div>
 
-           <Col>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>Sắp xếp:</span>
+          <Select value={sortOption} onChange={setSortOption} style={{ width: 140 }}>
+            <Option value="default">Mặc định</Option>
+            <Option value="az">Tên A-Z</Option>
+            <Option value="za">Tên Z-A</Option>
+          </Select>
+        </div>
+
+        <Button onClick={handleRefresh} style={{ background: '#FFD700', color: '#000' }}>
+          Làm Mới
+        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Col>
             <Button
               type="primary"
               onClick={() => openModal()}
@@ -243,30 +245,30 @@ const ListHeDieuHanhComponent = () => {
               + Thêm Hệ điều hành
             </Button>
           </Col>
-        </Space>
+        )}
+      </Space>
 
-        <Table
-          rowKey={(r) => r?.id ?? r?.idHedieuhanh}
-          columns={columns}
-          dataSource={filteredList}
-          loading={loading}
-          bordered
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: filteredList.length,
-            showSizeChanger: true,
-            pageSizeOptions: ['5', '10', '20', '50'],
-            style: { textAlign: 'center', marginTop: 16 },
-          }}
-          onChange={(pag) => {
-            setPagination({
-              current: pag.current,
-              pageSize: pag.pageSize,
-            });
-          }}
-        />
-     
+      <Table
+        rowKey={(r) => r?.id ?? r?.idHedieuhanh}
+        columns={columns}
+        dataSource={filteredList}
+        loading={loading}
+        bordered
+        pagination={{
+          current: pagination.current,
+          pageSize: pagination.pageSize,
+          total: filteredList.length,
+          showSizeChanger: true,
+          pageSizeOptions: ['5', '10', '20', '50'],
+          style: { textAlign: 'center', marginTop: 16 },
+        }}
+        onChange={(pag) => {
+          setPagination({
+            current: pag.current,
+            pageSize: pag.pageSize,
+          });
+        }}
+      />
 
       {modalVisible && (
         <AddHeDieuHanhModal

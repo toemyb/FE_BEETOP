@@ -24,10 +24,24 @@ const ListMauSacComponent = () => {
     pageSize: 5,
   });
 
+  // ✅ role: NHÂN VIÊN ẩn nút thêm + ẩn cột hành động
+  const [isEmployee, setIsEmployee] = useState(false);
+
   const { error } = useToast();
 
   useEffect(() => {
+    // ✅ lấy role từ sessionStorage
+    try {
+      const raw = sessionStorage.getItem('user');
+      const user = raw ? JSON.parse(raw) : null;
+      const role = user?.role || '';
+      setIsEmployee(role === 'NHAN_VIEN' || role === 'ROLE_NHAN_VIEN');
+    } catch {
+      setIsEmployee(false);
+    }
+
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
@@ -85,7 +99,8 @@ const ListMauSacComponent = () => {
     fetchData();
   };
 
-  const columns = [
+  // ✅ columns dạng let để ẩn cột hành động khi NHÂN VIÊN
+  let columns = [
     {
       title: 'STT',
       render: (_, __, index) =>
@@ -116,6 +131,7 @@ const ListMauSacComponent = () => {
     },
     {
       title: 'Hành động',
+      key: 'action',
       render: (_, record) => (
         <Button type="link" onClick={() => openModal(record.id)}>
           Sửa
@@ -124,10 +140,13 @@ const ListMauSacComponent = () => {
     },
   ];
 
+  // ✅ NHÂN VIÊN: ẩn cột hành động
+  if (isEmployee) {
+    columns = columns.filter((c) => c.key !== 'action' && c.title !== 'Hành động');
+  }
+
   return (
     <div style={{ padding: 24 }}>
-     
-
       <h2>Danh sách Màu Sắc</h2>
 
       <Space
@@ -141,8 +160,6 @@ const ListMauSacComponent = () => {
           onChange={(e) => setSearchText(e.target.value)}
           style={{ width: 200 }}
         />
-
-        
 
         <span>Trạng thái:</span>
         <Select
@@ -165,15 +182,20 @@ const ListMauSacComponent = () => {
           <Option value="az">Tên A-Z</Option>
           <Option value="za">Tên Z-A</Option>
         </Select>
-<Button
+
+        <Button
           onClick={handleRefresh}
           style={{ background: '#FFD700', color: '#000' }}
         >
           Làm mới
         </Button>
-        <Button type="primary" onClick={() => openModal()}>
-          + Thêm Màu Sắc
-        </Button>
+
+        {/* ✅ NHÂN VIÊN: ẩn nút thêm */}
+        {!isEmployee && (
+          <Button type="primary" onClick={() => openModal()}>
+            + Thêm Màu Sắc
+          </Button>
+        )}
       </Space>
 
       <Table
@@ -197,7 +219,8 @@ const ListMauSacComponent = () => {
         }}
       />
 
-      {modalVisible && (
+      {/* ✅ NHÂN VIÊN: không render modal */}
+      {!isEmployee && modalVisible && (
         <AddMauSacModal
           open={modalVisible}
           id={editingId}

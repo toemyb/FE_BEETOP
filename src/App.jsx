@@ -76,7 +76,7 @@ import EditKhachHangComponent from './admin/adminTaiKhoanComponents/EditKhachHan
 
 import ListThongKeComponent from './admin/adminThongKeComponents/ListThongKeComponent';
 import ListBanTaiQuayComponent from './admin/adminBanHangTaiQuayComponents/ListBanTaiQuayComponent';
-import ListTraHangComponent from './admin/adminTraHangComponents/ListTraHangComponent';
+
 
 import ListDotGiamGiaComponent from './admin/adminDotGiamGiaComponents/ListDotGiamGiaComponent';
 import DotGiamGiaComponents from './admin/adminDotGiamGiaComponents/DotGiamGiaComponent';
@@ -305,7 +305,7 @@ const AppContent = () => {
     { path: '/admin/nhan-vien/edit/:id', element: <EditNhanVienComponent />, roles: ['ADMIN'] },
 
     { path: '/admin/ban-hang-tai-quay', element: <ListBanTaiQuayComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
-    { path: '/admin/tra-hang', element: <ListTraHangComponent />, roles: ['ADMIN', 'NHAN_VIEN'] },
+
 
     // POS result pages (admin)
     { path: '/pos/payment-success', element: <PaymentSuccessPage />, roles: ['ADMIN', 'NHAN_VIEN'] },
