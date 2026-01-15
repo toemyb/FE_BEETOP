@@ -54,13 +54,18 @@ const detectFlowFromData = (timeline) => {
 };
 
 // fallback steps nếu BE không trả steps/state
-const buildFallbackSteps = (flow, current) => {
-  const codes = flow === "TAI_QUAY" ? [0, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
+const buildFallbackSteps = (flow, current, isDeliveryFromPos) => {
+  const codes =
+    flow === "TAI_QUAY"
+      ? [0, 6, 7]
+      : (isDeliveryFromPos && Number(current) === 0)
+        ? [0, 3, 4, 5, 6, 7]
+        : [1, 2, 3, 4, 5, 6, 7];
+
   return codes.map((code) => {
     let state = "UPCOMING";
 
     if (current === 7) {
-      // canceled
       if (code === 7) state = "CANCELLED";
       else if (code < 7) state = "DONE";
       else state = "UPCOMING";
@@ -70,7 +75,6 @@ const buildFallbackSteps = (flow, current) => {
       else state = "UPCOMING";
     }
 
-    // nếu completed
     if (current === 6) {
       if (code < 6) state = "DONE";
       if (code === 6) state = "CURRENT";
@@ -108,6 +112,21 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
   // ===== derived =====
   const flow = useMemo(() => detectFlowFromData(data), [data]);
   const isPos = flow === "TAI_QUAY";
+  const getRole = () => {
+  try { return JSON.parse(sessionStorage.getItem("user"))?.role; }
+  catch { return null; }
+};
+const isAdminOrStaffRole = (r) => {
+  const x = String(r || "").toUpperCase();
+  return ["ADMIN", "STAFF", "NHAN_VIEN", "EMPLOYEE"].includes(x);
+};
+
+const role = useMemo(() => getRole(), []);
+const isStaff = useMemo(() => isAdminOrStaffRole(role), [role]);
+
+const typeNorm = useMemo(() => normalizeLoaiDon(data?.loaiDon), [data?.loaiDon]);
+const isDelivery = typeNorm === "GIAO_HANG";
+const isDeliveryFromPos = isDelivery && Number(data?.trangThai ?? 0) === 0;
 
   const current = useMemo(() => Number(data?.trangThai ?? 0), [data?.trangThai]);
   const cancelCode = 7;
@@ -198,7 +217,7 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
       // nếu BE không set state -> suy từ current
       const hasState = normalized.some((x) => !!x.state);
       if (!hasState) {
-        return buildFallbackSteps(flow, current).map((f) => {
+        return buildFallbackSteps(flow, current, isDeliveryFromPos).map((f) => {
           const found = normalized.find((n) => n.code === f.code);
           return found ? { ...found, state: f.state } : f;
         });
@@ -206,7 +225,7 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
       return normalized;
     }
 
-    return buildFallbackSteps(flow, current);
+    return buildFallbackSteps(flow, current, isDeliveryFromPos);
   }, [data?.steps, flow, current]);
 
   // ✅ nextCode: tính theo current + flow, không phụ thuộc state (ổn định hơn)
@@ -238,18 +257,15 @@ export default function OrderTimelinePanel({ orderId, onChanged }) {
   if (!data) return null;
 
   const canMove = !!nextCode && !isFinal && !isPos;
-  const canCancel = useMemo(() => {
-  if (isPos) return false;              // POS không dùng panel này
-  if (isFinal) return false;            // completed/canceled
+const canCancel = useMemo(() => {
+  if (isPos) return false;
+  if (isFinal) return false;
 
-  // ✅ đã có thanh toán hoặc BE báo PAID -> không cho hủy
-  if (isPaid || totalPaid > 0) return false;
+  // trước SHIPPING (4) cho hủy dù đã thanh toán
+  if (current >= 4) return false;
 
-  // ✅ ONLINE/GIAO_HANG: chỉ cho hủy khi còn PENDING_CONFIRM (1)
-  if (current >= 2) return false; // từ CONFIRMED trở đi
-if (current >= 4) return false;
   return true;
-}, [isPos, isFinal, isPaid, totalPaid, current]); 
+}, [isPos, isFinal, current]);
 
 
   return (

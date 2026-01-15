@@ -341,21 +341,20 @@ const paymentsForRender = useMemo(() => {
   const cancelCode = 7;
 
   const isFinal = useMemo(() => currentStatus === doneCode || currentStatus === cancelCode, [currentStatus]);
-  const canCancel = useMemo(() => {
+  const isDelivery = useMemo(() => typeNorm === "GIAO_HANG", [typeNorm]);
+
+const canCancel = useMemo(() => {
   if (isFinal) return false;
 
-  // ✅ POS: đã có payment -> không hủy
+  // POS: đã có payment -> không hủy
   if (isPos) return totalPaid <= 0;
 
-  // ✅ ONLINE/GIAO_HANG: theo rule giống customer (BE mới)
-  if (isOnlineLike) {
-    if (isPaid || totalPaid > 0) return false;
-    if (currentStatus >= 4) return false; // từ CONFIRMED trở đi
-  }
+  // Chỉ chặn từ SHIPPING (4) trở lên
+  if (currentStatus >= 4) return false;
 
+  // ONLINE / GIAO_HANG: cho hủy trước khi giao hàng, kể cả đã thanh toán
   return true;
-}, [isFinal, isPos, isOnlineLike, isPaid, totalPaid, currentStatus]);
-
+}, [isFinal, isPos, currentStatus, totalPaid]);
   const canCancelPos = canCancel;
 
   const shippingFee = useMemo(() => {
@@ -451,8 +450,14 @@ const fullAddress = useMemo(() => {
   // ===== build steps fallback =====
   const buildFallbackSteps = (typeNormArg, current, cancelC, doneC) => {
     const isPosFlow = typeNormArg === "TAI_QUAY";
-    const map = isPosFlow ? ORDER_STATUS_POS_MAP : ORDER_STATUS_ONLINE_MAP;
-    const codes = isPosFlow ? [0, 6, 7] : [1, 2, 3, 4, 5, 6, 7];
+const isDeliveryFlow = typeNormArg === "GIAO_HANG";
+const map = isPosFlow ? ORDER_STATUS_POS_MAP : ORDER_STATUS_ONLINE_MAP;
+
+const codes = isPosFlow
+  ? [0, 6, 7]
+  : (isDeliveryFlow && Number(current) === 0)
+    ? [0, 3, 4, 5, 6, 7]
+    : [1, 2, 3, 4, 5, 6, 7];
 
     return codes.map((code) => {
       const title = map[code]?.text || `Bước ${code}`;
@@ -635,8 +640,10 @@ const fullAddress = useMemo(() => {
     Modal.confirm({
       title: "Xác nhận hủy đơn hàng?",
       content: isPos
-        ? "Sau khi hủy, đơn tại quầy sẽ không thể hoàn tất."
-        : "Sau khi hủy, đơn sẽ không thể tiếp tục luồng xử lý.",
+  ? "Sau khi hủy, đơn tại quầy sẽ không thể hoàn tất."
+  : (isPaid || totalPaid > 0)
+    ? "Đơn đã thanh toán. Sau khi hủy, hệ thống sẽ ghi nhận xử lý hoàn tiền theo quy định."
+    : "Sau khi hủy, đơn sẽ không thể tiếp tục luồng xử lý.",
       okText: "Hủy đơn",
       okButtonProps: { danger: true },
       cancelText: "Không",
